@@ -13,22 +13,22 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Tier = Literal["fast", "strong"]
 
 #: Providers that the LLM router knows how to construct.
-LLMProviderName = Literal["mock", "claude", "openai"]
+LLMProviderName = Literal["mock", "claude", "openai", "ollama"]
 
 #: Image-generation providers behind the image interface.
-ImageProviderName = Literal["mock", "openai", "stability"]
+ImageProviderName = Literal["mock", "openai", "stability", "none"]
 
 #: Web-search providers behind the research tools.
-SearchProviderName = Literal["mock", "tavily", "serper", "brave"]
+SearchProviderName = Literal["mock", "tavily", "serper", "brave", "none"]
 
 #: Keyword-data providers.
-KeywordProviderName = Literal["mock", "dataforseo"]
+KeywordProviderName = Literal["mock", "dataforseo", "none"]
 
 
 class Settings(BaseSettings):
@@ -69,6 +69,18 @@ class Settings(BaseSettings):
     # Provider API keys (never logged, never persisted).
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    ollama_base_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ollama_base_url", "ngrok_url", "ollama_url"),
+    )
+    ollama_model: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ollama_model", "ngrok_model_id", "ollama_model_id"),
+    )
+    ollama_timeout_seconds: float = Field(
+        default=120.0,
+        validation_alias=AliasChoices("ollama_timeout_seconds", "ngrok_timeout_seconds"),
+    )
 
     # Per-call HTTP behaviour for the real providers.
     llm_timeout_seconds: float = 60.0
@@ -127,12 +139,12 @@ class Settings(BaseSettings):
     website_fetch_timeout_seconds: float = 15.0
     website_max_bytes: int = 2_000_000
     website_max_redirects: int = 3
-    website_allowed_schemes: tuple[str, ...] = ("http", "https")
+    website_allowed_schemes: tuple[str, ...] | str = ("http", "https")
 
     # --------------------------------------------------------------- uploads --
     upload_dir: str = "./var/uploads"
     upload_max_bytes: int = 10_000_000
-    upload_allowed_types: tuple[str, ...] = (
+    upload_allowed_types: tuple[str, ...] | str = (
         "image/png",
         "image/jpeg",
         "image/webp",
@@ -143,19 +155,23 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------ features ---
     # Comma-separated list of origins allowed to call the API (frontend).
-    cors_origins: tuple[str, ...] = ("http://localhost:3000",)
+    cors_origins: tuple[str, ...] | str = ("http://localhost:3000",)
 
     # ----------------------------------------------------------------- log ---
     log_level: str = "INFO"
     log_json: bool = True
+    # ----------------------------------------------------------------- ollama ---
+    OLLAMA_TIMEOUT_SECONDS: int = 300
+    OLLAMA_MODEL: str | None = None
+    OLLAMA_BASE_URL: str | None = None
 
-    @field_validator("cors_origins", "upload_allowed_types", "website_allowed_schemes", mode="before")
+    @field_validator("cors_origins", "upload_allowed_types", "website_allowed_schemes", mode="after")
     @classmethod
-    def _split_csv(cls, v: object) -> object:
+    def _split_csv(cls, v: object) -> tuple[str, ...]:
         """Allow comma-separated strings in env for tuple fields."""
         if isinstance(v, str):
             return tuple(part.strip() for part in v.split(",") if part.strip())
-        return v
+        return tuple(v)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------- helpers ---
     @property
@@ -166,7 +182,17 @@ class Settings(BaseSettings):
     @property
     def model_for_tier(self) -> dict[Tier, str]:
         """The model->tier map. Never read a model string from anywhere else."""
-        return {"fast": self.llm_model_fast, "strong": self.llm_model_strong}
+        fast_model = (
+            self.ollama_model
+            if self.llm_provider_fast == "ollama" and self.ollama_model
+            else self.llm_model_fast
+        )
+        strong_model = (
+            self.ollama_model
+            if self.llm_provider_strong == "ollama" and self.ollama_model
+            else self.llm_model_strong
+        )
+        return {"fast": fast_model, "strong": strong_model}
 
     def is_mock_llm(self) -> bool:
         """True when no real provider is configured for either tier."""
@@ -179,6 +205,8 @@ class Settings(BaseSettings):
             return bool(self.anthropic_api_key)
         if "openai" in providers:
             return bool(self.openai_api_key)
+        if "ollama" in providers:
+            return bool(self.ollama_base_url)
         return False
 
 

@@ -12,6 +12,7 @@ from app.core.errors import LLMNotConfiguredError
 from app.core.llm.base import LLMClient, TierName
 from app.core.llm.claude_client import ClaudeClient
 from app.core.llm.mock_client import MockClient
+from app.core.llm.ollama_client import OllamaClient
 from app.core.llm.openai_client import OpenAIClient
 from app.core.logging import get_logger
 
@@ -47,6 +48,14 @@ def build_client(tier: TierName, settings: Settings | None = None) -> LLMClient:
             api_key=cfg.openai_api_key,
             model=model,
             timeout=cfg.llm_timeout_seconds,
+            max_retries=cfg.llm_max_retries,
+            base_delay=cfg.llm_retry_base_delay,
+        )
+    elif provider == "ollama":
+        client = OllamaClient(
+            base_url=cfg.ollama_base_url,
+            model=model,
+            timeout=cfg.ollama_timeout_seconds,
             max_retries=cfg.llm_max_retries,
             base_delay=cfg.llm_retry_base_delay,
         )

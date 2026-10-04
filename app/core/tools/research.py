@@ -73,7 +73,7 @@ async def _search_tavily(payload: WebSearchInput, key: str, timeout: float) -> l
         SearchResult(
             title=r.get("title", ""),
             url=r.get("url", ""),
-            snippet=r.get("content", ""),
+            snippet=(r.get("content", "") or "")[:600],
             published_date=r.get("published_date"),
             score=r.get("score"),
         )
@@ -143,7 +143,8 @@ async def _handle_web_search(payload: WebSearchInput, ctx: ToolContext) -> WebSe
     provider = cfg.search_provider
     source = f"web_search:{provider}"
     try:
-        if provider == "tavily" and cfg.tavily_api_key:
+        if (provider == "tavily" or (provider == "none" and cfg.tavily_api_key)) and cfg.tavily_api_key:
+            source = "web_search:tavily"
             results = await _search_tavily(payload, cfg.tavily_api_key, cfg.llm_timeout_seconds)
         elif provider == "serper" and cfg.serper_api_key:
             results = await _search_serper(payload, cfg.serper_api_key, cfg.llm_timeout_seconds)
