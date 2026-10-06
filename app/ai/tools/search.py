@@ -11,11 +11,15 @@ from app.ai.settings import get_ai_settings
 def web_search_tool(query: str, config: RunnableConfig) -> str:
     """
     Perform a web search using the configured search provider.
-    This tool should be used when you need to find up-to-date information,
-    news, market trends, or external data that is not in your memory.
+    
+    CRITICAL SEARCH GUIDELINES:
+    1. Be highly specific with your queries. Avoid generic searches.
+    2. If looking for competitors, include the industry and region (e.g., "men's classic suits competitors Egypt").
+    3. Do not search for generic business directories unless necessary.
+    4. If you need deep information, make multiple targeted searches rather than one broad one.
     
     Args:
-        query: The search query string.
+        query: The highly specific search query string.
     """
     # The search provider is initialized based on the AI settings
     ai_settings = get_ai_settings()

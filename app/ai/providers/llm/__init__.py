@@ -31,6 +31,9 @@ _PROVIDER_MODULES: dict[LLMProvider, str] = {
     LLMProvider.OLLAMA: "app.ai.providers.llm.ollama",
     LLMProvider.OPENAI: "app.ai.providers.llm.openai",
     LLMProvider.ANTHROPIC: "app.ai.providers.llm.anthropic",
+    LLMProvider.GEMINI: "app.ai.providers.llm.gemini",
+    LLMProvider.GROQ: "app.ai.providers.llm.groq",
+    LLMProvider.OPENROUTER: "app.ai.providers.llm.openrouter",
     LLMProvider.MOCK: "app.ai.providers.llm.mock",
 }
 

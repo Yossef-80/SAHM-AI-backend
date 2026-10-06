@@ -62,7 +62,7 @@ class AISettings(BaseSettings):
     #: Overrides the provider-specific model below when set.
     llm_model: str | None = Field(None, validation_alias=_env("AI_LLM_MODEL"))
     llm_temperature: float = Field(0.2, validation_alias=_env("AI_LLM_TEMPERATURE"))
-    llm_max_tokens: int = Field(2048, validation_alias=_env("AI_LLM_MAX_TOKENS"))
+    llm_max_tokens: int = Field(4096, validation_alias=_env("AI_LLM_MAX_TOKENS"))
     llm_timeout_seconds: float = Field(180.0, validation_alias=_env("AI_LLM_TIMEOUT_SECONDS"))
     llm_max_retries: int = Field(2, validation_alias=_env("AI_LLM_MAX_RETRIES"))
 
@@ -93,6 +93,18 @@ class AISettings(BaseSettings):
     # ========================================================= ANTHROPIC ====
     anthropic_api_key: str | None = Field(None, validation_alias=_env("ANTHROPIC_API_KEY"))
     anthropic_model: str = Field("claude-haiku-4-5", validation_alias=_env("ANTHROPIC_MODEL"))
+
+    # ============================================================ GEMINI ====
+    gemini_api_key: str | None = Field(None, validation_alias=_env("GEMINI_API_KEY", "GOOGLE_API_KEY"))
+    gemini_model: str = Field("gemini-1.5-flash", validation_alias=_env("GEMINI_MODEL"))
+    
+    # ============================================================== GROQ ====
+    groq_api_key: str | None = Field(None, validation_alias=_env("GROQ_API_KEY"))
+    groq_model: str = Field("llama3-8b-8192", validation_alias=_env("GROQ_MODEL"))
+
+    # ======================================================== OPENROUTER ====
+    openrouter_api_key: str | None = Field(None, validation_alias=_env("OPENROUTER_API_KEY"))
+    openrouter_model: str = Field("google/gemini-flash-1.5-exp", validation_alias=_env("OPENROUTER_MODEL"))
 
     # ============================================================ SEARCH ====
     tavily_api_key: str | None = Field(None, validation_alias=_env("TAVILY_API_KEY"))

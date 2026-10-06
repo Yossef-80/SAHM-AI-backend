@@ -7,6 +7,7 @@ app/ai/errors.py
 app/ai/settings.py
 app/ai/agents/nour/__init__.py
 app/ai/agents/nour/graph.py
+app/ai/agents/nour/schema.py
 app/ai/agents/nour/state.py
 app/ai/loggers/__init__.py
 app/ai/loggers/base.py
@@ -32,15 +33,19 @@ app/ai/providers/db/postgres.py
 app/ai/providers/db/sqlite.py
 app/ai/providers/llm/__init__.py
 app/ai/providers/llm/anthropic.py
+app/ai/providers/llm/gemini.py
+app/ai/providers/llm/groq.py
 app/ai/providers/llm/mock.py
 app/ai/providers/llm/ollama.py
 app/ai/providers/llm/openai.py
+app/ai/providers/llm/openrouter.py
 app/ai/providers/search/__init__.py
 app/ai/providers/search/base.py
 app/ai/providers/search/mock.py
 app/ai/providers/search/none.py
 app/ai/providers/search/tavily.py
 app/ai/tools/__init__.py
+app/ai/tools/analyze_website.py
 app/ai/tools/brand_context.py
 app/ai/tools/search.py
 app/api/__init__.py

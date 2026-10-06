@@ -25,6 +25,9 @@ class LLMProvider(StrEnum):
     OLLAMA = "ollama"  # local or remote (ngrok / Colab) Ollama server
     OPENAI = "openai"  # OpenAI or any OpenAI-compatible endpoint
     ANTHROPIC = "anthropic"  # Claude
+    GEMINI = "gemini"  # Google Gemini
+    GROQ = "groq"  # Groq (Llama3, Mixtral, etc.)
+    OPENROUTER = "openrouter"  # OpenRouter (Aggregator)
     MOCK = "mock"  # deterministic, offline -- for tests and dry runs
 
 
