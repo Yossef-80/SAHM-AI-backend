@@ -8,7 +8,7 @@ from langgraph.prebuilt import ToolNode
 
 from app.ai.agents.nour.state import NourState
 from app.ai.providers.llm import get_llm
-from app.ai.tools import web_search_tool, get_brand_context_tool, analyze_website_tool
+from app.ai.tools import web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool
 from app.ai.settings import get_ai_settings
 from app.ai.enums import AgentName
 from app.ai.agents.nour.schema import MarketResearchReport
@@ -19,7 +19,7 @@ def submit_research_report(**kwargs) -> str:
     return "REPORT_SUBMITTED_SUCCESSFULLY"
 
 # Define the tools available to Nour
-NOUR_TOOLS = [web_search_tool, get_brand_context_tool, analyze_website_tool, submit_research_report]
+NOUR_TOOLS = [web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool, submit_research_report]
 
 # System prompt for Nour
 NOUR_PROMPT = """You are Nour, an expert digital marketing agent and competitive intelligence analyst.

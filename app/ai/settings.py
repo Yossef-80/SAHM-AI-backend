@@ -124,6 +124,12 @@ class AISettings(BaseSettings):
     sqlite_path: str = Field("./var/ai_memory.sqlite", validation_alias=_env("AI_SQLITE_PATH"))
     postgres_url: str | None = Field(None, validation_alias=_env("AI_POSTGRES_URL"))
 
+    # =========================================================== REVIEWS ====
+    google_places_api_key: str | None = Field(None, validation_alias=_env("GOOGLE_PLACES_API_KEY"))
+    apify_api_token: str | None = Field(None, validation_alias=_env("APIFY_API_TOKEN", "APIFY_TOKEN"))
+    google_maps_reviews_actor_id: str = Field("compass/crawler-google-places", validation_alias=_env("APIFY_MAPS_ACTOR_ID"))
+    reviews_timeout_seconds: float = Field(120.0, validation_alias=_env("REVIEWS_TIMEOUT_SECONDS"))
+
     # =========================================================== LOGGING ====
     log_dir: str = Field("./logs", validation_alias=_env("AI_LOG_DIR"))
     log_level: LogLevel = Field(LogLevel.INFO, validation_alias=_env("AI_LOG_LEVEL"))

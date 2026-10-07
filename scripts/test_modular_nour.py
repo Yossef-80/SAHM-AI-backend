@@ -11,8 +11,27 @@ async def run_test():
     print("Starting Modular Nour Test...\n")
     
     # 1. This is where you add your query!
-    user_query = """What are the latest marketing trends for Classis Suits and what is the compatators offers and strenghts now
-    and specificly analysi these competetors `tie house`: [https://tie-house.com/], `U-turn`: [uturn-store.com]"""
+    user_query = """Task: We need to analyze our brand and our main competitor using the new Brand Research MCP tools.
+
+Target Brands:
+
+Our Brand: [Your Brand Name] (Website: [https://xmegacorner.com], Country: [Egypt], Code: [EG])
+Competitor: [Competitor Brand Name] (Website: [https://nacitaautocare.com/], Country: [Egypt], Code: [EG])
+
+Execution Rules & Constraints (STRICTLY FOLLOW):
+
+Limit Tool Calls: Do NOT make separate search tool calls for basic concepts like "strengths" or "weaknesses". Group your analysis.
+Be Concise: I do not need long, conversational paragraphs. Give me dense, bulleted data.
+Workflow:
+Call the brand_report tool for Our Brand.
+Call the brand_report tool for the Competitor.
+Call full_analysis for both brands to get sentiment and product insights.
+
+Final Output Required: Once the tools finish collecting and analyzing the data, provide a single, concise comparative summary. Include:
+
+Engagement Comparison: Who has a better social engagement rate?
+Sentiment Comparison: Who has a higher positive review percentage and average stars?
+Strengths vs Weaknesses (Combined): Based on the product_insights top praises and complaints, give me a single bulleted list of where we beat them and where they beat us."""
     print(f"User Query: {user_query}\n")
     
     # 2. We pass the business_id via RunnableConfig (so the tools can access it implicitly)
