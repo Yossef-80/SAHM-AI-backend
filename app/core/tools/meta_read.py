@@ -65,8 +65,23 @@ async def _resolve_meta_campaign_id(
 
 
 async def _get_meta_token(ctx: ToolContext) -> str | None:
-    """Read and decrypt the stored Meta token for this business."""
+    """The Meta token for this business, or None.
+
+    Two sources, in this order:
+
+    1. A connected ``Integration`` row -- an explicit OAuth grant the user made in
+       Integrations, which is always the most deliberate signal.
+    2. The ``tool_settings`` Meta row (P2.4) -- configuration typed into the
+       admin panel, decrypted through the single resolver in
+       ``app.core.tools.settings``.
+
+    Falling through to (2) rather than to ``Settings.meta_access_token`` is the
+    point of P2.5: with no env var set at all, a workspace that saved a token in
+    the UI gets real insights.
+    """
     from sqlalchemy import select
+
+    from app.core.tools.settings import resolve_tool_settings
 
     stmt = select(Integration).where(
         Integration.business_id == ctx.business_id,
@@ -74,15 +89,33 @@ async def _get_meta_token(ctx: ToolContext) -> str | None:
         Integration.status == "connected",
     )
     integration = (await ctx.db.execute(stmt)).scalars().first()
-    if integration is None or not integration.access_token_enc:
-        return None
     cfg = ctx.require_settings()
-    cipher = TokenCipher(cfg.token_encryption_key)
-    try:
-        return cipher.decrypt(integration.access_token_enc)
-    except Exception as exc:  # pragma: no cover - corrupt/rotated key
-        _logger.warning("meta_token_decrypt_failed", extra={"error": str(exc)})
-        return None
+    if integration is not None and integration.access_token_enc:
+        cipher = TokenCipher(cfg.token_encryption_key)
+        try:
+            return cipher.decrypt(integration.access_token_enc)
+        except Exception as exc:  # pragma: no cover - corrupt/rotated key
+            _logger.warning("meta_token_decrypt_failed", extra={"error": str(exc)})
+            return None
+    tools_cfg = await resolve_tool_settings(ctx)
+    # The resolver already merges env; the explicit fallback is for the case
+    # where a caller passed no workspace at all (scripts, exercise_tools.py).
+    return tools_cfg.meta_access_token or cfg.meta_access_token
+
+
+async def _meta_config(ctx: ToolContext, cfg: Any) -> tuple[str, str]:
+    """(graph base url, access token) with the workspace row preferred.
+
+    Resolved once per call and cached on the context, so the insights handler and
+    the token lookup cannot disagree about which configuration is in force.
+    """
+    from app.core.tools.settings import resolve_tool_settings
+
+    tools_cfg = await resolve_tool_settings(ctx)
+    return (
+        tools_cfg.meta_graph_base_url or cfg.meta_graph_base_url,
+        tools_cfg.meta_access_token or cfg.meta_access_token or "",
+    )
 
 
 def _default_range(payload: Any) -> tuple[date, date]:
@@ -95,6 +128,7 @@ async def _handle_get_campaign_insights(
     payload: GetCampaignInsightsInput, ctx: ToolContext
 ) -> InsightsPayload:
     cfg = ctx.require_settings()
+    meta_base, _fallback_token = await _meta_config(ctx, cfg)
     source = "meta_marketing_api"
     start, end = _default_range(payload)
 
@@ -129,7 +163,7 @@ async def _handle_get_campaign_insights(
     try:
         async with httpx.AsyncClient(timeout=cfg.meta_api_timeout_seconds) as client:
             resp = await client.get(
-                f"{cfg.meta_graph_base_url}/{cfg.meta_graph_version}/{meta_campaign_id}/insights",
+                f"{meta_base}/{cfg.meta_graph_version}/{meta_campaign_id}/insights",
                 params={
                     "access_token": token,
                     "time_range": json_dumps({"since": start.isoformat(), "until": end.isoformat()}),
@@ -190,6 +224,7 @@ async def _handle_get_breakdowns(
     payload: GetBreakdownsInput, ctx: ToolContext
 ) -> BreakdownPayload:
     cfg = ctx.require_settings()
+    meta_base, _fallback_token = await _meta_config(ctx, cfg)
     source = "meta_marketing_api"
     start, end = _default_range(payload)
 
@@ -222,7 +257,7 @@ async def _handle_get_breakdowns(
     try:
         async with httpx.AsyncClient(timeout=cfg.meta_api_timeout_seconds) as client:
             resp = await client.get(
-                f"{cfg.meta_graph_base_url}/{cfg.meta_graph_version}/{meta_campaign_id}/insights",
+                f"{meta_base}/{cfg.meta_graph_version}/{meta_campaign_id}/insights",
                 params={
                     "access_token": token,
                     "time_range": json_dumps({"since": start.isoformat(), "until": end.isoformat()}),

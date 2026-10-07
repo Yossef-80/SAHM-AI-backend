@@ -65,6 +65,26 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:24]}"
 
 
+def _row_to_item(row: Any) -> BrandMemoryItem:
+    """Rehydrate a mapping row into an ORM instance.
+
+    The store reads through ``__table__`` (not the ORM) because the similarity
+    queries need the raw column set; this keeps the three read paths in
+    ``store.py`` consistent instead of making each caller rebuild the object.
+    The embedding is deliberately not loaded -- it is large, unused by the API
+    layer, and there is a dedicated ``search`` path for anything semantic.
+    """
+    return BrandMemoryItem(
+        id=row["id"],
+        business_id=row["business_id"],
+        kind=row["kind"],
+        text=row["text"],
+        campaign_id=row["campaign_id"],
+        metadata_=row["metadata"] or {},
+        created_at=row["created_at"],
+    )
+
+
 # ------------------------------------------------------------------- store ----
 
 
@@ -256,18 +276,7 @@ class BrandMemoryStore:
             .limit(limit)
         )
         rows = (await self.db.execute(stmt)).mappings().all()
-        return [
-            BrandMemoryItem(
-                id=r["id"],
-                business_id=r["business_id"],
-                kind=r["kind"],
-                text=r["text"],
-                campaign_id=r["campaign_id"],
-                metadata_=r["metadata"] or {},
-                created_at=r["created_at"],
-            )
-            for r in rows
-        ]
+        return [_row_to_item(r) for r in rows]
 
     async def get_business(self, business_id: str) -> Business:
         business = await self.db.get(Business, business_id)
@@ -302,6 +311,116 @@ class BrandMemoryStore:
             .where(BrandMemoryItem.business_id == business_id)
         )
         return int((await self.db.execute(stmt)).scalar() or 0)
+
+    # ------------------------------------------------- CRUD (P2.2) --
+
+    async def list_items(
+        self, *, business_id: str, kind: str | None = None, limit: int = 50
+    ) -> list[BrandMemoryItem]:
+        """Newest first, optionally filtered to one kind.
+
+        Plain newest-first rather than similarity-ordered: an editor screen wants
+        "what did I write last week", which is what this returns. The
+        similarity ordering lives on :meth:`search`, which is what the
+        ``?q=`` box uses.
+        """
+        stmt = (
+            BrandMemoryItem.__table__.select()
+            .where(BrandMemoryItem.business_id == business_id)
+            .order_by(BrandMemoryItem.created_at.desc())
+            .limit(limit)
+        )
+        if kind:
+            stmt = stmt.where(BrandMemoryItem.kind == kind)
+        return [_row_to_item(row) for row in (await self.db.execute(stmt)).mappings().all()]
+
+    async def get_item(
+        self, *, business_id: str, item_id: str
+    ) -> BrandMemoryItem | None:
+        """One row, ownership-filtered. ``None`` for another workspace's row.
+
+        An ORM ``select`` rather than the ``__table__`` form the read paths use:
+        the CRUD methods modify and delete the result, which requires a real
+        session-managed instance -- a hand-built transient one raises
+        "Instance is not persisted" on delete.
+        """
+        return await self.db.scalar(
+            select(BrandMemoryItem).where(
+                BrandMemoryItem.id == item_id,
+                BrandMemoryItem.business_id == business_id,
+            )
+        )
+
+    async def update_item(
+        self,
+        *,
+        business_id: str,
+        item_id: str,
+        text: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> BrandMemoryItem | None:
+        """Edit text and/or metadata. Re-embeds only when the text changed.
+
+        Re-embedding on a metadata-only edit would be waste; re-embedding is not
+        skipped when the text changes, because a stale vector returns the row
+        under the wrong search results forever.
+        """
+        row = await self.get_item(business_id=business_id, item_id=item_id)
+        if row is None:
+            return None
+        if text is not None and text != row.text:
+            row.text = text
+            row.embedding = await self.embeddings.embed(text)
+        if metadata is not None:
+            row.metadata_ = metadata
+        await self.db.flush()
+        _logger.info(
+            "memory_updated",
+            extra={"kind": row.kind, "business_id": business_id, "id": item_id},
+        )
+        return row
+
+    async def delete_item(self, *, business_id: str, item_id: str) -> bool:
+        """Remove one row. False when it does not exist in this workspace."""
+        row = await self.get_item(business_id=business_id, item_id=item_id)
+        if row is None:
+            return False
+        await self.db.delete(row)
+        await self.db.flush()
+        _logger.info(
+            "memory_deleted",
+            extra={"business_id": business_id, "id": item_id},
+        )
+        return True
+
+    async def reindex_items(
+        self, *, business_id: str, kind: str | None = None
+    ) -> list[BrandMemoryItem]:
+        """Recompute every embedding for this workspace (optionally one kind).
+
+        Needed after ``EMBEDDING_DIM`` or the embedding provider changes: rows
+        written under the old dimension produce either a dimension error or,
+        worse, silently meaningless similarity scores.
+        """
+        stmt = select(BrandMemoryItem).where(
+            BrandMemoryItem.business_id == business_id
+        )
+        if kind:
+            stmt = stmt.where(BrandMemoryItem.kind == kind)
+        items = list((await self.db.execute(stmt)).scalars().all())
+        for item in items:
+            item.embedding = await self.embeddings.embed(item.text)
+        touched = items
+        await self.db.flush()
+        _logger.info(
+            "memory_reindexed",
+            extra={
+                "business_id": business_id,
+                "kind": kind or "all",
+                "count": len(touched),
+            },
+        )
+        return touched
 
     # ------------------------------------------------------ context assembly --
 

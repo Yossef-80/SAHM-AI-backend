@@ -144,9 +144,31 @@ async def api_client(db_engine: Any, seeded_db: AsyncSession):
     set_engine_for_tests(db_engine)
     try:
         app = create_app()
+        # P4.2: buckets are per app. A test that makes many requests in one
+        # second (the auth suite does) must not inherit the previous test's
+        # spend, so every test starts from a full set of buckets. The limiter's
+        # own behaviour is asserted directly in tests/test_usage_rate_limit.py.
+        app.state.rate_limiter.reset()
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app)
-            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            async with httpx.AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as client:
                 yield client
     finally:
         await dispose_engine()
+
+
+@pytest.fixture()
+def rate_limiter(api_client: Any) -> Any:
+    """The limiter instance the running app is actually enforcing.
+
+    ``create_app`` builds its limiter once, from the settings at boot, so a test
+    that wants a small capacity cannot simply patch ``Settings`` afterwards -- the
+    buckets would still be the ones the app captured. This hands the test the live
+    object so it can reshape the limits (or switch the limiter off) exactly the way
+    an operator would through configuration.
+    """
+    app = getattr(api_client._transport, "app", None)
+    assert app is not None, "api_client must use an ASGI transport"
+    return app.state.rate_limiter

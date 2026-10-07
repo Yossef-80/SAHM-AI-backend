@@ -1,0 +1,197 @@
+# Local development stack for the Sahm backend (P5.1).
+#
+#   cd "sahm-ai backend"
+#   docker compose up -d --build
+#
+# The folder name contains a SPACE, so the context path needs quoting in the
+# shell. Paths *inside* this file are container paths and need no quoting.
+#
+# This file deliberately uses Postgres + pgvector rather than SQLite, so a
+# developer exercises the same pgvector path production runs on: the migration
+# is Postgres-only (`CREATE EXTENSION IF NOT EXISTS vector`,
+# app/db/migrations/versions/cfe093781e86_initial_schema.py:28), similarity
+# search becomes a real `<=>` index scan instead of a Python cosine fallback,
+# and the pooler/pool-size decisions in app/db/session.py can actually be
+# exercised. SQLite remains the unit-test path.
+
+name: sahm-dev
+
+services:
+  postgres:
+    # Pin the tag explicitly. `pgvector/pgvector:latest` would silently move the
+    # Postgres major version under a restored backup; pg16 matches the
+    # Postgres 14-16 line the production target runs.
+    image: pgvector/pgvector:pg16
+    container_name: sahm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sahm
+      # Local development only. Never reuse this value anywhere else, and never
+      # read this file for a production secret -- it is committed to the repo.
+      POSTGRES_PASSWORD: sahm_local_dev_password
+      POSTGRES_DB: sahm
+    ports:
+      - "5432:5432"
+    volumes:
+      - sahm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` alone is not enough: during the very first init Postgres
+      # accepts connections on the unix socket before the real server is up, so
+      # a TCP probe against the maintenance database is what actually gates.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U sahm -d sahm -h 127.0.0.1 -p 5432",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  migrate:
+    # One-shot release step (P5.5): apply `alembic upgrade head` BEFORE the API
+    # is allowed to start, exactly once.
+    #
+    # Why this is a separate service rather than a command in the api service:
+    # a production boot must issue zero DDL (app/main.py:107, P0.7) because N
+    # replicas racing `CREATE TABLE` is a real outage. Running the migration as
+    # a pre-deploy job, with exactly one execution, is the fix -- and Compose's
+    # `service_completed_successfully` condition gives that ordering locally for
+    # free.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sahm-backend:dev
+    container_name: sahm-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: dev
+      DATABASE_URL: >-
+        postgresql+asyncpg://sahm:sahm_local_dev_password@postgres:5432/sahm
+      # Supabase-style Fernet key. Development only; the app refuses to boot in
+      # prod without a real one (`verify_runtime_security`, D5).
+      TOKEN_ENCRYPTION_KEY: >-
+        Zm9yLWRldi1vbmx5LW5vdC11c2UtaW4tcHJvZHVjdGlvbi0xMjM0NTY3OD0=
+      LLM_PROVIDER_FAST: mock
+      LLM_PROVIDER_STRONG: mock
+      EMBEDDING_PROVIDER: mock
+      SEARCH_PROVIDER: mock
+      KEYWORD_PROVIDER: mock
+      IMAGE_PROVIDER: mock
+    # alembic.ini declares a *relative* `script_location = app/db/migrations`,
+    # which is why the Dockerfile runs from /srv/app. Run migrations as the
+    # non-root `app` user, exactly as the app itself runs.
+    user: app
+    working_dir: /srv/app
+    command:
+      - python
+      - -m
+      - alembic
+      - -c
+      - app/db/migrations/alembic.ini
+      - upgrade
+      - head
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sahm-backend:dev
+    container_name: sahm-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      ENVIRONMENT: dev
+      DATABASE_URL: >-
+        postgresql+asyncpg://sahm:sahm_local_dev_password@postgres:5432/sahm
+      TOKEN_ENCRYPTION_KEY: >-
+        Zm9yLWRldi1vbmx5LW5vdC11c2UtaW4tcHJvZHVjdGlvbi0xMjM0NTY3OD0=
+      LLM_PROVIDER_FAST: mock
+      LLM_PROVIDER_STRONG: mock
+      EMBEDDING_PROVIDER: mock
+      SEARCH_PROVIDER: mock
+      KEYWORD_PROVIDER: mock
+      IMAGE_PROVIDER: mock
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live-reload of the source tree for local iteration. This is the one
+      # place `--reload` is acceptable, and it is a *development* container
+      # only -- the image's CMD deliberately has no --reload (see Dockerfile).
+      - ./app:/srv/app/app:ro
+    healthcheck:
+      # SAME endpoint as the Dockerfile HEALTHCHECK and the one documented in
+      # docs/RUNNING_BACKEND.md: `/health`, the liveness endpoint. It opens no
+      # database connection, so a Postgres hiccup cannot make Docker restart a
+      # healthy API. `/health/ready` is the readiness gate (database + encryption
+      # key) and belongs to a load balancer, not to a restart-on-failure probe.
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  # Named volume so `docker compose down` never takes the database with it.
+  # Remove it explicitly (or run `down -v`) when you really want a clean slate.
+  sahm_pgdata:
+    name: sahm_pgdata
+
+# ---------------------------------------------------------------------------
+# FIRST RUN
+# ---------------------------------------------------------------------------
+#   cd "sahm-ai backend"
+#   docker compose up -d --build          # migrate runs automatically, then api
+#   docker compose logs -f migrate        # watch `alembic upgrade head`
+#   curl http://localhost:8000/health
+#
+# The `migrate` service IS the documented first-run `alembic upgrade head`, and
+# it is ordered exactly once ahead of `api` (service_completed_successfully), so
+# no replica ever issues DDL at boot.
+#
+# To run it by hand instead (e.g. against an already-running api container):
+#   docker compose exec api python -m alembic -c app/db/migrations/alembic.ini upgrade head
+#
+# Reset everything, including the data:
+#   docker compose down -v
+# ---------------------------------------------------------------------------
+# PRODUCTION COMMAND (P5.4) -- for reference; do NOT put --reload in it.
+# ---------------------------------------------------------------------------
+#   python -m uvicorn app.main:app \
+#       --host 0.0.0.0 --port 8000 \
+#       --workers 2 \
+#       --proxy-headers \
+#       --forwarded-allow-ips='*' \
+#       --forwarded-allow-ports='443'
+#
+#   --proxy-headers            so request.client.host is the real client IP behind
+#                               the load balancer; the P4.2 rate limiter keys on
+#                               it, so without this every client looks like the
+#                               proxy and one caller can exhaust the bucket.
+#   --forwarded-allow-ips='*'  trust the X-Forwarded-For header. Safe only while
+#                               the app is reachable solely through that proxy.
+#   --forwarded-allow-ports    so --port-https-style redirects stay correct.
+#   --workers 2                explicit floor. Size as 2 x CPU + 1, then check
+#                               pool_size x workers against the database's
+#                               connection limit (PRODUCTION_ROADMAP.md 3.3).
+#   --reload                   NEVER IN PRODUCTION. It spawns a reloader parent
+#                               that ignores --workers (silently running one
+#                               process), burns CPU watching mtimes, and restarts
+#                               the app on any write into the tree -- a log
+#                               write or a mounted volume then becomes a crash
+#                               loop.
+# ---------------------------------------------------------------------------

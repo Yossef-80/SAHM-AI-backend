@@ -85,12 +85,29 @@ _RULES: list[tuple[str, IntentKind, float]] = [
     ),
     (r"\b(how should we (grow|approach)|what should our)\b", IntentKind.STRATEGY, 0.7),
     (
-        r"\b(research\w*|competitors?|market\w*|keywords?|seo|reviews?|trends?|"
+        r"\b(research\w*|search\w*|competitors?|market\w*|keywords?|seo|reviews?|trends?|"
         r"audience insight|what (are|do) (people|competitors)\w*)\b",
         IntentKind.RESEARCH,
         0.85,
     ),
-    (r"\b(find out|look up|analyse the market|analyze the market)\b", IntentKind.RESEARCH, 0.75),
+    (
+        r"\b(find out|look up|analyse the market|analyze the market)\b|"
+        r"(ابحث|بحث|منافسين|السوق)",
+        IntentKind.RESEARCH,
+        0.85,
+    ),
+    (
+        r"\b(?:who are|which are|list|name|compare|identify)\b.{0,80}"
+        r"\b(?:(?:major|main|top)\s+)?(?:brands?|companies|players)\b.{0,50}\b(?:in|for|within)\b",
+        IntentKind.RESEARCH,
+        0.85,
+    ),
+    (
+        r"\b(?:planning|plan|want|looking)\b.{0,80}\b(?:start|launch|build|create)\b"
+        r".{0,60}\b(?:brand|business|product|company)\b|\bwhere to start\b",
+        IntentKind.RESEARCH,
+        0.75,
+    ),
 ]
 
 #: Signals that a specific task is meant, overriding the intent default.
@@ -132,6 +149,17 @@ _REQUIRED_BY_TASK: dict[str, list[str]] = {
 #: The only keys a classifier may report as missing. Anything else is dropped
 #: so a stray model output cannot produce a question the UI cannot answer.
 MISSING_INFO_KEYS = ("campaign_id", "budget", "audience", "goal")
+
+# Greetings are ordinary conversational turns, not marketing task requests.
+_GREETING_RE = re.compile(
+    r"^\s*(?:hi|hello|hey|howdy|good morning|good afternoon|good evening|"
+    r"nice to meet you(?: too)?|pleased to meet you|how are you(?: doing)?|"
+    r"what(?:'s| is) up|thanks?(?: a lot| so much)?|thank you(?: so much)?|"
+    r"مرحبا|مرحباً|أهلا|أهلًا|السلام عليكم|سلام عليكم|ازيك|إزيك|عامل ايه|عامل إيه|"
+    r"تشرفت بمعرفتك|شكرا|شكرًا|كيف حالك)"
+    r"[\s!.؟،,]*$",
+    re.IGNORECASE,
+)
 
 _HUMAN_LABELS = {
     "campaign_id": "which campaign this is about",
@@ -208,6 +236,12 @@ def _detect_missing_info(text: str, task_name: str, context: dict[str, Any]) -> 
 
 def classify_with_rules(user_message: str, context: dict[str, Any]) -> RuleGuess:
     """Deterministic pre-classifier. No LLM, no cost, fully testable."""
+    if _GREETING_RE.fullmatch(user_message):
+        return RuleGuess(
+            intent=IntentKind.CHAT,
+            confidence=1.0,
+            rationale="greeting",
+        )
     intent, confidence, rationale = _score(user_message)
     default_task = INTENT_ROUTES[intent][1]
     task_name = _pick_task(user_message, intent, default_task)
@@ -237,14 +271,21 @@ async def classify_intent(
     """
     ctx = context or {}
     guess = classify_with_rules(user_message, ctx)
+    _logger.info(
+        "intent_rule_guess intent=%s confidence=%.2f task=%s",
+        guess.intent.value,
+        guess.confidence,
+        guess.task_name or "none",
+    )
 
     if guess.confidence >= confidence_threshold:
+        route = INTENT_ROUTES.get(guess.intent)
         return IntentClassification(
             intent=guess.intent,
             confidence=guess.confidence,
             missing_info=guess.missing_info,
             task_name=guess.task_name,
-            persona_id=INTENT_ROUTES[guess.intent][0],
+            persona_id=route[0] if route else None,
             rationale=guess.rationale,
         )
 
@@ -253,7 +294,13 @@ async def classify_intent(
     system = (
         "You classify a marketing-assistant user message into exactly one intent "
         "and pick the task and persona that should handle it.\n\n"
-        "Intents: research, strategy, creative, analyze, optimize, ask_clarification.\n"
+        "Intents: chat, research, strategy, creative, analyze, optimize, ask_clarification.\n"
+        "A request to identify or compare competitors, brands, companies, market players, "
+        "or an industry/category market is research, even when phrased as a casual question. "
+        "Do not classify such a request as chat just because it is phrased conversationally.\n"
+        "Use chat for greetings, pleasantries, general conversation, and informational "
+        "questions that do not ask the system to perform a marketing task. For chat, "
+        "leave task_name and persona_id null.\n"
         "Personas: researcher (research tasks), omar (strategy), layla (creative), "
         "karim (analysis), salma (optimization).\n"
         "Tasks: competitor_research, market_analysis, market_gaps, marketing_strategy, "
@@ -291,18 +338,46 @@ async def classify_intent(
             clean = [k for k in classification.missing_info if k in MISSING_INFO_KEYS]
             if not clean:
                 clean = [k for k in guess.missing_info if k in MISSING_INFO_KEYS]
-            classification = classification.model_copy(update={"missing_info": clean})
-            _logger.info("intent_classified_by_llm", extra={"intent": classification.intent.value})
+            route = INTENT_ROUTES.get(classification.intent)
+            classification = classification.model_copy(
+                update={
+                    "missing_info": clean,
+                    "task_name": classification.task_name
+                    or (route[1] if route else None),
+                    "persona_id": classification.persona_id
+                    or (route[0] if route else None),
+                }
+            )
+            _logger.info(
+                "intent_classified_by_llm intent=%s confidence=%.2f task=%s",
+                classification.intent.value,
+                classification.confidence,
+                classification.task_name or "none",
+                extra={
+                    "intent": classification.intent.value,
+                    "confidence": classification.confidence,
+                    "task": classification.task_name,
+                },
+            )
             return classification
     except Exception as exc:  # pragma: no cover - fall back to rules
         _logger.warning("intent_llm_failed_using_rules", extra={"error": str(exc)})
 
+    if guess.confidence == 0:
+        # With no task signals and no usable fast-tier classification, treat
+        # the message as normal chat and let the configured strong model answer.
+        return IntentClassification(
+            intent=IntentKind.CHAT,
+            confidence=0.0,
+            rationale="no marketing task intent matched",
+        )
+    route = INTENT_ROUTES.get(guess.intent)
     return IntentClassification(
         intent=guess.intent,
         confidence=guess.confidence,
         missing_info=guess.missing_info,
-        task_name=guess.task_name,
-        persona_id=INTENT_ROUTES[guess.intent][0],
+        task_name=guess.task_name or (route[1] if route else None),
+        persona_id=route[0] if route else None,
         rationale=guess.rationale,
     )
 

@@ -34,8 +34,24 @@ def current_request_id() -> str | None:
 
 
 def bind_workspace(workspace_id: str | None, business_id: str | None = None) -> None:
+    """Bind the request's tenant to the log context.
+
+    Called as a side effect of ``resolve_workspace``
+    (``app/api/deps.py``) -- dependencies run before the handler, which is why
+    this cannot live in the request-id middleware. See D7.
+    """
     _workspace_id.set(workspace_id)
     _business_id.set(business_id)
+
+
+def current_workspace_id() -> str | None:
+    """The workspace bound to the current request, or None."""
+    return _workspace_id.get()
+
+
+def current_business_id() -> str | None:
+    """The business bound to the current request, or None."""
+    return _business_id.get()
 
 
 class ContextFilter(logging.Filter):
@@ -70,7 +86,19 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 
-#: Keys whose values must never reach a log line.
+#: Keys whose values must never reach a log line. Matched case-insensitively on
+#: the whole key, so ``password`` also covers ``password_hash`` only by explicit
+#: listing -- hence the compound names below.
+#:
+#: P1 added the session-token family: a bearer token, its sha256 and the stored
+#: hash are all useless once leaked, so none of them may appear in a log line.
+#:
+#: **Maintenance rule (P5.5).** ``tests/test_deployment_ops.py`` walks every
+#: column of every mapped table and fails if a secret-bearing column name is
+#: missing from this set, so adding a ``*_enc`` column without adding its name
+#: here is a red test, not a silent leak. Keep it that way: the redaction is the
+#: only thing standing between a ``logger.info(extra=...)`` and a credential in
+#: a log aggregator.
 _SENSITIVE_KEYS = frozenset(
     {
         "api_key",
@@ -79,6 +107,7 @@ _SENSITIVE_KEYS = frozenset(
         "token",
         "authorization",
         "password",
+        "password_hash",
         "secret",
         "app_secret",
         "anthropic_api_key",
@@ -90,6 +119,54 @@ _SENSITIVE_KEYS = frozenset(
         "dataforseo_password",
         "token_encryption_key",
         "credit_card",
+        "app_secret_enc",
+        "meta_app_secret_enc",
+        "access_token_enc",
+        "meta_access_token_enc",
+        "refresh_token_enc",
+        "google_places_api_key_enc",
+        "dataforseo_password_enc",
+        "image_api_key_enc",
+        "search_api_key_enc",
+        "google_places_api_key",
+        "image_api_key",
+        "meta_app_secret",
+        # --- Supabase + gateway credentials (P5.5 audit) ------------------
+        # ``SUPABASE_SECRET_KEY`` / ``SUPABASE_SERVICE_ROLE_KEY`` are the
+        # service-role credentials: they bypass Row Level Security entirely.
+        "supabase_secret_key",
+        "supabase_service_role_key",
+        "supabase_publishable_key",
+        # ``llm_extra_headers`` is merged into every outbound LLM request, and
+        # gateways (OpenRouter, LiteLLM, vLLM) routinely carry
+        # ``Authorization: Bearer <key>`` in exactly that field. It looked
+        # harmless because it is a config knob, but it is the one place a
+        # gateway credential can reach a log line.
+        "llm_extra_headers",
+        # Generic spellings that appear in provider payloads and headers.
+        "client_secret",
+        "secret_key",
+        "private_key",
+        "x-api-key",
+        "x_api_key",
+        "authorization_header",
+        "db_password",
+        "pgpassword",
+        # Cookies. The refresh token lives in an HttpOnly cookie (P1.2), and a
+        # request dump that echoes headers would otherwise carry it.
+        "cookie",
+        "set-cookie",
+        # --- session credentials (P1) -------------------------------------
+        "access_token_bearer",
+        "bearer_token",
+        "session_token",
+        "token_hash",
+        "refresh_token",
+        "refresh_token_hash",
+        # --- rate limiting (P4.2) ------------------------------------------
+        # Not a credential, but logging it would let anyone reading logs
+        # fingerprint a customer and correlate their traffic across requests.
+        "rate_limit_key",
     }
 )
 

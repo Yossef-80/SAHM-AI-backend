@@ -91,8 +91,10 @@ def test_no_agent_module_imports_protected_tools() -> None:
             continue
         text = path.read_text(encoding="utf-8")
         if "tools.protected" in text or "from app.core.tools import protected" in text:
-            if "approvals/service.py" not in str(path):
-                offenders.append(str(path.relative_to(root)))
+            # as_posix() keeps this separator-agnostic (Windows uses backslashes).
+            relative = path.relative_to(root).as_posix()
+            if relative != "core/approvals/service.py":
+                offenders.append(relative)
     assert not offenders, "unexpected importers of protected tools: " + ", ".join(offenders)
 
 

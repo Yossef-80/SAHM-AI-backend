@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from sqlalchemy import select
 
-from app.api.deps import SessionDep
-from app.db.models import Business, Campaign as CampaignRow, Creative, Recommendation
+from app.api.deps import SessionDep, WorkspaceDep, assert_owned
+from app.db.models import Campaign as CampaignRow, Creative, Recommendation
 from app.schemas.campaigns import (
     Campaign,
     CampaignCreateRequest,
@@ -19,16 +17,6 @@ from app.schemas.campaigns import (
 )
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
-
-
-async def _business(db) -> Business:
-    stmt = select(Business).order_by(Business.created_at).limit(1)
-    business = (await db.execute(stmt)).scalars().first()
-    if business is None:
-        business = Business(id=f"biz_{uuid.uuid4().hex[:20]}", name="My Business")
-        db.add(business)
-        await db.flush()
-    return business
 
 
 def _to_schema(row: CampaignRow, *, creatives: int = 0, recommendations: int = 0) -> Campaign:
@@ -54,11 +42,12 @@ def _to_schema(row: CampaignRow, *, creatives: int = 0, recommendations: int = 0
 
 
 @router.post("", response_model=Campaign)
-async def create_campaign(payload: CampaignCreateRequest, db: SessionDep) -> Campaign:
-    business = await _business(db)
+async def create_campaign(
+    payload: CampaignCreateRequest, ws: WorkspaceDep, db: SessionDep
+) -> Campaign:
     row = CampaignRow(
         id=f"cmp_{uuid.uuid4().hex[:20]}",
-        business_id=business.id,
+        business_id=ws.business_id,
         name=payload.name,
         objective=payload.objective,
         channel=payload.channel,
@@ -78,11 +67,12 @@ async def create_campaign(payload: CampaignCreateRequest, db: SessionDep) -> Cam
 
 
 @router.get("", response_model=CampaignListResponse)
-async def list_campaigns(db: SessionDep) -> CampaignListResponse:
-    business = await _business(db)
+async def list_campaigns(
+    ws: WorkspaceDep, db: SessionDep
+) -> CampaignListResponse:
     stmt = (
         select(CampaignRow)
-        .where(CampaignRow.business_id == business.id)
+        .where(CampaignRow.business_id == ws.business_id)
         .order_by(CampaignRow.created_at.desc())
     )
     rows = (await db.execute(stmt)).scalars().all()
@@ -92,12 +82,16 @@ async def list_campaigns(db: SessionDep) -> CampaignListResponse:
 
 
 @router.get("/{campaign_id}", response_model=CampaignDetailResponse)
-async def get_campaign(campaign_id: str, db: SessionDep) -> CampaignDetailResponse:
-    row = await db.get(CampaignRow, campaign_id)
-    if row is None:
-        from app.core.errors import NotFoundError
-
-        raise NotFoundError(f"campaign '{campaign_id}' not found")
+async def get_campaign(
+    campaign_id: str, ws: WorkspaceDep, db: SessionDep
+) -> CampaignDetailResponse:
+    """One campaign. A campaign owned by another workspace is a 404, not a 403."""
+    stmt = select(CampaignRow).where(
+        CampaignRow.id == campaign_id, CampaignRow.business_id == ws.business_id
+    )
+    row = assert_owned(
+        await db.scalar(stmt), ws, entity=f"campaign '{campaign_id}'"
+    )
 
     creatives = (
         await db.execute(select(Creative).where(Creative.campaign_id == campaign_id))

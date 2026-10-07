@@ -7,7 +7,7 @@ from datetime import date
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from app.api.deps import SessionDep
+from app.api.deps import SessionDep, WorkspaceDep, assert_owned
 from app.core.tools.meta_read import _handle_get_campaign_insights  # noqa: F401  (see note)
 from app.db.models import Campaign, Insight
 from app.schemas.insights import CampaignInsightsResponse, InsightRecord, InsightsPayload
@@ -18,16 +18,22 @@ router = APIRouter(tags=["insights"])
 @router.get("/campaigns/{campaign_id}/insights", response_model=CampaignInsightsResponse)
 async def get_campaign_insights(
     campaign_id: str,
+    ws: WorkspaceDep,
     db: SessionDep,
     date_start: date | None = Query(default=None),
     date_end: date | None = Query(default=None),
 ) -> CampaignInsightsResponse:
-    """Stored insights for a campaign, plus a fresh Meta pull when connected."""
-    campaign = await db.get(Campaign, campaign_id)
-    if campaign is None:
-        from app.core.errors import NotFoundError
+    """Stored insights for a campaign, plus a fresh Meta pull when connected.
 
-        raise NotFoundError(f"campaign '{campaign_id}' not found")
+    The campaign is loaded through the workspace filter, so another tenant's
+    campaign id is a 404 rather than someone else's performance data.
+    """
+    stmt = select(Campaign).where(
+        Campaign.id == campaign_id, Campaign.business_id == ws.business_id
+    )
+    campaign = assert_owned(
+        await db.scalar(stmt), ws, entity=f"campaign '{campaign_id}'"
+    )
 
     rows = (
         await db.execute(
@@ -60,7 +66,7 @@ async def get_campaign_insights(
         from app.schemas.tools import GetCampaignInsightsInput
 
         ctx = ToolContext(
-            workspace_id="default",
+            workspace_id=ws.workspace_id,
             business_id=campaign.business_id,
             db=db,
             llm=MockClient(),

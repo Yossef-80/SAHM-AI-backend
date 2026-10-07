@@ -260,16 +260,31 @@ def _mock_asset(prompt: str, aspect_ratio: str, index: int) -> GeneratedAssetRec
 
 
 async def _generate_openai_image(
-    prompt: str, aspect_ratio: str, cfg: Any
+    prompt: str,
+    aspect_ratio: str,
+    *,
+    api_key: str,
+    model: str,
+    base_url: str | None = None,
 ) -> list[GeneratedAssetRecord]:
+    """Call the OpenAI-compatible image endpoint.
+
+    ``api_key`` / ``model`` / ``base_url`` are passed in rather than read off
+    ``Settings`` so P2.5's workspace row can win over the env var without this
+    module knowing where the value came from.
+    """
     size = {"1:1": "1024x1024", "4:5": "1024x1280", "9:16": "1024x1792", "16:9": "1792x1024"}.get(
         aspect_ratio, "1024x1024"
     )
+    url = (
+        (base_url or "https://api.openai.com/v1").rstrip("/")
+        + "/images/generations"
+    )
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
-            "https://api.openai.com/v1/images/generations",
-            headers={"authorization": f"Bearer {cfg.image_api_key}"},
-            json={"model": cfg.image_model, "prompt": prompt, "size": size, "n": 1},
+            url,
+            headers={"authorization": f"Bearer {api_key}"},
+            json={"model": model, "prompt": prompt, "size": size, "n": 1},
         )
         resp.raise_for_status()
         data = resp.json().get("data", [])
@@ -280,7 +295,7 @@ async def _generate_openai_image(
             prompt=prompt,
             aspect_ratio=aspect_ratio,
             provider="openai",
-            model=cfg.image_model,
+            model=model,
         )
         for item in data
     ]
@@ -289,8 +304,15 @@ async def _generate_openai_image(
 async def _handle_generate_image(
     payload: GenerateImageInput, ctx: ToolContext
 ) -> GenerateImageOutput:
+    from app.core.tools.settings import resolve_tool_settings
+
     cfg = ctx.require_settings()
-    source = f"generate_image:{cfg.image_provider}"
+    tools_cfg = await resolve_tool_settings(ctx)
+    image_provider = tools_cfg.image_provider or cfg.image_provider
+    image_key = tools_cfg.image_api_key or cfg.image_api_key
+    image_model = tools_cfg.image_model or cfg.image_model
+    image_base = tools_cfg.image_base_url or cfg.image_base_url
+    source = f"generate_image:{image_provider}"
 
     # The style spec is the ONLY thing that may carry reference styling.
     style = dict(payload.style_spec or {})
@@ -302,9 +324,15 @@ async def _handle_generate_image(
     effective_prompt = _compose_image_prompt(payload.prompt, style)
 
     try:
-        if cfg.image_provider == "openai" and cfg.image_api_key:
-            assets = await _generate_openai_image(effective_prompt, payload.aspect_ratio, cfg)
-        elif cfg.image_provider == "stability" and cfg.image_api_key:
+        if image_provider == "openai" and image_key:
+            assets = await _generate_openai_image(
+                effective_prompt,
+                payload.aspect_ratio,
+                api_key=image_key,
+                model=image_model,
+                base_url=image_base,
+            )
+        elif image_provider == "stability" and image_key:
             return GenerateImageOutput.unavailable(
                 source=source,
                 reason=(

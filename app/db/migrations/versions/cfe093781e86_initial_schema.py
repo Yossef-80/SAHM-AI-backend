@@ -1,8 +1,27 @@
 """initial schema
 
 Revision ID: cfe093781e86
-Revises: 
+Revises:
 Create Date: 2026-09-28 07:41:36.400296
+
+.. warning::
+
+   **This revision has never been applied to any real database, so it is still
+   editable.** The only database that exists is the local ``sahm.db``, which is
+   built by ``create_all()`` at boot -- and ``create_all()`` does not touch
+   ``alembic_version``, so the Alembic chain is genuinely at zero everywhere.
+   That is why P1's ``users`` / ``memberships`` / ``sessions`` tables and the
+   ``recommendations.workspace_id`` column were added *here* rather than in a
+   second revision: editing in place keeps exactly one authoritative
+   ``create_table`` per table instead of describing 15 tables in revision 1 and
+   a handful in revision 2 that can never have been run.
+
+   **The moment this revision is applied anywhere -- a Supabase project, a
+   staging Postgres -- it is frozen.** From that moment, every subsequent schema
+   change ships as a new revision with ``down_revision = "cfe093781e86"``;
+   editing this file afterwards means the new databases and the migrated ones
+   silently disagree. Check ``SELECT version_num FROM alembic_version`` before
+   running any later migration task.
 """
 from __future__ import annotations
 
@@ -108,6 +127,8 @@ def upgrade() -> None:
     sa.Column('language', sa.String(length=2), nullable=False),
     sa.Column('currency', sa.String(length=8), nullable=True),
     sa.Column('monthly_budget', sa.Float(), nullable=True),
+    # P2.7/P4.1: NULL means "inherit Settings.daily_token_budget".
+    sa.Column('daily_token_budget', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id')
@@ -285,6 +306,9 @@ def upgrade() -> None:
     op.create_table('recommendations',
     sa.Column('id', sa.String(length=64), nullable=False),
     sa.Column('campaign_id', sa.String(length=64), nullable=True),
+    # P1: the owning business, denormalised. Nullable so a row naming no owner
+    # fails closed and stays invisible to every workspace.
+    sa.Column('workspace_id', sa.String(length=64), nullable=True),
     sa.Column('insight_id', sa.String(length=64), nullable=True),
     sa.Column('action_type', sa.String(length=60), nullable=False),
     sa.Column('title', sa.String(length=400), nullable=False),
@@ -304,18 +328,112 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['campaign_id'], ['campaigns.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['insight_id'], ['insights.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['workspace_id'], ['businesses.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_recommendations_action_type'), 'recommendations', ['action_type'], unique=False)
     op.create_index(op.f('ix_recommendations_campaign_id'), 'recommendations', ['campaign_id'], unique=False)
     op.create_index(op.f('ix_recommendations_insight_id'), 'recommendations', ['insight_id'], unique=False)
     op.create_index(op.f('ix_recommendations_status'), 'recommendations', ['status'], unique=False)
+    op.create_index(op.f('ix_recommendations_workspace_id'), 'recommendations', ['workspace_id'], unique=False)
+    # --- P1: identity (users / memberships / sessions) ---
+    # Created last, not first: memberships and sessions carry foreign keys into
+    # users and businesses, and Postgres refuses to create a table whose
+    # REFERENCES target does not exist yet.
+    op.create_table('users',
+    sa.Column('id', sa.String(length=64), nullable=False),
+    sa.Column('email', sa.String(length=320), nullable=False),
+    sa.Column('password_hash', sa.String(length=255), nullable=False),
+    sa.Column('full_name', sa.String(length=200), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('email')
+    )
+    # email is stored already lowercased (app/core/auth.py::normalise_email), so
+    # this constraint is the citext behaviour without the Postgres extension.
+    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_table('memberships',
+    sa.Column('id', sa.String(length=64), nullable=False),
+    sa.Column('user_id', sa.String(length=64), nullable=False),
+    sa.Column('workspace_id', sa.String(length=64), nullable=False),
+    sa.Column('business_id', sa.String(length=64), nullable=False),
+    sa.Column('role', sa.String(length=20), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint("role IN ('owner','member','viewer')", name='ck_membership_role'),
+    sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'business_id', name='uq_membership_user_business'),
+    sa.UniqueConstraint('user_id', 'workspace_id', name='uq_membership_user_workspace')
+    )
+    op.create_index(op.f('ix_memberships_business_id'), 'memberships', ['business_id'], unique=False)
+    op.create_index(op.f('ix_memberships_role'), 'memberships', ['role'], unique=False)
+    op.create_index(op.f('ix_memberships_user_id'), 'memberships', ['user_id'], unique=False)
+    op.create_index(op.f('ix_memberships_workspace_id'), 'memberships', ['workspace_id'], unique=False)
+    op.create_table('sessions',
+    sa.Column('id', sa.String(length=64), nullable=False),
+    sa.Column('user_id', sa.String(length=64), nullable=False),
+    # sha256 hex of the bearer token -- never the token itself, so a stolen
+    # database cannot be replayed as a session.
+    sa.Column('token_hash', sa.String(length=64), nullable=False),
+    sa.Column('user_agent', sa.String(length=400), nullable=True),
+    sa.Column('ip', sa.String(length=64), nullable=True),
+    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('last_used_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('revoked_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('token_hash')
+    )
+    op.create_index(op.f('ix_sessions_created_at'), 'sessions', ['created_at'], unique=False)
+    op.create_index(op.f('ix_sessions_expires_at'), 'sessions', ['expires_at'], unique=False)
+    op.create_index(op.f('ix_sessions_revoked_at'), 'sessions', ['revoked_at'], unique=False)
+    op.create_index(op.f('ix_sessions_token_hash'), 'sessions', ['token_hash'], unique=True)
+    op.create_index(op.f('ix_sessions_user_id'), 'sessions', ['user_id'], unique=False)
+    # --- P2.4: per-workspace connector configuration ---
+    # One row per (business, connector). The unique constraint is the isolation
+    # mechanism: a query that forgets the business_id predicate still cannot
+    # return two workspaces' rows. Every *_enc column is TokenCipher ciphertext.
+    op.create_table('tool_settings',
+    sa.Column('id', sa.String(length=64), nullable=False),
+    sa.Column('business_id', sa.String(length=64), nullable=False),
+    sa.Column('connector', sa.String(length=40), nullable=False),
+    sa.Column('meta_app_id', sa.String(length=120), nullable=True),
+    sa.Column('meta_ad_account_id', sa.String(length=120), nullable=True),
+    sa.Column('google_places_base_url', sa.String(length=500), nullable=True),
+    sa.Column('dataforseo_login', sa.String(length=200), nullable=True),
+    sa.Column('image_provider', sa.String(length=30), nullable=True),
+    sa.Column('image_model', sa.String(length=80), nullable=True),
+    sa.Column('search_provider', sa.String(length=30), nullable=True),
+    sa.Column('keyword_provider', sa.String(length=30), nullable=True),
+    sa.Column('base_url', sa.String(length=500), nullable=True),
+    sa.Column('meta_app_secret_enc', sa.Text(), nullable=True),
+    sa.Column('meta_access_token_enc', sa.Text(), nullable=True),
+    sa.Column('google_places_api_key_enc', sa.Text(), nullable=True),
+    sa.Column('dataforseo_password_enc', sa.Text(), nullable=True),
+    sa.Column('image_api_key_enc', sa.Text(), nullable=True),
+    sa.Column('search_api_key_enc', sa.Text(), nullable=True),
+    sa.Column('updated_by', sa.String(length=64), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint("connector IN ('meta','google_places','dataforseo','image','search')", name='ck_tool_settings_connector'),
+    sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('business_id', 'connector', name='uq_tool_settings_business_connector')
+    )
+    op.create_index(op.f('ix_tool_settings_business_id'), 'tool_settings', ['business_id'], unique=False)
+    op.create_index(op.f('ix_tool_settings_connector'), 'tool_settings', ['connector'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     op.execute("DROP EXTENSION IF EXISTS vector")
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(op.f('ix_recommendations_workspace_id'), table_name='recommendations')
     op.drop_index(op.f('ix_recommendations_status'), table_name='recommendations')
     op.drop_index(op.f('ix_recommendations_insight_id'), table_name='recommendations')
     op.drop_index(op.f('ix_recommendations_campaign_id'), table_name='recommendations')
@@ -379,4 +497,22 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_agent_tasks_conversation_id'), table_name='agent_tasks')
     op.drop_index(op.f('ix_agent_tasks_business_id'), table_name='agent_tasks')
     op.drop_table('agent_tasks')
+    op.drop_index(op.f('ix_sessions_user_id'), table_name='sessions')
+    op.drop_index(op.f('ix_sessions_token_hash'), table_name='sessions')
+    op.drop_index(op.f('ix_sessions_revoked_at'), table_name='sessions')
+    op.drop_index(op.f('ix_sessions_expires_at'), table_name='sessions')
+    op.drop_index(op.f('ix_sessions_created_at'), table_name='sessions')
+    op.drop_table('sessions')
+    op.drop_index(op.f('ix_memberships_workspace_id'), table_name='memberships')
+    op.drop_index(op.f('ix_memberships_user_id'), table_name='memberships')
+    op.drop_index(op.f('ix_memberships_role'), table_name='memberships')
+    op.drop_index(op.f('ix_memberships_business_id'), table_name='memberships')
+    op.drop_table('memberships')
+    op.drop_index(op.f('ix_users_email'), table_name='users')
+    op.drop_table('users')
+    # --- P2.4 reversal (dropped first: it FKs into businesses) ---
+    op.drop_index(op.f('ix_tool_settings_connector'), table_name='tool_settings')
+    op.drop_index(op.f('ix_tool_settings_business_id'), table_name='tool_settings')
+    op.drop_table('tool_settings')
+    op.drop_column('daily_token_budget', table_name='businesses')
     # ### end Alembic commands ###

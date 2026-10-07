@@ -12,18 +12,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.approvals import service as approvals
 from app.core.errors import ApprovalRequired, ApprovalStateError
-from app.db.models import AuditLog, Recommendation
+from app.db.models import AuditLog, Campaign, Recommendation
 from app.schemas.recommendations import (
     ApproveRecommendationRequest,
     RecommendationStatus,
     RejectRecommendationRequest,
 )
 
+#: The campaign every test recommendation hangs off. It must exist and must
+#: belong to ``biz_test`` (the workspace ``seeded_db`` sets up). Since P1 a
+#: recommendation names its owning business directly in ``workspace_id``, so a
+#: row that leaves it NULL is attributable to no workspace and is correctly a
+#: 404 for everyone. Seeding both keeps this fixture realistic and keeps these
+#: tests about the approval flow rather than about tenancy.
+CAMPAIGN_ID = "cmp_test"
+BUSINESS_ID = "biz_test"
+
 
 async def _make_recommendation(db: AsyncSession) -> Recommendation:
+    db.add(
+        Campaign(
+            id=CAMPAIGN_ID,
+            business_id=BUSINESS_ID,
+            name="Ramadan Subscription Push",
+            status="active",
+            objective="OUTCOME_SALES",
+            budget=12000.0,
+            currency="EGP",
+        )
+    )
+    await db.flush()
     row = Recommendation(
         id="rec_test_1",
-        campaign_id="cmp_test",
+        campaign_id=CAMPAIGN_ID,
+        workspace_id=BUSINESS_ID,
         action_type="pause_ad",
         title="Pause 'Ramadan Reel v2'",
         rationale="CTR fell to 0.4% with frequency 6.1 over 14 days.",

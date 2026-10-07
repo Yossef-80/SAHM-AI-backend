@@ -42,6 +42,7 @@ class ToolContext:
     db: AsyncSession
     llm: LLMClient
     request_id: str
+    fast_llm: LLMClient | None = None
     campaign_id: str | None = None
     creative_id: str | None = None
     insight_id: str | None = None
@@ -49,6 +50,11 @@ class ToolContext:
     task_id: str | None = None
     conversation_id: str | None = None
     settings: Settings | None = None
+    #: P2.5: the workspace's resolved connector configuration, populated lazily
+    #: by ``app.core.tools.settings.resolve_tool_settings`` the first time a
+    #: handler asks for it. Cached here rather than resolved per call because an
+    #: agent run makes many tool calls in one request.
+    tool_settings: Any = None
     #: Data the user pasted/uploaded, for tools that support a manual fallback
     #: (e.g. competitor ads the Meta Ad Library API does not cover).
     user_supplied: dict[str, Any] = field(default_factory=dict)

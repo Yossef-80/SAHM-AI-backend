@@ -5,10 +5,16 @@ from __future__ import annotations
 from fastapi import APIRouter
 from sqlalchemy import select
 
-from app.api.deps import SessionDep
+from app.api.deps import (
+    LLMDep,
+    SessionDep,
+    WorkspaceContext,
+    WorkspaceDep,
+    assert_campaign_owned,
+)
 from app.core.tools.base import ToolContext
 from app.core.tools.media import _handle_analyze_reference, _handle_generate_image
-from app.db.models import Business, Creative
+from app.db.models import BrandMemoryItem, Creative
 from app.schemas.creatives import (
     AnalyzeReferenceRequest,
     GenerateCreativeRequest,
@@ -21,36 +27,25 @@ from app.schemas.tools import AnalyzeReferenceInput, GenerateImageInput
 router = APIRouter(prefix="/creatives", tags=["creatives"])
 
 
-async def _business(db) -> Business:
-    stmt = select(Business).order_by(Business.created_at).limit(1)
-    business = (await db.execute(stmt)).scalars().first()
-    if business is None:
-        import uuid
-
-        business = Business(id=f"biz_{uuid.uuid4().hex[:20]}", name="My Business")
-        db.add(business)
-        await db.flush()
-    return business
-
-
-def _ctx(db, business_id: str) -> ToolContext:
-    from app.core.llm.router import get_llm
-
+def _ctx(db, ws: WorkspaceContext, llm) -> ToolContext:
     return ToolContext(
-        workspace_id="default",
-        business_id=business_id,
+        workspace_id=ws.workspace_id,
+        business_id=ws.business_id,
         db=db,
-        llm=get_llm("strong"),
+        llm=llm,
         request_id="",
     )
 
 
 @router.post("/analyze-reference", response_model=ReferenceAnalysis)
 async def analyze_reference(
-    payload: AnalyzeReferenceRequest, db: SessionDep
+    payload: AnalyzeReferenceRequest, ws: WorkspaceDep, db: SessionDep, llm: LLMDep
 ) -> ReferenceAnalysis:
     """Analyse a reference creative into a structured StyleSpec."""
-    business = await _business(db)
+    # The campaign id arrives in the body, so it is checked against the
+    # workspace before it is used -- otherwise a caller could file another
+    # tenant's creative into their own analysis.
+    await assert_campaign_owned(db, payload.campaign_id, ws)
     analysis = await _handle_analyze_reference(
         AnalyzeReferenceInput(
             image_url=payload.image_url,
@@ -58,7 +53,7 @@ async def analyze_reference(
             campaign_id=payload.campaign_id,
             focus=payload.focus,
         ),
-        _ctx(db, business.id),
+        _ctx(db, ws, llm),
     )
     await db.commit()
     return analysis
@@ -66,17 +61,22 @@ async def analyze_reference(
 
 @router.post("/generate", response_model=GenerateCreativeResponse)
 async def generate_creative(
-    payload: GenerateCreativeRequest, db: SessionDep
+    payload: GenerateCreativeRequest, ws: WorkspaceDep, db: SessionDep, llm: LLMDep
 ) -> GenerateCreativeResponse:
     """Generate image creatives from a prompt and an optional style spec."""
-    business = await _business(db)
+    await assert_campaign_owned(db, payload.campaign_id, ws)
 
     analysis: ReferenceAnalysis | None = None
     if payload.reference_analysis_id and not payload.style_spec:
-        from app.db.models import BrandMemoryItem
-
         item = await db.get(BrandMemoryItem, payload.reference_analysis_id)
-        if item is not None and (item.metadata_ or {}).get("style"):
+        # Another workspace's reference analysis is simply not found here:
+        # degrading to "no style spec" rather than erroring keeps generation
+        # working without ever reading across the boundary.
+        if (
+            item is not None
+            and item.business_id == ws.business_id
+            and (item.metadata_ or {}).get("style")
+        ):
             payload = payload.model_copy(
                 update={"style_spec": dict(item.metadata_["style"])}
             )
@@ -90,7 +90,7 @@ async def generate_creative(
             num_images=payload.num_images,
             reference_analysis_id=payload.reference_analysis_id,
         ),
-        _ctx(db, business.id),
+        _ctx(db, ws, llm),
     )
     await db.commit()
 
@@ -116,12 +116,11 @@ async def generate_creative(
 
 
 @router.get("", response_model=list[dict])
-async def list_creatives(db: SessionDep) -> list[dict]:
-    business = await _business(db)
+async def list_creatives(ws: WorkspaceDep, db: SessionDep) -> list[dict]:
     rows = (
         await db.execute(
             select(Creative)
-            .where(Creative.business_id == business.id)
+            .where(Creative.business_id == ws.business_id)
             .order_by(Creative.created_at.desc())
             .limit(100)
         )

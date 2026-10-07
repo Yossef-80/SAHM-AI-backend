@@ -1,0 +1,41 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+
+# --- Virtual environments ----------------------------------------------------
+.venv/
+venv/
+env/
+
+# --- Packaging / tooling -----------------------------------------------------
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# --- Secrets / local config --------------------------------------------------
+# Never commit real credentials or a local database URL.
+.env
+.env.*
+!.env.example
+
+# --- Runtime artefacts -------------------------------------------------------
+# Local SQLite database (files already tracked stay tracked; new ones are
+# ignored from here on).
+sahm.db
+sahm.db-journal
+sahm.db-wal
+sahm.db-shm
+*.db-journal
+var/
+uploads/

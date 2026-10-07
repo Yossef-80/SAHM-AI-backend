@@ -1,0 +1,86 @@
+# Docker build context exclusions for the Sahm backend (P5.1).
+#
+# The context is the whole "sahm-ai backend" folder, which also contains a
+# virtualenv, a local SQLite database and a .env with real credentials. Without
+# this file every one of those bytes is uploaded to the daemon on every build,
+# and .env would end up in an intermediate layer.
+
+# --- Virtual environments (hundreds of MB, and never wanted in an image) ----
+.venv
+venv
+env
+ENV
+.python-version
+
+# --- Python bytecode / build artefacts --------------------------------------
+__pycache__
+**/__pycache__
+*.py[cod]
+*$py.class
+*.so
+build
+dist
+*.egg-info
+.eggs
+
+# --- Test / lint caches ------------------------------------------------------
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.tox
+.coverage
+.coverage.*
+htmlcov
+
+# --- Secrets and local config ------------------------------------------------
+# .env holds DATABASE_URL with a password, TOKEN_ENCRYPTION_KEY and provider
+# API keys. It must never enter a build context. `.env.example` is kept.
+.env
+.env.*
+!.env.example
+
+# --- Local database ----------------------------------------------------------
+# Local SQLite artefacts. `sahm.db*` covers sahm.db, sahm.db-journal,
+# sahm.db-wal and sahm.db-shm.
+sahm.db*
+*.db-journal
+*.db-wal
+*.db-shm
+
+# --- Runtime artefacts -------------------------------------------------------
+var/
+uploads/
+
+# --- VCS / editor / CI -------------------------------------------------------
+.git
+.gitignore
+.github
+.idea
+.vscode
+*.swp
+.DS_Store
+
+# --- Ops scratch files -------------------------------------------------------
+# Stray debugging helpers that live beside the code during development.
+_dump.py
+_dump_connectors.py
+_netcheck.py
+_ipv6.py
+_pgcheck.py
+
+# ---------------------------------------------------------------------------
+# TESTS DO NOT SHIP IN THE IMAGE -- and here is the consequence.
+#
+# Consequence: `testpaths = ["tests"]` in pyproject.toml:42 points pytest at a
+# directory that does not exist inside the image, so `python -m pytest` in the
+# running container fails with
+#     ERROR: file or directory not found: tests
+# rather than reporting "0 passed". This is deliberate: the image is a runtime
+# artefact, tests belong to CI on the host (they need pytest/respx/fastmcp,
+# which are `[dev]` extras and deliberately not installed by stage 1).
+#
+# If you ever want to run the suite inside the image you must (a) delete the
+# `tests` line below, (b) install the `[dev]` extra, and (c) accept that you
+# have just made a production image larger and more attack-surface-y.
+# ---------------------------------------------------------------------------
+tests

@@ -9,6 +9,7 @@ model strings from ``config.py`` only.
 from __future__ import annotations
 
 import json
+import re
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Protocol, runtime_checkable
@@ -312,7 +313,16 @@ class BaseLLMClient(ABC):
                 last_error = exc
                 if not exc.retryable or attempt == self.max_retries:
                     raise
+                # Rate-limit retries should obey the provider's reset hint. A
+                # fast exponential retry just burns more requests while the
+                # same TPM window is still full, so retry a 429 only once.
+                if exc.status_code == 429 and attempt >= 1:
+                    raise
                 delay = self.base_delay * (2**attempt)
+                provider_delay = _retry_after_seconds(exc)
+                if provider_delay is not None:
+                    delay = max(delay, provider_delay + 0.1)
+                delay = min(delay, 60.0)
                 await _sleep(delay)
                 attempt += 1
         raise last_error or LLMProviderError("llm call failed")
@@ -355,7 +365,10 @@ class BaseLLMClient(ABC):
             repaired = await self._complete_once(
                 system=system,
                 messages=repair_messages,
-                tools=None,
+                # Preserve the tool schemas for providers that require them to
+                # remain present in tool-call history. Provider adapters can
+                # still disable further calls for structured output.
+                tools=tools,
                 response_schema=schema,
                 tier=tier,
                 max_tokens=max_tokens,
@@ -397,6 +410,24 @@ async def _sleep(seconds: float) -> None:
     import asyncio
 
     await asyncio.sleep(seconds)
+
+
+def _retry_after_seconds(exc: LLMProviderError) -> float | None:
+    if exc.retry_after is not None:
+        return max(0.0, exc.retry_after)
+    detail = exc.detail or {}
+    body = str(detail.get("body") or "")
+    match = re.search(
+        r"(?:try again in|retry after)\s*([0-9]+(?:\.[0-9]+)?)\s*s(?:ec(?:onds?)?)?",
+        body,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    try:
+        return max(0.0, float(match.group(1)))
+    except ValueError:  # pragma: no cover - regex already validates numeric text
+        return None
 
 
 def is_retryable_status(status_code: int) -> bool:

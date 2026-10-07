@@ -108,6 +108,7 @@ class BlockKind(str, Enum):
 
 
 class IntentKind(str, Enum):
+    CHAT = "chat"
     RESEARCH = "research"
     STRATEGY = "strategy"
     CREATIVE = "creative"

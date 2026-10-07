@@ -34,7 +34,7 @@ from app.core.tools.protected import (
     PublishCampaignInput,
     PublishCampaignOutput,
 )
-from app.db.models import AuditLog, Campaign
+from app.db.models import AuditLog, Business, Campaign
 from app.db.models import Recommendation as RecommendationRow
 from app.schemas.recommendations import (
     ApproveRecommendationRequest,
@@ -91,15 +91,21 @@ async def _write_audit(
     return row
 
 
-def _current_value_for(db: AsyncSession, recommendation: RecommendationRow, key: str) -> Any:
+async def _current_value_for(
+    db: AsyncSession, recommendation: RecommendationRow, key: str
+) -> Any:
     """Best-known current value of the field being changed.
 
     Read from our own records. When we do not hold it (e.g. the value lives only
     in Meta), return None so the UI shows "unknown" rather than a guess.
+
+    This is async because it queries through an ``AsyncSession``: the previous
+    synchronous ``db.get(...)`` returned an un-awaited coroutine, so any diff on
+    a budget field would have raised instead of showing a "before" value.
     """
     if key in ("budget", "daily_budget", "lifetime_budget"):
         if recommendation.campaign_id:
-            campaign = db.get(Campaign, recommendation.campaign_id)
+            campaign = await db.get(Campaign, recommendation.campaign_id)
             if campaign is not None and key == "budget":
                 return campaign.budget
     return None
@@ -115,7 +121,7 @@ async def build_diff(db: AsyncSession, recommendation: RecommendationRow) -> lis
     payload = recommendation.payload or {}
     for key in sorted(payload):
         proposed = payload[key]
-        current = _current_value_for(db, recommendation, key)
+        current = await _current_value_for(db, recommendation, key)
         diffs.append(ChangeDiff(field=key, before=current, after=proposed))
     if not diffs:
         diffs.append(
@@ -272,17 +278,39 @@ async def approve_recommendation(
     )
 
 
+async def _tenant_of_campaign(
+    db: AsyncSession, campaign_id: str | None
+) -> tuple[str, str]:
+    """(workspace_id, business_id) owning ``campaign_id``.
+
+    D2: the execute path used to build ``ToolContext(business_id=row.campaign_id)``,
+    so every tool that resolves an integration or brand memory by
+    ``ctx.business_id`` during execution looked up a business id that does not
+    exist. The owning business is read back off the campaign instead.
+    """
+    if not campaign_id:
+        return "", ""
+    campaign = await db.get(Campaign, campaign_id)
+    if campaign is None:
+        return "", ""
+    business = await db.get(Business, campaign.business_id)
+    workspace_id = business.workspace_id or "" if business is not None else ""
+    return workspace_id, campaign.business_id
+
+
 async def _execute(
     db: AsyncSession, row: RecommendationRow, *, actor: str, request_id: str | None
 ) -> ApplyChangeOutput:
     """The single call site of the protected ``apply_change`` tool."""
     from app.core.tools.base import ToolContext
 
+    workspace_id, business_id = await _tenant_of_campaign(db, row.campaign_id)
+
     # A ToolContext is required by the handler. It is built here, inside the
     # approvals service, which is the only place allowed to do this.
     ctx = ToolContext(
-        workspace_id="default",
-        business_id=row.campaign_id or "",
+        workspace_id=workspace_id,
+        business_id=business_id,
         db=db,
         llm=None,  # type: ignore[arg-type]
         request_id=request_id or "",
@@ -328,9 +356,10 @@ async def publish_campaign(
         raise ApprovalNotFoundError(f"campaign '{campaign_id}' not found")
 
     before = {"status": campaign.status, "meta_campaign_id": campaign.meta_campaign_id}
+    workspace_id, _ = await _tenant_of_campaign(db, campaign_id)
 
     ctx = ToolContext(
-        workspace_id="default",
+        workspace_id=workspace_id,
         business_id=campaign.business_id,
         db=db,
         llm=MockClient(),
@@ -392,11 +421,33 @@ async def reject_recommendation(
 
 
 async def list_audit(
-    db: AsyncSession, *, entity_id: str | None = None, limit: int = 50
+    db: AsyncSession,
+    *,
+    entity_id: str | None = None,
+    business_id: str | None = None,
+    entity_type: str | None = None,
+    actor: str | None = None,
+    action: str | None = None,
+    limit: int = 50,
 ) -> list[AuditLog]:
+    """Audit rows, newest first, with the filters ``GET /audit`` exposes.
+
+    ``business_id`` was added in P4.4. Every filter is optional and the result
+    is always a tenant-scoped list once ``business_id`` is passed -- the
+    unscoped call is what the pre-P4.4 internal callers used, and it now has
+    exactly one HTTP caller (``app/api/audit.py``) which always scopes it.
+    """
     stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
     if entity_id:
         stmt = stmt.where(AuditLog.entity_id == entity_id)
+    if business_id:
+        stmt = stmt.where(AuditLog.business_id == business_id)
+    if entity_type:
+        stmt = stmt.where(AuditLog.entity_type == entity_type)
+    if actor:
+        stmt = stmt.where(AuditLog.actor == actor)
+    if action:
+        stmt = stmt.where(AuditLog.action == action)
     return list((await db.execute(stmt)).scalars().all())
 
 

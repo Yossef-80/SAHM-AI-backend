@@ -11,9 +11,17 @@ from __future__ import annotations
 import ipaddress
 import socket
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
-from app.core.errors import BlockedTargetError, UploadRejectedError
+from app.core.errors import (
+    BlockedTargetError,
+    EncryptionKeyMissingError,
+    UploadRejectedError,
+)
+from app.core.logging import get_logger
+
+_logger = get_logger(__name__)
 
 #: Schemes we will ever fetch. Anything else is rejected.
 ALLOWED_SCHEMES = frozenset({"http", "https"})
@@ -107,21 +115,85 @@ def check_redirect(target: str, *, allowed_schemes: tuple[str, ...]) -> SafeUrl:
 
 # ------------------------------------------------------------- encryption ----
 
+#: The deterministic development key. Published in this file on purpose: it is
+#: not a secret and must never be trusted. It exists so ``python -m uvicorn``
+#: works with zero configuration, and ``verify_runtime_security`` refuses to let
+#: it reach production.
+DEV_FERNET_KEY = b"c2FobS1kZXYtb25seS10b2tlbi1rZXktMzItYnl0ZXM="
+
+
+def verify_runtime_security(settings: Any | None = None) -> list[str]:
+    """P4 startup validator: refuse to serve with dev-grade security.
+
+    Called once from the FastAPI lifespan, *before* the app reports itself ready,
+    so a deploy with no ``TOKEN_ENCRYPTION_KEY`` fails at boot instead of
+    "encrypting" customer Meta tokens with a key that is in git.
+
+    Returns the list of warnings raised (empty when the deployment is clean).
+    Raises ``EncryptionKeyMissingError`` in production when the key is absent --
+    the one condition here that is fatal rather than noisy.
+
+    D5 in the roadmap. The roadmap files this under P5.6 but it is a one-line
+    guard, and shipping the configuration surface (P2.4) without it would mean
+    a new "set my connector credentials in the UI" feature writes secrets under
+    a published key.
+    """
+    from app.config import get_settings
+
+    cfg = settings or get_settings()
+    warnings: list[str] = []
+    if not cfg.token_encryption_key:
+        if cfg.environment == "prod":
+            raise EncryptionKeyMissingError(
+                "TOKEN_ENCRYPTION_KEY is not set and ENVIRONMENT=prod. Every "
+                "stored integration token would be encrypted with a key that is "
+                "published in the source. Generate one with "
+                "`python -c \"from cryptography.fernet import Fernet; "
+                "print(Fernet.generate_key().decode())\"` and set it before starting.",
+                detail={"environment": cfg.environment, "setting": "TOKEN_ENCRYPTION_KEY"},
+            )
+        warnings.append(
+            "TOKEN_ENCRYPTION_KEY is unset: falling back to the published dev key. "
+            "Stored tokens are only as private as this repository."
+        )
+    return warnings
+
 
 class TokenCipher:
     """Fernet-based encryption for integration tokens at rest.
 
-    When no key is configured, we derive a deterministic dev key so the app
-    still boots in development. Production must set TOKEN_ENCRYPTION_KEY.
+    When no key is configured in dev/test we derive a deterministic dev key so
+    the app still boots with zero configuration -- and warn, loudly, once. In
+    production the same situation raises ``EncryptionKeyMissingError``: the
+    alternative is silently protecting customer credentials with a constant
+    from this file.
     """
 
-    def __init__(self, key: str | None) -> None:
+    def __init__(self, key: str | None, *, environment: str | None = None) -> None:
+        from app.config import get_settings
+
+        env = environment or get_settings().environment
+        if not key and env == "prod":
+            # Same failure as the startup validator, reached from the request
+            # path. Raised here rather than delegated: ``verify_runtime_security``
+            # reads the *cached* settings, which in a test (or any process where
+            # the two disagree) would answer for a different environment.
+            raise EncryptionKeyMissingError(
+                "TOKEN_ENCRYPTION_KEY is not set and the deployment is running as "
+                "production, so there is no key to encrypt or decrypt with.",
+                detail={"environment": env, "setting": "TOKEN_ENCRYPTION_KEY"},
+            )
         self._fernet = None
         self._dev_mode = key is None
         if key:
             from cryptography.fernet import Fernet
 
             self._fernet = Fernet(key.encode() if isinstance(key, str) else key)
+        elif self._dev_mode:
+            _logger.warning(
+                "token_cipher_dev_key_in_use",
+                extra={"environment": env},
+            )
 
     @property
     def is_dev_mode(self) -> bool:
@@ -130,8 +202,7 @@ class TokenCipher:
     def _dev_fernet(self):
         from cryptography.fernet import Fernet
 
-        # Deterministic, obviously-not-secret dev key. Never used in prod.
-        return Fernet(b"c2FobS1kZXYtb25seS10b2tlbi1rZXktMzItYnl0ZXM=")
+        return Fernet(DEV_FERNET_KEY)
 
     def encrypt(self, plaintext: str) -> str:
         if not plaintext:

@@ -7,11 +7,19 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import RequestIdDep, SessionDep
+from app.api.deps import (
+    AuthDep,
+    RequestIdDep,
+    SessionDep,
+    SettingsDep,
+    WorkspaceDep,
+    require_role,
+)
 from app.core.logging import get_logger
 from app.core.security import TokenCipher
-from app.db.models import Business, Integration
+from app.db.models import Integration
 from app.schemas.integrations import (
     MetaConnectRequest,
     MetaConnectResponse,
@@ -23,17 +31,10 @@ router = APIRouter(prefix="/integrations", tags=["integrations"])
 _logger = get_logger(__name__)
 
 
-async def _business(db) -> Business:
-    stmt = select(Business).order_by(Business.created_at).limit(1)
-    business = (await db.execute(stmt)).scalars().first()
-    if business is None:
-        business = Business(id=f"biz_{uuid.uuid4().hex[:20]}", name="My Business")
-        db.add(business)
-        await db.flush()
-    return business
-
-
-async def _meta_integration(db, business_id: str) -> Integration | None:
+async def _meta_integration(
+    db: AsyncSession, business_id: str
+) -> Integration | None:
+    """The Meta grant for one business. Always scoped to a resolved workspace."""
     stmt = select(Integration).where(
         Integration.business_id == business_id, Integration.provider == "meta"
     )
@@ -41,9 +42,8 @@ async def _meta_integration(db, business_id: str) -> Integration | None:
 
 
 @router.get("/meta/status", response_model=MetaIntegrationStatus)
-async def meta_status(db: SessionDep) -> MetaIntegrationStatus:
-    business = await _business(db)
-    integration = await _meta_integration(db, business.id)
+async def meta_status(ws: WorkspaceDep, db: SessionDep) -> MetaIntegrationStatus:
+    integration = await _meta_integration(db, ws.business_id)
     if integration is None or integration.status != "connected":
         return MetaIntegrationStatus(
             connected=False,
@@ -65,23 +65,31 @@ async def meta_status(db: SessionDep) -> MetaIntegrationStatus:
 
 @router.post("/meta/connect", response_model=MetaConnectResponse)
 async def meta_connect(
-    payload: MetaConnectRequest, db: SessionDep, request_id: RequestIdDep = ""
+    payload: MetaConnectRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+    principal: AuthDep,
+    settings: SettingsDep,
+    request_id: RequestIdDep = "",
 ) -> MetaConnectResponse:
     """Store a Meta access token, encrypted at rest.
 
     The token is never logged and never returned by any endpoint.
-    """
-    from app.config import get_settings
 
-    business = await _business(db)
-    cfg = get_settings()
+    ``owner`` only. Connecting an ad account is a workspace-level credential
+    change: it decides which Meta ad account every agent in this workspace
+    writes to, so it is the one integration action a ``member`` or ``viewer``
+    must not reach. ``GET /meta/status`` stays open to every role.
+    """
+    await require_role(principal, settings, ws, minimum="owner")
+    cfg = settings
     cipher = TokenCipher(cfg.token_encryption_key)
 
-    integration = await _meta_integration(db, business.id)
+    integration = await _meta_integration(db, ws.business_id)
     if integration is None:
         integration = Integration(
             id=f"int_{uuid.uuid4().hex[:20]}",
-            business_id=business.id,
+            business_id=ws.business_id,
             provider="meta",
         )
         db.add(integration)
@@ -127,9 +135,12 @@ async def meta_connect(
 
 
 @router.post("/meta/disconnect")
-async def meta_disconnect(db: SessionDep) -> dict[str, str]:
-    business = await _business(db)
-    integration = await _meta_integration(db, business.id)
+async def meta_disconnect(
+    ws: WorkspaceDep, db: SessionDep, principal: AuthDep, settings: SettingsDep
+) -> dict[str, str]:
+    """Drop the stored Meta grant. ``owner`` only, same as connect."""
+    await require_role(principal, settings, ws, minimum="owner")
+    integration = await _meta_integration(db, ws.business_id)
     if integration is not None:
         integration.status = "disconnected"
         integration.access_token_enc = None

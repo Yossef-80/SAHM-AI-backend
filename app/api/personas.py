@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.deps import SessionDep
+from app.api.deps import AuthDep, SessionDep, SettingsDep, WorkspaceDep, require_role
 from app.core.agents.persona import load_persona, save_persona_override
 from app.core.agents.personas import PERSONAS, PERSONA_ORDER, all_personas
 from app.schemas.personas import PersonaResponse, PersonaUpdateRequest
@@ -31,14 +31,16 @@ def _to_response(persona, *, is_overridden: bool) -> PersonaResponse:
 
 
 @router.get("", response_model=list[PersonaResponse])
-async def list_personas(db: SessionDep) -> list[PersonaResponse]:
+async def list_personas(
+    ws: WorkspaceDep, db: SessionDep
+) -> list[PersonaResponse]:
     """All personas, with this workspace's overrides applied."""
     out: list[PersonaResponse] = []
     for persona_id in PERSONA_ORDER:
         base = PERSONAS.get(persona_id)
         if base is None:
             continue
-        merged = await load_persona(persona_id, db)
+        merged = await load_persona(persona_id, db, ws.workspace_id)
         overridden = (
             merged.name != base.name
             or merged.tone != base.tone
@@ -51,9 +53,20 @@ async def list_personas(db: SessionDep) -> list[PersonaResponse]:
 
 @router.patch("/{persona_id}", response_model=PersonaResponse)
 async def update_persona(
-    persona_id: str, payload: PersonaUpdateRequest, db: SessionDep
+    persona_id: str,
+    payload: PersonaUpdateRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+    principal: AuthDep,
+    settings: SettingsDep,
 ) -> PersonaResponse:
-    """Edit a persona. Only editable_fields are accepted."""
+    """Edit a persona. Only editable_fields are accepted.
+
+    Reads stay open to every role; the write needs ``member`` or better. A
+    persona override decides how an agent behaves -- its tone, its autonomy
+    ceiling -- so a ``viewer`` editing one would be an escalation, not a typo.
+    """
+    await require_role(principal, settings, ws, minimum="member")
     if persona_id not in PERSONAS:
         from app.core.errors import NotFoundError
 
@@ -64,9 +77,19 @@ async def update_persona(
 
         raise ValidationFailed("no editable fields were provided")
 
-    await save_persona_override(db, workspace_id="default", persona_id=persona_id, fields=changed)
+    # ``changed_fields()`` reports the *names* that were set, so the values have
+    # to be re-read here -- passing that set straight through raised
+    # ``'set' object has no attribute 'items'`` inside the repository.
+    fields = {
+        name: value
+        for name, value in payload.model_dump(exclude_unset=True).items()
+        if value is not None
+    }
+    await save_persona_override(
+        db, workspace_id=ws.workspace_id, persona_id=persona_id, fields=fields
+    )
     await db.commit()
-    merged = await load_persona(persona_id, db)
+    merged = await load_persona(persona_id, db, ws.workspace_id)
     return _to_response(merged, is_overridden=True)
 
 

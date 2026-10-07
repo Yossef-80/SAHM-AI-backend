@@ -247,6 +247,17 @@ def compose_blocks(
     try:
         if task_name in ("competitor_research", "market_analysis", "market_gaps"):
             blocks.extend(_research_blocks(task_name, output))
+            tool_calls = agent_result.get("tool_calls_made") or []
+            if task_name == "competitor_research" and tool_calls:
+                activity = [
+                    f"- **{str(call.get('tool') or 'Research tool')}** — "
+                    f"{str(call.get('status') or 'completed')}: "
+                    f"{str(call.get('output_summary') or 'tool call completed')}"
+                    for call in tool_calls
+                    if isinstance(call, dict)
+                ]
+                if activity:
+                    blocks.append(text_block("**Research activity**\n" + "\n".join(activity)))
         elif task_name in ("marketing_strategy", "campaign_strategy", "content_calendar"):
             blocks.append(_strategy_block(task_name, output))
         elif task_name in ("creative_brief", "ad_copy", "ad_variations"):
@@ -301,11 +312,26 @@ def _research_blocks(task_name: str, output: dict[str, Any]) -> list[dict[str, A
         for comp in output.get("competitors") or []:
             if not isinstance(comp, dict):
                 continue
+            detail_parts = []
+            for label, key in (
+                ("Positioning", "positioning"),
+                ("Offers", "offers"),
+                ("Strengths", "strengths"),
+                ("Weaknesses", "weaknesses"),
+                ("Channels", "channels"),
+            ):
+                value = comp.get(key)
+                if isinstance(value, list):
+                    value = "; ".join(str(item) for item in value if item)
+                value = str(value or "").strip()
+                if value:
+                    detail_parts.append(f"**{label}:** {value}")
             findings.append(
                 Finding(
                     title=str(comp.get("name") or "Competitor"),
-                    detail=str(comp.get("positioning") or ""),
+                    detail="\n".join(detail_parts),
                     source=str(comp.get("source") or "competitor_research"),
+                    evidence=evidence,
                 )
             )
     elif task_name == "market_gaps":
@@ -336,18 +362,27 @@ def _research_blocks(task_name: str, output: dict[str, Any]) -> list[dict[str, A
         blocks.append(
             findings_block(f"{task_name.replace('_', ' ').title()} findings", findings)
         )
-    for key in ("differentiation_opportunities", "opportunities", "recommended_focus"):
+    for key in ("common_patterns", "differentiation_opportunities", "opportunities", "recommended_focus"):
         values = output.get(key)
         if isinstance(values, list) and values:
             blocks.append(text_block("**" + key.replace("_", " ").title() + "**\n" + "\n".join(
                 f"- {v}" for v in values if isinstance(v, str)
             )))
-            break
     if evidence:
+        evidence_lines = []
+        for item in evidence:
+            label = item.source or "Source"
+            if item.url:
+                from urllib.parse import urlsplit
+
+                parsed = urlsplit(item.url)
+                if parsed.scheme in ("http", "https") and parsed.netloc:
+                    label = f"[{label}]({item.url})"
+            evidence_lines.append(f"- {label}: {item.detail}" if item.detail else f"- {label}")
         blocks.append(
             text_block(
                 "**Evidence**\n"
-                + "\n".join(f"- {e.source}: {e.detail}" for e in evidence if e.detail)
+                + "\n".join(evidence_lines)
             )
         )
     return blocks

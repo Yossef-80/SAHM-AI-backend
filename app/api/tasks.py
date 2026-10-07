@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
 
-from app.api.deps import RequestIdDep, SessionDep
+from app.api.deps import RequestIdDep, SessionDep, SettingsDep, WorkspaceDep
 from app.core.agents.persona import load_persona
 from app.core.orchestrator.service import (
     cancel_task,
@@ -15,23 +14,11 @@ from app.core.orchestrator.service import (
     run_task_in_background,
     stream_task,
 )
-from app.db.models import AgentTask, Business
+from app.db.models import AgentTask
 from app.schemas.tasks import AgentTask as AgentTaskSchema
 from app.schemas.tasks import CancelTaskResponse
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
-
-
-async def _business(db) -> Business:
-    stmt = select(Business).order_by(Business.created_at).limit(1)
-    business = (await db.execute(stmt)).scalars().first()
-    if business is None:
-        import uuid
-
-        business = Business(id=f"biz_{uuid.uuid4().hex[:20]}", name="My Business")
-        db.add(business)
-        await db.flush()
-    return business
 
 
 def _to_schema(row: AgentTask) -> AgentTaskSchema:
@@ -62,36 +49,48 @@ def _to_schema(row: AgentTask) -> AgentTaskSchema:
 
 
 @router.get("/{task_id}", response_model=AgentTaskSchema)
-async def read_task(task_id: str, db: SessionDep) -> AgentTaskSchema:
+async def read_task(
+    task_id: str, ws: WorkspaceDep, db: SessionDep
+) -> AgentTaskSchema:
     """Poll a long-running task. SSE uses the same shape behind /tasks/{id}/stream."""
-    return _to_schema(await get_task(db, task_id))
+    return _to_schema(await get_task(db, task_id, business_id=ws.business_id))
 
 
 @router.post("/{task_id}/cancel", response_model=CancelTaskResponse)
-async def cancel(task_id: str, db: SessionDep) -> CancelTaskResponse:
-    row = await cancel_task(db, task_id)
+async def cancel(
+    task_id: str, ws: WorkspaceDep, db: SessionDep
+) -> CancelTaskResponse:
+    row = await cancel_task(db, task_id, business_id=ws.business_id)
     return CancelTaskResponse(
         task_id=row.id, status=row.status, message="Task cancelled."
     )
 
 
 @router.get("/{task_id}/stream")
-async def stream(task_id: str, db: SessionDep) -> StreamingResponse:
-    """SSE endpoint. Same interface as polling, so the frontend can switch."""
-    generator = stream_task(db, task_id, llm=None, request_id="")
-    return StreamingResponse(generator, media_type="text/event-stream")
+async def stream(
+    task_id: str, ws: WorkspaceDep, db: SessionDep
+) -> StreamingResponse:
+    """SSE endpoint. Same interface as polling, so the frontend can switch.
+
+    The task is loaded (and ownership-checked) here, not inside the generator:
+    once the first chunk is sent the status line is fixed, so a 404 raised
+    mid-stream would surface as a broken connection instead of a clean answer.
+    """
+    task = await get_task(db, task_id, business_id=ws.business_id)
+    return StreamingResponse(stream_task(task), media_type="text/event-stream")
 
 
 @router.post("", response_model=AgentTaskSchema)
 async def start_task(
     persona_id: str,
     task: str,
+    ws: WorkspaceDep,
     db: SessionDep,
+    settings: SettingsDep,
     request_id: RequestIdDep,
 ) -> AgentTaskSchema:
     """Queue a long-running task and return immediately."""
-    business = await _business(db)
-    persona = await load_persona(persona_id, db)
+    persona = await load_persona(persona_id, db, ws.workspace_id)
     if not persona.can_run_task(task):
         from app.core.errors import TaskNotAllowedError
 
@@ -104,7 +103,7 @@ async def start_task(
         task_name=task,
         persona_id=persona_id,
         conversation_id=None,
-        business_id=business.id,
+        business_id=ws.business_id,
         inputs={},
         request_id=request_id,
     )
@@ -112,14 +111,17 @@ async def start_task(
 
     import asyncio
 
-    from app.core.llm.router import get_llm
+    from app.core.llm.router import get_workspace_llm
     from app.db.session import get_sessionmaker
 
+    llm = await get_workspace_llm(
+        "strong", db=db, business_id=ws.business_id, settings=settings
+    )
     asyncio.create_task(
         run_task_in_background(
             row.id,
             db_factory=get_sessionmaker(),
-            llm=get_llm("strong"),
+            llm=llm,
             persona_id=persona_id,
             task_name=task,
             inputs={},

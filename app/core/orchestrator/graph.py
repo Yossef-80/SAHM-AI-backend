@@ -10,19 +10,23 @@ the user clicks, which arrives as a new turn.
 
 from __future__ import annotations
 
+import asyncio
+import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
 from app.core.agents.persona import load_persona
-from app.core.agents.runtime import RunOptions, run_agent
-from app.core.llm.base import LLMClient
+from app.core.agents.runtime import RunOptions, run_agent, run_agent_stream
+from app.core.llm.base import LLMClient, Msg
 from app.core.logging import get_logger
 from app.core.orchestrator.blocks import (
     compose_blocks,
     error_block,
     question_block,
+    text_block,
 )
 from app.core.orchestrator.router import clarification_question, classify_intent
 from app.core.orchestrator.state import OrchestratorState, initial_state
@@ -30,6 +34,17 @@ from app.core.tools.base import ToolContext
 from app.schemas.common import IntentKind
 
 _logger = get_logger(__name__)
+
+_SEARCH_STATUS_RE = re.compile(
+    r"\b(?:did you (?:actually )?(?:search|research|look up)|did (?:you|the assistant) search|"
+    r"was (?:this|that) researched|have you searched|how did you (?:get|find|retrieve) "
+    r"(?:this )?(?:information|info|answer)|where did (?:this|that|the) (?:information|info|answer) "
+    r"come from|what (?:source|sources|evidence) (?:did you use|is this based on)|"
+    r"is this (?:sourced|verified|based on research))\b|"
+    r"هل\s*(?:بحثت|قمت\s+بالبحث)|(?:من أين|ما مصدر|ما مصادر).*(?:المعلومات|المعلومة|الإجابة)|"
+    r"كيف\s*(?:وصلت|حصلت)\s+على\s+هذه\s+(?:المعلومات|المعلومة)",
+    re.IGNORECASE,
+)
 
 #: persona -> the intent its node is keyed by.
 _PERSONA_INTENT: dict[str, IntentKind] = {
@@ -48,12 +63,14 @@ class OrchestratorDeps:
     db: Any
     llm: LLMClient
     business_id: str
+    fast_llm: LLMClient | None = None
     workspace_id: str = "default"
     request_id: str = ""
     options: RunOptions = field(default_factory=RunOptions)
     #: Set when the caller already resolved a persona (e.g. an action card).
     forced_persona_id: str | None = None
     forced_task: str | None = None
+    event_queue: asyncio.Queue[dict[str, Any]] | None = None
 
 
 # --------------------------------------------------------------------- nodes --
@@ -62,6 +79,19 @@ class OrchestratorDeps:
 async def _classify_node(state: OrchestratorState, deps: OrchestratorDeps) -> dict[str, Any]:
     message = state.get("user_message", "")
     context = state.get("context") or {}
+
+    # Search-status questions need only inspect the completed conversation
+    # record. Bypass both the classifier LLM and the Strong-tier chat model so
+    # a status check can never accidentally trigger a tool call.
+    if _SEARCH_STATUS_RE.search(message):
+        _logger.info("search_status_turn")
+        return {
+            "intent": IntentKind.CHAT.value,
+            "intent_confidence": 1.0,
+            "missing_info": [],
+            "task_name": "",
+            "persona_id": "",
+        }
 
     if deps.forced_persona_id and deps.forced_task:
         _logger.info("intent_forced", extra={"persona": deps.forced_persona_id})
@@ -79,15 +109,20 @@ async def _classify_node(state: OrchestratorState, deps: OrchestratorDeps) -> di
     classification = await classify_intent(
         message,
         context=context,
-        llm=deps.llm,
+        llm=deps.fast_llm or deps.llm,
         confidence_threshold=0.7,
     )
     _logger.info(
-        "intent_classified",
+        "intent_classified intent=%s confidence=%.2f task=%s rationale=%s",
+        classification.intent.value,
+        classification.confidence,
+        classification.task_name or "none",
+        classification.rationale or "none",
         extra={
             "intent": classification.intent.value,
             "confidence": classification.confidence,
             "task": classification.task_name,
+            "rationale": classification.rationale,
         },
     )
     return {
@@ -135,6 +170,7 @@ async def _agent_node(state: OrchestratorState, deps: OrchestratorDeps, persona_
         db=deps.db,
         llm=deps.llm,
         request_id=deps.request_id,
+        fast_llm=deps.fast_llm,
         campaign_id=(state.get("context") or {}).get("campaign_id"),
         creative_id=(state.get("context") or {}).get("creative_id"),
         insight_id=(state.get("context") or {}).get("insight_id"),
@@ -143,15 +179,43 @@ async def _agent_node(state: OrchestratorState, deps: OrchestratorDeps, persona_
     )
 
     try:
-        result = await run_agent(
-            persona,
-            task_name,
-            dict(state.get("context") or {}),
-            ctx,
-            llm=deps.llm,
-            options=deps.options,
-            user_message=state.get("user_message", ""),
-        )
+        if deps.event_queue is None:
+            result = await run_agent(
+                persona,
+                task_name,
+                dict(state.get("context") or {}),
+                ctx,
+                llm=deps.llm,
+                options=deps.options,
+                user_message=state.get("user_message", ""),
+            )
+        else:
+            result = None
+            async for event in run_agent_stream(
+                persona,
+                task_name,
+                dict(state.get("context") or {}),
+                ctx,
+                llm=deps.llm,
+                options=deps.options,
+                user_message=state.get("user_message", ""),
+            ):
+                if event.type in {"step_started", "tool_called", "tool_result", "failed"}:
+                    data = event.data or {}
+                    await deps.event_queue.put(
+                        {
+                            "type": event.type,
+                            "step": event.step,
+                            "detail": (event.detail or "")[:240],
+                            "status": data.get("status"),
+                        }
+                    )
+                if event.type in {"completed", "failed"} and event.data and event.data.get("result"):
+                    from app.schemas.agent import AgentResult
+
+                    result = AgentResult.model_validate(event.data["result"])
+            if result is None:
+                raise RuntimeError("agent stream ended without a result")
     except Exception as exc:
         _logger.warning("agent_run_failed", extra={"error": str(exc)})
         return {"error": f"{persona.name} could not complete the task: {exc}", "agent_result": None}
@@ -172,6 +236,159 @@ async def _ask_clarification_node(
     return {
         "clarification": payload,
         "blocks": [question_block(payload["question"], payload["options"], payload["missing_info"])],
+    }
+
+
+async def _chat_node(state: OrchestratorState, deps: OrchestratorDeps) -> dict[str, Any]:
+    """Answer non-task conversation with the configured strong-tier model."""
+    message = state.get("user_message", "")
+    if _SEARCH_STATUS_RE.search(message):
+        previous_research = next(
+            (
+                item
+                for item in reversed(state.get("messages", []))
+                if item.get("role") == "assistant" and item.get("persona_id") == "researcher"
+            ),
+            None,
+        )
+        blocks = (previous_research or {}).get("blocks") or []
+        has_evidence = False
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "findings":
+                for finding in block.get("findings") or []:
+                    if not isinstance(finding, dict):
+                        continue
+                    refs = finding.get("evidence") or []
+                    has_search_source = str(finding.get("source") or "").startswith("web_search")
+                    has_source_reference = any(
+                        isinstance(ref, dict)
+                        and (
+                            bool(ref.get("url"))
+                            or str(ref.get("source") or "").startswith("web_search")
+                        )
+                        for ref in refs
+                    )
+                    if has_search_source or has_source_reference:
+                        has_evidence = True
+                        break
+            if block.get("type") == "text":
+                evidence_text = str(block.get("text") or "").lower()
+                if "web_search" in evidence_text and (
+                    "http://" in evidence_text or "https://" in evidence_text
+                ):
+                    has_evidence = True
+            if has_evidence:
+                break
+        if has_evidence:
+            reply = "Yes. The previous turn completed researcher work and included source evidence in its result."
+        else:
+            reply = "No. The previous reply did not contain completed research with source evidence; it failed before a sourced search result was produced."
+        return {"blocks": [text_block(reply)]}
+
+    _logger.info(
+        "chat_llm_request "
+        f"tier=strong model={getattr(deps.llm, 'model', 'unknown')} "
+        f"client={type(deps.llm).__name__}",
+        extra={
+            "tier": "strong",
+            "model": getattr(deps.llm, "model", None),
+            "client": type(deps.llm).__name__,
+        },
+    )
+    history: list[Msg] = []
+    for item in state.get("messages", []):
+        if item.get("role") not in ("user", "assistant"):
+            continue
+        previous_text = str(item.get("content") or "")
+        # Older chat replies sometimes promised to route a request to research
+        # even though no tool was run. Do not let that promise teach GPT-OSS to
+        # emit a tool call in a later tool-free chat request.
+        if (
+            item.get("role") == "assistant"
+            and item.get("persona_id") != "researcher"
+            and re.search(r"\b(?:search|research|web\s+tool|route.{0,30}tool)\b", previous_text, re.IGNORECASE)
+        ):
+            continue
+        history.append(Msg(role=item["role"], content=previous_text))
+    history.append(Msg(role="user", content=message))
+    try:
+        result = await deps.llm.complete(
+            system=(
+                "You are Sahm, a helpful conversational assistant for a marketing system. "
+                "Respond naturally and directly to ordinary conversation and questions. "
+                "Use the language the user is using. Keep simple replies concise. "
+                "Do not claim to have accessed live data, changed settings, or performed "
+                "an action unless a tool result explicitly confirms it. This chat request "
+                "has no tools: do not attempt to call a tool, claim you are routing a task, "
+                "or say that research is starting. If asked whether a search was done, "
+                "answer only from source evidence in the conversation."
+            ),
+            messages=history,
+            tier="strong",
+            max_tokens=1600,
+            temperature=0.7,
+        )
+        reply = result.text.strip()
+        if reply:
+            return {"blocks": [text_block(reply)]}
+        _logger.warning("chat_llm_returned_empty", extra={"model": result.model})
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        detail = getattr(exc, "detail", None)
+        provider_message = None
+        raw_body = detail.get("body") if isinstance(detail, dict) else None
+        if isinstance(raw_body, str):
+            try:
+                payload = json.loads(raw_body)
+                provider_error = payload.get("error") if isinstance(payload, dict) else None
+                if isinstance(provider_error, dict):
+                    provider_message = provider_error.get("message") or provider_error.get("code")
+                elif isinstance(provider_error, str):
+                    provider_message = provider_error
+            except (ValueError, TypeError):
+                provider_message = None
+        if isinstance(provider_message, str):
+            provider_message = " ".join(provider_message.split())[:240]
+        if provider_message and "tool choice is none" in provider_message.lower():
+            _logger.warning("chat_tool_call_blocked model=%s", getattr(deps.llm, "model", "unknown"))
+            return {
+                "blocks": [
+                    text_block(
+                        "I didn't complete a search in this turn. The chat model attempted "
+                        "to call a tool, but no research tool ran and no new sources were retrieved."
+                    )
+                ]
+            }
+        diagnostic = (
+            f"chat_llm_failed error_type={type(exc).__name__} "
+            f"status_code={status_code or 'none'} error={str(exc)}"
+        )
+        if provider_message:
+            diagnostic += f" provider_message={provider_message}"
+        _logger.warning(
+            diagnostic,
+            extra={
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+                "status_code": status_code,
+                "provider_message": provider_message,
+            },
+        )
+        suffix = (
+            f" Provider HTTP {status_code}." if status_code else ""
+        ) + (f" Provider message: {provider_message}" if provider_message else "")
+    else:
+        suffix = " The model returned an empty reply."
+    return {
+        "blocks": [
+            error_block(
+                "I couldn't respond using the Strong-tier model. Check its provider, exact model ID, and API key in Settings → Language Models."
+                + suffix,
+                code="llm_chat_failed",
+            )
+        ]
     }
 
 
@@ -236,6 +453,9 @@ def build_graph(deps: OrchestratorDeps) -> Any:
     async def ask_clarification(state: OrchestratorState) -> dict[str, Any]:
         return await _ask_clarification_node(state, deps)
 
+    async def chat(state: OrchestratorState) -> dict[str, Any]:
+        return await _chat_node(state, deps)
+
     async def compose_blocks_node(state: OrchestratorState) -> dict[str, Any]:
         return await _compose_node(state, deps)
 
@@ -246,6 +466,7 @@ def build_graph(deps: OrchestratorDeps) -> Any:
     graph.add_node("analyze", analyze)
     graph.add_node("optimize", optimize)
     graph.add_node("ask_clarification", ask_clarification)
+    graph.add_node("chat", chat)
     graph.add_node("compose_blocks", compose_blocks_node)
 
     graph.add_edge(START, "classify_intent")
@@ -259,11 +480,13 @@ def build_graph(deps: OrchestratorDeps) -> Any:
             "analyze": "analyze",
             "optimize": "optimize",
             "ask_clarification": "ask_clarification",
+            "chat": "chat",
         },
     )
     for node in ("research", "strategy", "creative", "analyze", "optimize"):
         graph.add_edge(node, "compose_blocks")
     graph.add_edge("ask_clarification", END)
+    graph.add_edge("chat", END)
     graph.add_edge("compose_blocks", END)
 
     return graph.compile()

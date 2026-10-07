@@ -51,11 +51,13 @@ class LLMProviderError(LLMError):
         detail: dict[str, object] | None = None,
         retryable: bool = True,
         status_code: int | None = None,
+        retry_after: float | None = None,
     ) -> None:
         super().__init__(message, detail=detail)
         #: Whether the caller should back off and try again.
         self.retryable = retryable
         self.status_code = status_code
+        self.retry_after = retry_after
 
 
 class LLMNotConfiguredError(LLMError):
@@ -183,11 +185,74 @@ class ForbiddenError(SahmError):
     http_status = 403
 
 
+class WorkspaceRequiredError(SahmError):
+    """No workspace could be identified for this request.
+
+    Raised by ``resolve_workspace`` (``app/api/deps.py``) when an
+    unauthenticated request carries no ``X-Workspace-Id`` header while
+    ``require_workspace_header`` is set. Since P1 the same dependency resolves
+    the workspace from the caller's memberships when a principal is present, so
+    the seam is now: identify the tenant or say no.
+    """
+
+    code = "workspace_required"
+    http_status = 400
+
+
+class EmailTakenError(SahmError):
+    """Registration for an address that already has an account.
+
+    409, and only ever raised by ``POST /auth/register``. Login stays generic
+    for both "unknown address" and "wrong password" -- a duplicate-registration
+    conflict has to tell the user the truth, because there is nothing to
+    enumerate on an endpoint whose whole job is to create the account.
+    """
+
+    code = "email_taken"
+    http_status = 409
+
+
 class BlockedTargetError(SahmError):
     """SSRF guard: the requested URL resolves to a private/reserved range."""
 
     code = "blocked_target"
     http_status = 400
+
+
+class EncryptionKeyMissingError(SahmError):
+    """P4/D5: no TOKEN_ENCRYPTION_KEY while running as production.
+
+    Raised by ``verify_runtime_security`` at startup and by ``TokenCipher`` on
+    the request path. Deliberately fatal in prod and deliberately a loud warning
+    everywhere else: a dev boot with no key is a convenience, a prod boot with
+    no key means every customer credential is "encrypted" with a constant in the
+    repository.
+    """
+
+    code = "encryption_key_missing"
+    http_status = 500
+
+
+class RateLimitExceeded(SahmError):
+    """Too many requests for the caller's bucket (P4.2).
+
+    Carries ``retry_after`` so the middleware can set the ``Retry-After`` header
+    without re-deriving it, and so the error envelope carries the same number a
+    client would read off the header.
+    """
+
+    code = "rate_limited"
+    http_status = 429
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        detail: dict[str, object] | None = None,
+        retry_after: int = 1,
+    ) -> None:
+        super().__init__(message, detail=detail)
+        self.retry_after = max(1, int(retry_after))
 
 
 class UploadRejectedError(SahmError):

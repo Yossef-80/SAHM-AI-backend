@@ -12,24 +12,29 @@ from __future__ import annotations
 
 import json
 import math
+import uuid
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
+from app.config import get_settings
 from app.schemas.common import (
     Autonomy,
     Language,
@@ -37,6 +42,19 @@ from app.schemas.common import (
     TaskStatus,
     Tone,
 )
+
+#: Vector width for every ``Embedding`` column (D6).
+#:
+#: Read once at import time, deliberately. The column type is constructed while
+#: the model class body executes, i.e. at module import, so there is no
+#: connection or request context in which to resolve it later; and
+#: ``get_settings()`` is ``@lru_cache``d, so this is a single evaluation whose
+#: value every worker agrees on. The trade-off is that changing
+#: ``EMBEDDING_DIM`` requires a restart *and* a migration -- which is the point:
+#: previously the column silently used the class default of 64 while the
+#: embedding provider emitted ``EMBEDDING_DIM`` floats, so raising the env var
+#: desynchronised the two with no error anywhere.
+EMBEDDING_DIM: int = get_settings().embedding_dim
 
 
 class Base(DeclarativeBase):
@@ -58,9 +76,11 @@ class Embedding(TypeDecorator):
     impl = JSON
     cache_ok = True
 
-    def __init__(self, dim: int = 64) -> None:
+    def __init__(self, dim: int | None = None) -> None:
         super().__init__()
-        self.dim = dim
+        #: Falls back to the configured dimension so the class default can
+        #: never drift from ``EMBEDDING_DIM`` (D6).
+        self.dim = dim if dim is not None else EMBEDDING_DIM
 
     def load_dialect_impl(self, dialect: Any) -> Any:
         if dialect.name == "postgresql":
@@ -150,6 +170,11 @@ class Business(Base, TimestampMixin):
     language: Mapped[str] = mapped_column(String(2), default=Language.EN.value)
     currency: Mapped[str | None] = mapped_column(String(8))
     monthly_budget: Mapped[float | None] = mapped_column(Float)
+    # P2.7 / P4.1: the per-workspace override for ``Settings.daily_token_budget``.
+    # NULL means "inherit the process default", which is why this is a nullable
+    # override and not a second mandatory number: two workspaces can hold
+    # different budgets while a fresh workspace still boots with the env value.
+    daily_token_budget: Mapped[int | None] = mapped_column(Integer)
 
     profile: Mapped["BrandProfile"] = relationship(
         back_populates="business", uselist=False, cascade="all, delete-orphan",
@@ -197,7 +222,7 @@ class BrandMemoryItem(Base):
         comment="voice_example|visual_style|offer|audience|competitor_note|learning|reference_analysis",
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list[float] | None] = mapped_column(Embedding())
+    embedding: Mapped[list[float] | None] = mapped_column(Embedding(EMBEDDING_DIM))
     # Free-form: campaign ids, scores, tags, reference analysis payloads.
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
     campaign_id: Mapped[str | None] = mapped_column(String(64), index=True)
@@ -333,6 +358,15 @@ class Recommendation(Base, TimestampMixin):
     campaign_id: Mapped[str | None] = mapped_column(
         String(64), ForeignKey("campaigns.id", ondelete="CASCADE"), index=True
     )
+    # P1: the owning business, denormalised. Before this column the tenant had to
+    # be reached through ``campaign_id`` -> ``Campaign.business_id``, which is
+    # ambiguous for a recommendation raised outside a campaign (no owner at all)
+    # and costs a join on every read. Nullable with ``ondelete="SET NULL"``: a
+    # NULL row belongs to nobody and stays invisible, so a deleted business fails
+    # closed rather than orphaning rows into someone's list.
+    workspace_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="SET NULL"), index=True
+    )
     insight_id: Mapped[str | None] = mapped_column(
         String(64), ForeignKey("insights.id", ondelete="SET NULL"), index=True
     )
@@ -462,6 +496,212 @@ class Integration(Base, TimestampMixin):
     )
 
 
+# ------------------------------------------------------------ identity (P1) ---
+
+
+class User(Base, TimestampMixin):
+    """A person who can sign in. The identity root for every other P1 table.
+
+    ``email`` is stored already normalised (see ``app/core/auth.py``:
+    ``normalise_email``) and carries a plain UNIQUE constraint. That is the
+    citext behaviour without a Postgres extension, and it is what makes
+    ``Foo@Example.com`` and ``foo@example.com`` one account rather than two --
+    which is also why login can never disclose whether an address is registered.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    #: ``pbkdf2_sha256$<iterations>$<b64 salt>$<b64 hash>``. Never logged.
+    password_hash: Mapped[str] = mapped_column(String(255))
+    full_name: Mapped[str | None] = mapped_column(String(200))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Membership(Base):
+    """The user <-> workspace join that makes multi-tenancy real (P1.7).
+
+    One row per (user, workspace). ``business_id`` records which business inside
+    that workspace the membership was created against; both unique constraints
+    are deliberate -- a user cannot end up with two memberships for the same
+    workspace, and therefore cannot hold two roles in it.
+    """
+
+    __tablename__ = "memberships"
+    __table_args__ = (
+        UniqueConstraint("user_id", "business_id", name="uq_membership_user_business"),
+        UniqueConstraint("user_id", "workspace_id", name="uq_membership_user_workspace"),
+        CheckConstraint(
+            "role IN ('owner','member','viewer')", name="ck_membership_role"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    #: An id namespace, not yet a foreign key -- see the roadmap's note on why.
+    workspace_id: Mapped[str] = mapped_column(String(64), index=True)
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True
+    )
+    #: ``owner | member | viewer`` (enforced by ``ck_membership_role``).
+    role: Mapped[str] = mapped_column(String(20), default="member", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Session(Base):
+    """One opaque bearer token. The raw token is returned once and never stored.
+
+    Only ``sha256(token)`` lands here, so a database leak -- a stolen backup, a
+    SQL console -- yields hashes that cannot be replayed as sessions. Revocation
+    is instant because every request reads this row; rotation (``/auth/refresh``)
+    is therefore just "insert a new row, stamp ``revoked_at`` on the old one".
+    """
+
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    #: sha256 hex of the raw token. Unique, so a collision is a 500 not a
+    #: silent account takeover.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_agent: Mapped[str | None] = mapped_column(String(400))
+    ip: Mapped[str | None] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class Profile(Base, TimestampMixin):
+    """Links a Supabase Auth user to a business + role.
+
+    Replaces the old User + Membership tables for authentication.
+    Supabase owns the identity (email, password, OAuth); we own the
+    business/role mapping via this table.
+    """
+
+    __tablename__ = "profiles"
+    __table_args__ = (
+        UniqueConstraint("supabase_user_id", name="uq_profiles_supabase_user_id"),
+        ForeignKeyConstraint(
+            ["business_id"], ["businesses.id"], ondelete="CASCADE", name="fk_profiles_business_id"
+        ),
+        CheckConstraint("role IN ('owner','member','viewer')", name="ck_profiles_role"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    supabase_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), unique=True, index=True, nullable=False
+    )
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(20), default="member", index=True, nullable=False)
+
+
+class ToolSettings(Base, TimestampMixin):
+    """P2.4: per-workspace connector configuration, one row per (business, connector).
+
+    ``integrations`` stores OAuth *grants*; this table stores *configuration* --
+    the provider, the non-secret ids and the encrypted secrets a workspace's
+    tools need. The split matters: disconnecting Meta must not delete the app id
+    an agency typed in, and rotating a search key must not touch the Meta grant.
+
+    One row per connector (not one wide row per workspace) is deliberate even
+    though the roadmap sketch in §5.1 shows a wide ``tool_settings`` row: it
+    makes ``DELETE /settings/connectors/{connector}`` a single-row delete, keeps
+    an added provider from needing a nullable column pair, and lets the unique
+    constraint below do the isolation work in the database instead of in a
+    ``WHERE`` clause somebody can forget.
+
+    Every ``*_enc`` column is Fernet ciphertext produced by ``TokenCipher``
+    (``app/core/security.py``). A secret is write-only over HTTP: no response
+    body, log line or audit row ever contains the plaintext.
+    """
+
+    __tablename__ = "tool_settings"
+    __table_args__ = (
+        UniqueConstraint(
+            "business_id", "connector", name="uq_tool_settings_business_connector"
+        ),
+        CheckConstraint(
+            "connector IN ('meta','google_places','dataforseo','image','search')",
+            name="ck_tool_settings_connector",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True
+    )
+    connector: Mapped[str] = mapped_column(String(40), index=True)
+    # --- non-secret configuration -------------------------------------------
+    #: Meta: the app and the ad account this workspace manages.
+    meta_app_id: Mapped[str | None] = mapped_column(String(120))
+    meta_ad_account_id: Mapped[str | None] = mapped_column(String(120))
+    #: Google Places / DataForSEO.
+    google_places_base_url: Mapped[str | None] = mapped_column(String(500))
+    dataforseo_login: Mapped[str | None] = mapped_column(String(200))
+    #: Provider selection for the two swappable connectors.
+    image_provider: Mapped[str | None] = mapped_column(String(30))
+    image_model: Mapped[str | None] = mapped_column(String(80))
+    search_provider: Mapped[str | None] = mapped_column(String(30))
+    keyword_provider: Mapped[str | None] = mapped_column(String(30))
+    #: Repointing column: the connector's base URL, when the map says the
+    #: connector is ``configurable_via`` a base URL.
+    base_url: Mapped[str | None] = mapped_column(String(500))
+    # --- encrypted secrets ---------------------------------------------------
+    meta_app_secret_enc: Mapped[str | None] = mapped_column(Text)
+    meta_access_token_enc: Mapped[str | None] = mapped_column(Text)
+    google_places_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    dataforseo_password_enc: Mapped[str | None] = mapped_column(Text)
+    image_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    search_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    #: Who last changed it, for the audit trail. Never a secret.
+    updated_by: Mapped[str | None] = mapped_column(String(64))
+
+
+class LlmProviderSettings(Base, TimestampMixin):
+    """Workspace-level LLM routing and credentials; secrets are encrypted."""
+
+    __tablename__ = "llm_provider_settings"
+    __table_args__ = (
+        UniqueConstraint("business_id", name="uq_llm_provider_settings_business"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True
+    )
+    fast_provider: Mapped[str | None] = mapped_column(String(20))
+    fast_model: Mapped[str | None] = mapped_column(String(120))
+    fast_base_url: Mapped[str | None] = mapped_column(String(500))
+    fast_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    fast_extra_headers_enc: Mapped[str | None] = mapped_column(Text)
+    strong_provider: Mapped[str | None] = mapped_column(String(20))
+    strong_model: Mapped[str | None] = mapped_column(String(120))
+    strong_base_url: Mapped[str | None] = mapped_column(String(500))
+    strong_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    strong_extra_headers_enc: Mapped[str | None] = mapped_column(Text)
+    updated_by: Mapped[str | None] = mapped_column(String(64))
+
+
 class UsageRecord(Base):
     """Per-call token accounting, used for the daily budget guard."""
 
@@ -482,6 +722,7 @@ class UsageRecord(Base):
 
 
 __all__ = [
+    "EMBEDDING_DIM",
     "AgentTask",
     "AgentToolCall",
     "AuditLog",
@@ -497,10 +738,16 @@ __all__ = [
     "Insight",
     "Message",
     "PersonaOverride",
+    "ToolSettings",
     "Recommendation",
     "UsageRecord",
+    "Profile",
     "Tone",
     "Autonomy",
     "Language",
     "cosine",
+    # Legacy (kept for migration, will be removed):
+    "User",
+    "Membership",
+    "Session",
 ]

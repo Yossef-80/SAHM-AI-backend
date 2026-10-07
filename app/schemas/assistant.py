@@ -34,6 +34,9 @@ class AssistantMessageResponse(ApiModel):
     # Present when async_mode=True or the run was long enough to be queued.
     task_id: str | None = None
     blocks: list[Block] = Field(default_factory=list)
+    #: Always set. The client needs it to navigate to /assistant/{id} when the
+    #: turn started a brand-new conversation.
+    conversation_id: str | None = None
 
 
 class ConversationSummary(ApiModel):

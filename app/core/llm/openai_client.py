@@ -22,13 +22,23 @@ from app.core.llm.base import (
     is_retryable_status,
     schema_instruction,
 )
+from app.core.logging import get_logger
 from app.schemas.common import Usage
 
+#: Default OpenAI endpoint. Overridable via ``LLM_BASE_URL`` for any
+#: OpenAI-compatible gateway (OpenRouter, Gemini, vLLM, ...). The override must
+#: be the FULL endpoint including "/chat/completions" -- no path joining here.
 API_URL = "https://api.openai.com/v1/chat/completions"
+
+_logger = get_logger(__name__)
 
 
 class OpenAIClient(BaseLLMClient):
-    """Talks to the OpenAI Chat Completions API."""
+    """Talks to the OpenAI Chat Completions API.
+
+    ``base_url`` and ``extra_headers`` make this client usable against any
+    OpenAI-compatible endpoint without touching the provider selection.
+    """
 
     def __init__(
         self,
@@ -39,11 +49,13 @@ class OpenAIClient(BaseLLMClient):
         max_retries: int = 3,
         base_delay: float = 0.5,
         base_url: str = API_URL,
+        extra_headers: dict[str, str] | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         super().__init__(model=model, timeout=timeout, max_retries=max_retries, base_delay=base_delay)
         self.api_key = api_key
         self.base_url = base_url
+        self.extra_headers: dict[str, str] = dict(extra_headers or {})
         self._client = client
 
     @property
@@ -62,11 +74,14 @@ class OpenAIClient(BaseLLMClient):
     def _headers(self) -> dict[str, str]:
         if not self.api_key:
             raise LLMNotConfiguredError(
-                "OPENAI_API_KEY is not set; cannot use the openai provider"
+                "No API key is configured for the selected OpenAI-compatible provider"
             )
+        # Extras first, ours last: a gateway may add headers (OpenRouter's
+        # HTTP-Referer / X-Title) but can never override the auth header.
         return {
-            "authorization": f"Bearer {self.api_key}",
+            **self.extra_headers,
             "content-type": "application/json",
+            "authorization": f"Bearer {self.api_key}",
         }
 
     def _build_body(
@@ -83,46 +98,90 @@ class OpenAIClient(BaseLLMClient):
         if response_schema is not None:
             effective_system = f"{system}\n\n{schema_instruction(response_schema)}"
 
-        api_messages: list[dict[str, Any]] = [{"role": "system", "content": effective_system}]
+        # Groq's GPT-OSS serving guidance is to put instructions in a user
+        # message rather than a system message. It also documents
+        # max_completion_tokens as the preferred output limit field.
+        groq_gpt_oss = (
+            "api.groq.com" in self.base_url
+            and self.model.startswith("openai/gpt-oss")
+        )
+        # During structured synthesis, GPT-OSS may try to call an unavailable
+        # tool again if the transcript still contains native tool-call records.
+        # Turn completed tool outputs into ordinary user context for this final
+        # no-tools request instead of replaying the provider's tool protocol.
+        flatten_tool_history = groq_gpt_oss and response_schema is not None
+        if flatten_tool_history:
+            effective_system = (
+                f"{effective_system}\n\nAll tools for this request have already run. "
+                "Do not call or request tools again. Produce the required final output "
+                "using only the completed tool results in the conversation. If those "
+                "results are unavailable, report that limitation without guessing."
+            )
+        api_messages: list[dict[str, Any]] = (
+            []
+            if groq_gpt_oss
+            else [{"role": "system", "content": effective_system}]
+        )
+        instruction_added = False
         for msg in messages:
             if msg.role == "system":
-                api_messages.append({"role": "system", "content": msg.content or ""})
+                if groq_gpt_oss:
+                    effective_system = f"{effective_system}\n\n{msg.content or ''}"
+                else:
+                    api_messages.append({"role": "system", "content": msg.content or ""})
             elif msg.role == "tool":
-                api_messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": msg.tool_call_id,
-                        "content": msg.content or "",
-                    }
-                )
+                if flatten_tool_history:
+                    api_messages.append(
+                        {
+                            "role": "user",
+                            # The system prompt already includes the rendered,
+                            # bounded tool results. Do not duplicate full tool
+                            # payloads here; search snippets can otherwise push
+                            # Groq's small TPM allowance over the limit.
+                            "content": f"Completed tool result ({msg.name or 'tool'}) was included in the task context.",
+                        }
+                    )
+                else:
+                    api_messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": msg.tool_call_id,
+                            "content": msg.content or "",
+                        }
+                    )
             elif msg.role == "assistant" and msg.tool_calls:
-                api_messages.append(
-                    {
-                        "role": "assistant",
-                        "content": msg.content or "",
-                        "tool_calls": [
-                            {
-                                "id": tc.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tc.name,
-                                    "arguments": _json_dumps(tc.arguments),
-                                },
-                            }
-                            for tc in msg.tool_calls
-                        ],
-                    }
-                )
+                if not flatten_tool_history:
+                    api_messages.append(
+                        {
+                            "role": "assistant",
+                            "content": msg.content or "",
+                            "tool_calls": [
+                                {
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.name,
+                                        "arguments": _json_dumps(tc.arguments),
+                                    },
+                                }
+                                for tc in msg.tool_calls
+                            ],
+                        }
+                    )
             else:
-                api_messages.append({"role": msg.role, "content": msg.content or ""})
+                content = msg.content or ""
+                if groq_gpt_oss and msg.role == "user" and not instruction_added:
+                    content = f"{effective_system}\n\n{content}"
+                    instruction_added = True
+                api_messages.append({"role": msg.role, "content": content})
 
         body: dict[str, Any] = {
             "model": self.model,
-            "max_tokens": max_tokens,
+            "max_completion_tokens" if groq_gpt_oss else "max_tokens": max_tokens,
             "temperature": temperature,
             "messages": api_messages,
         }
-        if tools:
+        if tools and not flatten_tool_history:
             body["tools"] = [
                 {
                     "type": "function",
@@ -134,6 +193,11 @@ class OpenAIClient(BaseLLMClient):
                 }
                 for t in tools
             ]
+            # GPT-OSS can otherwise attempt another call during the final
+            # synthesis step after receiving tool results. Keep the schemas in
+            # that request for valid tool-call history, but explicitly disable
+            # further calls while it produces the structured final answer.
+            body["tool_choice"] = "none" if response_schema is not None else "auto"
         return body
 
     # -- the one method the base class needs ---------------------------------
@@ -171,11 +235,20 @@ class OpenAIClient(BaseLLMClient):
 
         if response.status_code >= 400:
             retryable = is_retryable_status(response.status_code)
+            retry_after_header = response.headers.get("retry-after")
+            try:
+                retry_after = float(retry_after_header) if retry_after_header else None
+            except ValueError:
+                retry_after = None
             raise LLMProviderError(
                 f"openai returned {response.status_code}",
-                detail={"body": response.text[:500]},
+                detail={
+                    "body": response.text[:1000],
+                    "retry_after_header": retry_after_header or "",
+                },
                 retryable=retryable,
                 status_code=response.status_code,
+                retry_after=retry_after,
             )
 
         payload = response.json()
@@ -193,8 +266,24 @@ class OpenAIClient(BaseLLMClient):
                 ToolCall(id=tc.get("id", ""), name=fn.get("name", ""), arguments=args)
             )
         usage_block = payload.get("usage", {}) or {}
+        finish_reason = str(choice.get("finish_reason") or "")
+        if finish_reason == "length":
+            _logger.warning(
+                "llm_response_truncated",
+                extra={
+                    "model": payload.get("model", self.model),
+                    "finish_reason": finish_reason,
+                },
+            )
+        text = message.get("content") or ""
+        refusal = message.get("refusal")
+        if isinstance(refusal, str) and refusal.strip() and not text.strip():
+            # Some OpenAI-compatible gateways refuse instead of answering. Put
+            # the reason in `text` so extract_json raises a readable error
+            # rather than reporting an empty response.
+            text = refusal.strip()
         return LLMResult(
-            text=message.get("content") or "",
+            text=text,
             tool_calls=tool_calls,
             usage=Usage(
                 tokens_in=int(usage_block.get("prompt_tokens", 0)),

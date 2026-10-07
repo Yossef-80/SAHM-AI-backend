@@ -66,7 +66,17 @@ class PublishCampaignOutput(BaseModel):
 
 
 async def _meta_token(ctx: ToolContext) -> str | None:
+    """The Meta token for the write path, with the same precedence as the reads.
+
+    A connected ``Integration`` grant wins; otherwise the workspace's
+    ``tool_settings`` Meta row (P2.4) is used, then the env var. Keeping the
+    order identical to ``meta_read._get_meta_token`` matters -- an approval flow
+    that authenticated with a different credential than the read it was based on
+    is exactly the kind of split-brain that produces a confusing 403 from Meta.
+    """
     from sqlalchemy import select
+
+    from app.core.tools.settings import resolve_tool_settings
 
     stmt = select(Integration).where(
         Integration.business_id == ctx.business_id,
@@ -74,20 +84,39 @@ async def _meta_token(ctx: ToolContext) -> str | None:
         Integration.status == "connected",
     )
     integration = (await ctx.db.execute(stmt)).scalars().first()
-    if integration is None or not integration.access_token_enc:
-        return None
     cfg = ctx.require_settings()
-    return TokenCipher(cfg.token_encryption_key).decrypt(integration.access_token_enc)
+    if integration is not None and integration.access_token_enc:
+        return TokenCipher(cfg.token_encryption_key).decrypt(integration.access_token_enc)
+    tools_cfg = await resolve_tool_settings(ctx)
+    return tools_cfg.meta_access_token or cfg.meta_access_token
 
 
 async def _graph_post_async(
-    cfg: Any, token: str, path: str, payload: dict[str, Any]
+    cfg: Any,
+    token: str,
+    path: str,
+    payload: dict[str, Any],
+    *,
+    base_url: str | None = None,
 ) -> dict[str, Any]:
-    url = f"{cfg.meta_graph_base_url}/{cfg.meta_graph_version}/{path}"
+    """POST to the Graph API, honouring a workspace ``base_url`` override (P2.5)."""
+    base = (base_url or cfg.meta_graph_base_url).rstrip("/")
+    url = f"{base}/{cfg.meta_graph_version}/{path}"
     async with httpx.AsyncClient(timeout=cfg.meta_api_timeout_seconds) as client:
         resp = await client.post(url, params={"access_token": token}, json=payload)
         resp.raise_for_status()
         return resp.json()
+
+
+async def _graph_config(ctx: ToolContext, cfg: Any) -> tuple[str, str | None]:
+    """(graph base url, ad account id) with the workspace row preferred (P2.5)."""
+    from app.core.tools.settings import resolve_tool_settings
+
+    tools_cfg = await resolve_tool_settings(ctx)
+    return (
+        tools_cfg.meta_graph_base_url or cfg.meta_graph_base_url,
+        tools_cfg.meta_ad_account_id or cfg.meta_ad_account_id,
+    )
 
 
 # ------------------------------------------------------- apply_change handler --
@@ -131,7 +160,11 @@ async def _handle_apply_change(payload: ApplyChangeInput, ctx: ToolContext) -> A
     change_payload = dict(recommendation.payload or {})
     try:
         result = await _graph_post_async(
-            cfg, token, f"{recommendation.action_type}", change_payload
+            cfg,
+            token,
+            f"{recommendation.action_type}",
+            change_payload,
+            base_url=(await _graph_config(ctx, cfg))[0],
         )
     except httpx.HTTPError as exc:
         return ApplyChangeOutput(
@@ -190,12 +223,14 @@ async def _handle_publish_campaign(
         )
 
     try:
+        graph_base, ad_account = await _graph_config(ctx, cfg)
         result = await _graph_post_async(
             cfg,
             token,
-            f"act_{cfg.meta_ad_account_id}/campaigns" if cfg.meta_ad_account_id else "campaigns",
+            f"act_{ad_account}/campaigns" if ad_account else "campaigns",
             {"name": campaign.name, "objective": campaign.objective or "OUTCOME_AWARENESS",
              "status": "PAUSED"},
+            base_url=graph_base,
         )
     except httpx.HTTPError as exc:
         return PublishCampaignOutput(

@@ -13,6 +13,7 @@ Responsibilities:
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -25,7 +26,7 @@ from app.core.logging import get_logger
 from app.core.orchestrator.graph import OrchestratorDeps, build_graph
 from app.core.orchestrator.state import initial_state
 from app.core.orchestrator.blocks import validate_blocks
-from app.db.models import AgentTask, Conversation, Message
+from app.db.models import AgentTask, Business, Conversation, Message
 from app.schemas.assistant import (
     AssistantMessageRequest,
     AssistantMessageResponse,
@@ -47,19 +48,31 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:20]}"
 
 
+_RETRY_MESSAGE = re.compile(
+    r"\s*(?:please\s+)?(?:try\s+again|try\s+once\s+more|retry(?:\s+that)?|"
+    r"run\s+it\s+again|do\s+it\s+again)\s*[.!?]*\s*",
+    re.IGNORECASE,
+)
+
+
+def _resolve_retry_message(message: str, history: list[dict[str, Any]]) -> str:
+    """Route a short retry command using the last substantive user request."""
+    if not _RETRY_MESSAGE.fullmatch(message):
+        return message
+    previous = next(
+        (
+            str(item.get("content") or "").strip()
+            for item in reversed(history)
+            if item.get("role") == "user" and str(item.get("content") or "").strip()
+        ),
+        "",
+    )
+    if not previous:
+        return message
+    return f"Please retry the previous request: {previous}"
+
+
 # ------------------------------------------------------------- conversations --
-
-
-async def _default_business(db: AsyncSession) -> Any:
-    from app.db.models import Business
-
-    stmt = select(Business).order_by(Business.created_at).limit(1)
-    business = (await db.execute(stmt)).scalars().first()
-    if business is None:
-        business = Business(id=_new_id("biz"), name="My Business", workspace_id="default")
-        db.add(business)
-        await db.flush()
-    return business
 
 
 async def get_or_create_conversation(
@@ -107,8 +120,19 @@ async def list_conversations(db: AsyncSession, business_id: str) -> list[Convers
     return out
 
 
-async def get_conversation(db: AsyncSession, conversation_id: str) -> ConversationDetail:
-    conversation = await db.get(Conversation, conversation_id)
+async def get_conversation(
+    db: AsyncSession, conversation_id: str, *, business_id: str | None = None
+) -> ConversationDetail:
+    """One conversation.
+
+    ``business_id`` scopes the read to one workspace. A conversation owned by
+    another workspace raises ``NotFoundError`` -- 404, never 403, because a 403
+    would confirm the id exists to a stranger.
+    """
+    stmt = select(Conversation).where(Conversation.id == conversation_id)
+    if business_id is not None:
+        stmt = stmt.where(Conversation.business_id == business_id)
+    conversation = await db.scalar(stmt)
     if conversation is None:
         raise NotFoundError(f"conversation '{conversation_id}' not found")
     messages = [
@@ -167,13 +191,23 @@ async def handle_message(
     request: AssistantMessageRequest,
     *,
     llm: Any,
+    fast_llm: Any | None = None,
     request_id: str,
+    business: Business,
+    event_queue: asyncio.Queue[dict[str, Any]] | None = None,
 ) -> AssistantMessageResponse:
-    """Run one assistant turn synchronously."""
-    business = await _default_business(db)
+    """Run one assistant turn synchronously.
+
+    ``business`` is the already-resolved workspace row from
+    ``WorkspaceDep``; this layer never picks a tenant for itself.
+    """
     conversation = await get_or_create_conversation(
         db, request.conversation_id, business.id
     )
+    if event_queue is not None:
+        await event_queue.put(
+            {"type": "conversation_started", "conversationId": conversation.id}
+        )
 
     # Merge sticky context.
     context = dict(conversation.context or {})
@@ -182,6 +216,31 @@ async def handle_message(
             {k: v for k, v in request.context.model_dump().items() if v is not None}
         )
     conversation.context = context
+
+    # Keep a small recent window for the general-chat path. The current user
+    # message is appended below and by the chat node, so history excludes it.
+    history_rows = (
+        await db.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation.id)
+            .order_by(Message.created_at.desc())
+            .limit(12)
+        )
+    ).scalars().all()
+    history = [
+        {
+            "role": item.role,
+            "content": item.content or "",
+            "persona_id": item.persona_id,
+            "blocks": item.blocks or [],
+        }
+        for item in reversed(history_rows)
+        if item.role in ("user", "assistant")
+    ]
+    # A bare "try again" is an instruction about the preceding user request.
+    # Routing only that short phrase sent it to normal chat, where the model
+    # could claim it was starting research without actually invoking a task.
+    routed_message = _resolve_retry_message(request.message, history)
 
     await _persist_message(
         db,
@@ -196,19 +255,22 @@ async def handle_message(
     deps = OrchestratorDeps(
         db=db,
         llm=llm,
+        fast_llm=fast_llm,
         business_id=business.id,
         workspace_id=business.workspace_id,
         request_id=request_id,
         forced_persona_id=request.persona_id,
+        event_queue=event_queue,
     )
     graph = build_graph(deps)
     state = initial_state(
         conversation_id=conversation.id,
         business_id=business.id,
         workspace_id=business.workspace_id,
-        user_message=request.message,
+        user_message=routed_message,
         request_id=request_id,
         context=context,
+        messages=history,
     )
     final = await graph.ainvoke(state)
     blocks = validate_blocks(list(final.get("blocks") or []))
@@ -242,7 +304,12 @@ async def handle_message(
         task_id=final.get("task_id"),
         persona_id=str(agent_result.get("persona_id") or ""),
     )
-    return AssistantMessageResponse(message=message, task_id=final.get("task_id"), blocks=blocks)
+    return AssistantMessageResponse(
+        message=message,
+        task_id=final.get("task_id"),
+        blocks=blocks,
+        conversation_id=conversation.id,
+    )
 
 
 # -------------------------------------------------------------- agent tasks ----
@@ -276,15 +343,23 @@ async def create_task(
     return task
 
 
-async def get_task(db: AsyncSession, task_id: str) -> AgentTask:
-    task = await db.get(AgentTask, task_id)
+async def get_task(
+    db: AsyncSession, task_id: str, *, business_id: str | None = None
+) -> AgentTask:
+    """One task, optionally scoped to one workspace (404 across the boundary)."""
+    stmt = select(AgentTask).where(AgentTask.id == task_id)
+    if business_id is not None:
+        stmt = stmt.where(AgentTask.business_id == business_id)
+    task = await db.scalar(stmt)
     if task is None:
         raise NotFoundError(f"task '{task_id}' not found")
     return task
 
 
-async def cancel_task(db: AsyncSession, task_id: str) -> AgentTask:
-    task = await get_task(db, task_id)
+async def cancel_task(
+    db: AsyncSession, task_id: str, *, business_id: str | None = None
+) -> AgentTask:
+    task = await get_task(db, task_id, business_id=business_id)
     if task.status in (TaskStatus.SUCCEEDED.value, TaskStatus.FAILED.value,
                        TaskStatus.CANCELLED.value):
         # Already terminal: cancelling is a no-op, not an error.
@@ -323,9 +398,15 @@ async def run_task_in_background(
             from app.core.agents.runtime import run_agent
             from app.core.tools.base import ToolContext
 
-            persona = await load_persona(persona_id, db, task.workspace_id or "default")
+            # The task row carries a business, not a workspace, so the
+            # workspace is read back off it rather than assumed. A task with no
+            # business cannot be attributed to a tenant and runs with an empty
+            # workspace id.
+            business = await db.get(Business, task.business_id) if task.business_id else None
+            workspace_id = business.workspace_id or "" if business is not None else ""
+            persona = await load_persona(persona_id, db, workspace_id)
             ctx = ToolContext(
-                workspace_id="default",
+                workspace_id=workspace_id,
                 business_id=task.business_id or "",
                 db=db,
                 llm=llm,
@@ -358,19 +439,14 @@ async def run_task_in_background(
             await db.commit()
 
 
-async def stream_task(
-    db: AsyncSession,
-    task_id: str,
-    *,
-    llm: Any,
-    request_id: str,
-) -> Any:
-    """Yield SSE-formatted events for a running task.
+async def stream_task(task: AgentTask) -> Any:
+    """Yield SSE-formatted events for an already-authorised running task.
 
-    Same interface the polling endpoint uses, so switching the frontend from
-    polling to SSE is a transport change only.
+    Takes the row, not an id: the caller loads it with the workspace filter
+    *before* the response starts, because an ownership check raised from inside
+    a streaming body happens after the headers are sent and can no longer be
+    turned into a 404.
     """
-    task = await get_task(db, task_id)
     yield _sse("task_progress", {"task_id": task.id, "status": task.status,
                                  "progress": task.progress})
     yield _sse("done", {"task_id": task.id, "status": task.status})

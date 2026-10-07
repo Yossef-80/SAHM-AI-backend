@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -27,14 +28,71 @@ _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 
-def _make_engine(url: str, echo: bool) -> AsyncEngine:
+#: Host fragments that identify a connection-pooler proxy (PgBouncer / Supavisor).
+#: Matched against the parsed hostname only -- never against the whole URL, so a
+#: password that happens to contain "pgbouncer" cannot flip the branch.
+_POOLER_HOST_MARKERS: tuple[str, ...] = (
+    "pooler.supabase.com",  # Supabase's Supavisor pooler (IPv4-native)
+    ".pooler.",  # self-hosted / generic PgBouncer conventions
+    "pgbouncer",
+    "supavisor",
+)
+
+
+def is_pooler_url(url: str) -> bool:
+    """True when ``url`` points at a transaction-mode pooler, not a real server.
+
+    Deliberately host-based rather than config-based: the deployment that matters
+    is the one in front of the *URL*, and a URL is the only thing this function
+    is given. A self-hosted PgBouncer on a custom hostname is covered by the
+    ``pgbouncer`` marker; add a marker here if you front the app with something
+    else.
+    """
+    try:
+        host = (urlsplit(url).hostname or "").lower()
+    except ValueError:  # pragma: no cover - malformed URL
+        return False
+    return any(marker in host for marker in _POOLER_HOST_MARKERS)
+
+
+def _engine_kwargs(url: str, echo: bool) -> dict[str, Any]:
+    """Build the ``create_async_engine`` kwargs for ``url``.
+
+    Split out from :func:`_make_engine` so the pooler branch is assertable
+    without opening a connection (see ``tests/test_deployment_ops.py``).
+
+    **Why the pooler branch exists (P5.3):** a pooler in *transaction* mode hands
+    the same backend connection to many clients, so a named prepared statement
+    prepared by one session is still there when the next session reuses that
+    connection. asyncpg's statement cache then fails with ``prepared statement
+    "s1" already exists`` / ``prepared statement does not exist`` under load.
+    ``statement_cache_size=0`` disables that cache; the statements are then
+    re-prepared per transaction, which is slower but correct. See
+    ``docs/PRODUCTION_ROADMAP.md`` §3.3.
+    """
     kwargs: dict[str, Any] = {"future": True, "echo": echo}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
-    else:
-        # Postgres: sane pool defaults, pre-ping to survive restarts.
-        kwargs.update({"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20})
-    return create_async_engine(url, **kwargs)
+        return kwargs
+
+    # Postgres: sane pool defaults, pre-ping to survive restarts.
+    kwargs.update({"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20})
+
+    if is_pooler_url(url):
+        kwargs["connect_args"] = {"statement_cache_size": 0}
+        # The pooler already multiplexes; a local overflow pool on top of it just
+        # queues requests in the wrong place and multiplies the backend
+        # connections we are trying not to exhaust.
+        kwargs["max_overflow"] = 0
+
+    # pool_pre_ping stays on in both branches: a pooler restart (or a rotated DB
+    # password) kills every pooled connection, and pre-ping is what turns that
+    # into one transparent retry instead of an outage.
+    return kwargs
+
+
+def _make_engine(url: str, echo: bool) -> AsyncEngine:
+    return create_async_engine(url, **_engine_kwargs(url, echo))
 
 
 def get_engine() -> AsyncEngine:

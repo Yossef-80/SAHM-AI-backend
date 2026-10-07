@@ -50,6 +50,23 @@ def _settings(ctx: ToolContext) -> Settings:
     return ctx.require_settings()
 
 
+def _configured_search_key(cfg: Settings) -> str | None:
+    """Any search key present in the environment, whatever the provider."""
+    return cfg.tavily_api_key or cfg.serper_api_key or cfg.brave_api_key
+
+
+async def _connectors(ctx: ToolContext) -> Any:
+    """The workspace's resolved connector configuration (P2.5).
+
+    Every handler below reads its provider and key from here rather than from
+    ``Settings``, so a value saved in the admin panel wins over the env var with
+    no change to how the tool is invoked.
+    """
+    from app.core.tools.settings import resolve_tool_settings
+
+    return await resolve_tool_settings(ctx)
+
+
 def _unavailable(output_cls: type, *, source: str, reason: str) -> Any:
     return output_cls.unavailable(source=source, reason=reason)
 
@@ -140,26 +157,48 @@ def _search_mock(payload: WebSearchInput) -> list[SearchResult]:
 
 async def _handle_web_search(payload: WebSearchInput, ctx: ToolContext) -> WebSearchOutput:
     cfg = _settings(ctx)
-    provider = cfg.search_provider
+    tools_cfg = await _connectors(ctx)
+    # Workspace connector values may be stored as the UI label (e.g. TAVILY)
+    # while dispatch below uses canonical provider ids. Normalize before both
+    # routing and diagnostics so a valid saved key is not reported missing.
+    provider = str(tools_cfg.search_provider or cfg.search_provider or "tavily").strip().lower()
+    # One key for whichever provider is selected: the resolver already folded
+    # TAVILY/SERPER/BRAVE into "search_api_key", preferring the workspace row.
+    search_key = tools_cfg.search_api_key or _configured_search_key(cfg)
     source = f"web_search:{provider}"
+    _logger.info(
+        "web_search_config_resolved "
+        f"provider={provider} key_configured={bool(search_key)} "
+        f"key_source={tools_cfg.source('search', 'api_key')} "
+        f"provider_source={tools_cfg.source('search', 'provider')}",
+        extra={
+            "provider": provider,
+            "key_configured": bool(search_key),
+            "key_source": tools_cfg.source("search", "api_key"),
+            "provider_source": tools_cfg.source("search", "provider"),
+        },
+    )
     try:
-        if provider == "tavily" and cfg.tavily_api_key:
-            results = await _search_tavily(payload, cfg.tavily_api_key, cfg.llm_timeout_seconds)
-        elif provider == "serper" and cfg.serper_api_key:
-            results = await _search_serper(payload, cfg.serper_api_key, cfg.llm_timeout_seconds)
-        elif provider == "brave" and cfg.brave_api_key:
-            results = await _search_brave(payload, cfg.brave_api_key, cfg.llm_timeout_seconds)
+        if provider == "tavily" and search_key:
+            results = await _search_tavily(payload, search_key, cfg.llm_timeout_seconds)
+        elif provider == "serper" and search_key:
+            results = await _search_serper(payload, search_key, cfg.llm_timeout_seconds)
+        elif provider == "brave" and search_key:
+            results = await _search_brave(payload, search_key, cfg.llm_timeout_seconds)
         elif provider == "mock":
             results = _search_mock(payload)
         else:
+            if provider not in {"tavily", "serper", "brave", "mock"}:
+                reason = f"Unsupported web search provider '{provider}'. Choose Tavily, Serper, or Brave."
+            else:
+                reason = (
+                    f"No API key is available for the selected {provider} provider. "
+                    "Check its workspace connector key or the matching environment variable."
+                )
             return _unavailable(
                 WebSearchOutput,
                 source=source,
-                reason=(
-                    f"No web search provider is configured (SEARCH_PROVIDER='{provider}' "
-                    "and the matching API key is missing). Ask the user to paste the "
-                    "search results they want analysed."
-                ),
+                reason=reason,
             )
     except httpx.HTTPStatusError as exc:
         return _unavailable(
@@ -312,7 +351,10 @@ async def _handle_analyze_website(
     contact: dict[str, str] = {}
 
     try:
-        result = await ctx.llm.complete(
+        # Website extraction is a helper pass; use the configured fast tier so
+        # researching a source does not spend the Strong model's TPM budget.
+        extraction_llm = ctx.fast_llm or ctx.llm
+        result = await extraction_llm.complete(
             system=(
                 "You extract structured facts from a website's text. Report only what "
                 "is literally present. If something is absent, leave it empty. Never "
@@ -403,7 +445,8 @@ async def _handle_get_social_profile(
             source=source,
             reason=f"Platform '{payload.platform}' is not supported.",
         )
-    if not cfg.meta_access_token:
+    tools_cfg = await _connectors(ctx)
+    if not (tools_cfg.meta_access_token or cfg.meta_access_token):
         return _unavailable(
             SocialProfile,
             source=source,
@@ -464,8 +507,11 @@ def _reviews_mock(payload: GetReviewsInput) -> list[Review]:
 
 async def _handle_get_reviews(payload: GetReviewsInput, ctx: ToolContext) -> GetReviewsOutput:
     cfg = _settings(ctx)
+    tools_cfg = await _connectors(ctx)
+    places_key = tools_cfg.google_places_api_key or cfg.google_places_api_key
+    places_base = tools_cfg.places_base_url or cfg.places_base_url
     source = "get_reviews:google_places"
-    if not cfg.google_places_api_key:
+    if not places_key:
         if cfg.environment in ("dev", "test"):
             reviews = _reviews_mock(payload)
             return GetReviewsOutput(
@@ -490,12 +536,12 @@ async def _handle_get_reviews(payload: GetReviewsInput, ctx: ToolContext) -> Get
     async with httpx.AsyncClient(timeout=cfg.llm_timeout_seconds) as client:
         try:
             find = await client.get(
-                f"{cfg.places_base_url}/findplacefromtext/json",
+                f"{places_base}/findplacefromtext/json",
                 params={
                     "input": payload.place_query,
                     "inputtype": "textquery",
                     "fields": "place_id,name,rating,user_ratings_total",
-                    "key": cfg.google_places_api_key,
+                    "key": places_key,
                 },
             )
             find.raise_for_status()
@@ -512,7 +558,7 @@ async def _handle_get_reviews(payload: GetReviewsInput, ctx: ToolContext) -> Get
                     "place_id": place["place_id"],
                     "fields": "name,rating,user_ratings_total,reviews",
                     "reviews_sort": "most_relevant",
-                    "key": cfg.google_places_api_key,
+                    "key": places_key,
                 },
             )
             details.raise_for_status()
@@ -577,13 +623,17 @@ def _keywords_mock(payload: GetKeywordsInput) -> list[KeywordMetric]:
 
 async def _handle_get_keywords(payload: GetKeywordsInput, ctx: ToolContext) -> GetKeywordsOutput:
     cfg = _settings(ctx)
-    source = f"get_keywords:{cfg.keyword_provider}"
-    if cfg.keyword_provider == "dataforseo" and cfg.dataforseo_login:
+    tools_cfg = await _connectors(ctx)
+    keyword_provider = tools_cfg.keyword_provider or cfg.keyword_provider
+    dfs_login = tools_cfg.dataforseo_login or cfg.dataforseo_login
+    dfs_password = tools_cfg.dataforseo_password or cfg.dataforseo_password
+    source = f"get_keywords:{keyword_provider}"
+    if keyword_provider == "dataforseo" and dfs_login:
         try:
             async with httpx.AsyncClient(timeout=cfg.llm_timeout_seconds) as client:
                 resp = await client.post(
                     "https://api.dataforseo.com/v3/keywords_data/google_ads/search_volume/live",
-                    auth=(cfg.dataforseo_login, cfg.dataforseo_password or ""),
+                    auth=(dfs_login, dfs_password or ""),
                     json=[
                         {
                             "keywords": payload.seed_terms,
@@ -619,7 +669,7 @@ async def _handle_get_keywords(payload: GetKeywordsInput, ctx: ToolContext) -> G
                 reason=f"DataForSEO request failed: {exc}",
             )
 
-    if cfg.keyword_provider == "mock" or cfg.environment in ("dev", "test"):
+    if keyword_provider == "mock" or cfg.environment in ("dev", "test"):
         return GetKeywordsOutput(
             keywords=_keywords_mock(payload),
             country=payload.country,
@@ -635,7 +685,7 @@ async def _handle_get_keywords(payload: GetKeywordsInput, ctx: ToolContext) -> G
         GetKeywordsOutput,
         source=source,
         reason=(
-            f"Keyword provider '{cfg.keyword_provider}' is not configured. Set "
+            f"Keyword provider '{keyword_provider}' is not configured. Set "
             "DATAFORSEO_LOGIN/PASSWORD, or ask the user to supply keyword volumes."
         ),
     )
@@ -674,6 +724,9 @@ async def _handle_get_competitor_ads(
     payload: GetCompetitorAdsInput, ctx: ToolContext
 ) -> GetCompetitorAdsOutput:
     cfg = _settings(ctx)
+    tools_cfg = await _connectors(ctx)
+    meta_token = tools_cfg.meta_access_token or cfg.meta_access_token
+    meta_base = tools_cfg.meta_graph_base_url or cfg.meta_graph_base_url
     country = payload.country.upper()
     source = f"get_competitor_ads:meta_ad_library:{country}"
 
@@ -697,7 +750,7 @@ async def _handle_get_competitor_ads(
                 "as user_supplied_ads."
             ),
         )
-    if not cfg.meta_access_token:
+    if not meta_token:
         return _unavailable(
             GetCompetitorAdsOutput,
             source=source,
@@ -711,9 +764,9 @@ async def _handle_get_competitor_ads(
     try:
         async with httpx.AsyncClient(timeout=cfg.meta_api_timeout_seconds) as client:
             resp = await client.get(
-                f"{cfg.meta_graph_base_url}/{cfg.meta_graph_version}/ads_archive",
+                f"{meta_base}/{cfg.meta_graph_version}/ads_archive",
                 params={
-                    "access_token": cfg.meta_access_token,
+                    "access_token": meta_token,
                     "search_terms": payload.page_or_query,
                     "ad_reached_countries": f'["{country}"]',
                     "limit": payload.max_results,
