@@ -375,3 +375,8 @@ Before submitting a Pull Request for any tool, the developer must verify:
 - [ ] **Law 7:** Outputs are trimmed and bounded (no unbounded text dumps).
 - [ ] **Law 8:** If the tool modifies external ad platforms, it lives in `protected.py` with `side_effect=EXTERNAL_WRITE` and is NOT in `ALL_TOOLS`.
 - [ ] **Unit Test:** Automated test exists using `respx` or mock DB asserting both success and unavailable paths.
+
+
+## 9. Token Efficiency and Summarization Governance
+As of October 2026, all tools MUST summarize and strictly limit their outputs (e.g., search constrained to top 2 results) to prevent LangGraph context window explosion and token limit breaches. Raw complex objects should never be returned directly to the agent; they must be parsed and summarized within the tool first.
+

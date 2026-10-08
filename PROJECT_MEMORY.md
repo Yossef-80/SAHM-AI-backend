@@ -149,3 +149,12 @@ Pytest executes and passes cleanly, unblocking Developer 1 through Developer 5 t
 - To onboard a new AI session, pass the prompt inside `AGENT_MEMORY_INSTRUCTIONS.md`.
 - Incoming agents must inspect `PROJECT_MEMORY.md` first and continue from Section 10 ("Current Continuation Point").
 - Every completed task must update `PROJECT_MEMORY.md` immediately without waiting for a user handoff request.
+### Task: Integrate Custom AI Agents with GUI Blocks
+- Date/time: 2026-10-07
+- Changed:
+  - Replaced Yousef's custom LLM HTTP client with native LangChain implementations in `app/ai/providers/llm.py`.
+  - Bypassed Yousef's internal agent graph in `app/core/orchestrator/service.py` and hard-routed all chat to our custom Orchestrator Brain in `app/ai/agents/orchestrator/brain.py`.
+  - Configured the Brain to convert raw text outputs into strict React UI Blocks using Pydantic schema validation (`MessageWithBlocks`).
+  - Overhauled `app/ai/tools/search.py` to restrict API results (`max_results=2`) and summarize output, fixing LangGraph serialization crashes and optimizing token usage.
+  - Configured .env to enforce a 5,000 max token limit and correctly route to Groq models.
+

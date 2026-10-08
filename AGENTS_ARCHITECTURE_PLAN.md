@@ -14,7 +14,7 @@ This document defines the complete architectural blueprint, schemas, inter-agent
 ```
 +─────────────────────────────────────────────────────────────────────────────────────────+
 |                                    ORCHESTRATOR HUB                                     |
-|           Classifies User Intent -> Injects Shared Brand/Customer Identity              |
+|           Classifies User Intent -> Dispatches to app/ai/agents -> Converts to UI Blocks              |
 |                     Routes to Persona -> Dispatches Action Cards                        |
 +─────────────────────────────────────────────────────────────────────────────────────────+
          │                         │                        │                        │
