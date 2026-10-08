@@ -183,12 +183,12 @@ class Settings(BaseSettings):
     website_fetch_timeout_seconds: float = 15.0
     website_max_bytes: int = 2_000_000
     website_max_redirects: int = 3
-    website_allowed_schemes: tuple[str, ...] = ("http", "https")
+    website_allowed_schemes: tuple[str, ...] | str = ("http", "https")
 
     # --------------------------------------------------------------- uploads --
     upload_dir: str = "./var/uploads"
     upload_max_bytes: int = 10_000_000
-    upload_allowed_types: tuple[str, ...] = (
+    upload_allowed_types: tuple[str, ...] | str = (
         "image/png",
         "image/jpeg",
         "image/webp",

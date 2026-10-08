@@ -17,7 +17,9 @@ class RoutingDecision(BaseModel):
     agent: Literal["nour", "omar", "layla", "karim", "salma", "unknown"] = Field(description="The agent best suited to handle this prompt.")
     reason: str = Field(description="Why this agent was chosen.")
 
-def orchestrate(prompt: str) -> dict:
+from app.schemas.blocks import MessageWithBlocks
+
+def orchestrate(prompt: str) -> MessageWithBlocks:
     """The Brain that reads the prompt and routes it to the correct agent."""
     ai_settings = get_ai_settings()
     llm = get_llm(provider=ai_settings.llm_provider).chat.with_structured_output(RoutingDecision)
@@ -46,6 +48,13 @@ Agents:
     if decision.agent in graphs:
         config = {"configurable": {"thread_id": "test_thread"}}
         final_state = graphs[decision.agent].invoke({"messages": [HumanMessage(content=prompt)]}, config)
-        return {"agent": decision.agent, "state": final_state}
+        
+        # Format into UI blocks
+        final_msg = final_state["messages"][-1].content
+        block_llm = get_llm(provider=ai_settings.llm_provider).chat.with_structured_output(MessageWithBlocks)
+        return block_llm.invoke([
+            SystemMessage(content="Convert the following text into structured React UI Blocks (TextBlock for paragraphs, FindingsBlock for lists/bullet points)."),
+            HumanMessage(content=final_msg)
+        ])
     
-    return {"agent": "unknown", "error": "No suitable agent found."}
+    return None

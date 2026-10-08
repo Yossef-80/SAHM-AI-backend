@@ -27,9 +27,16 @@ def web_search_tool(query: str, config: RunnableConfig) -> str:
     search_provider = get_search_provider(provider_enum)
     
     try:
-        results = search_provider.search(query)
+        # Enforce strict maximum results limit to save tokens
+        results = search_provider.search(query, max_results=2)
         if not results:
             return "No results found for the query."
-        return results
+        
+        # Summarize tool outputs to significantly reduce token usage
+        summarized = []
+        for i, res in enumerate(results):
+            summarized.append(f"Result {i+1}: {res.title} - {res.snippet[:200]}")
+            
+        return "\n\n".join(summarized)
     except Exception as e:
         return f"Error performing web search: {str(e)}"

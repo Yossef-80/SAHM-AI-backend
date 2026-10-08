@@ -272,7 +272,12 @@ async def handle_message(
         context=context,
         messages=history,
     )
-    final = await graph.ainvoke(state)
+    # LANGGRAPH UI BLOCKS OVERRIDE
+    from app.ai.agents.orchestrator.brain import orchestrate
+    final_gui = orchestrate(routed_message)
+    blocks_raw = final_gui.model_dump()["blocks"] if final_gui else []
+    final = {"blocks": blocks_raw}
+    # END OVERRIDE
     blocks = validate_blocks(list(final.get("blocks") or []))
     agent_result = final.get("agent_result") or {}
 

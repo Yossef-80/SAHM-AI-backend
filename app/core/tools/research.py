@@ -22,7 +22,8 @@ from app.core.errors import BlockedTargetError, ToolUnavailable
 from app.core.llm.base import Msg
 from app.core.logging import get_logger
 from app.core.security import check_redirect, resolve_and_check
-from app.core.tools.base import Tool, ToolContext
+from app.core.tools.base import Tool, ToolContext, ToolOutput
+from app.schemas.common import ToolStatus
 from app.schemas.common import ToolSideEffect
 from app.schemas.tools import (
     AdRecord,
@@ -825,6 +826,84 @@ get_competitor_ads_tool = Tool(
 )
 
 
+
+
+# --- BRAND MCP INTEGRATION ---
+from pydantic import BaseModel
+import sys, os, json
+mcp_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../mcp_servers'))
+if mcp_path not in sys.path:
+    sys.path.append(mcp_path)
+from brand_mcp import brand_report as _brand_report, full_analysis as _full_analysis, route_file_to_tool as _route_file_to_tool
+
+class BrandReportInput(BaseModel):
+    brand: str
+    url: str = ''
+    country: str = 'Egypt'
+    country_code: str = 'EG'
+
+class BrandReportOutput(ToolOutput):
+    result: str
+
+async def _handle_brand_report(payload: BrandReportInput, ctx: ToolContext) -> BrandReportOutput:
+    try:
+        res = _brand_report(brand=payload.brand, website=payload.url, country=payload.country, country_code=payload.country_code)
+        return BrandReportOutput(result=json.dumps(res, ensure_ascii=False), source='brand_mcp', status=ToolStatus.OK)
+    except Exception as e:
+        return BrandReportOutput.unavailable(source='brand_mcp', reason=str(e))
+
+brand_report_tool = Tool(
+    name='brand_report',
+    description='Collects comprehensive brand data including website, social links, posts, and map reviews. Run this BEFORE analysis.',
+    input_model=BrandReportInput,
+    output_model=BrandReportOutput,
+    handler=_handle_brand_report,
+)
+
+class FullAnalysisInput(BaseModel):
+    brand: str
+
+class FullAnalysisOutput(ToolOutput):
+    result: str
+
+async def _handle_full_analysis(payload: FullAnalysisInput, ctx: ToolContext) -> FullAnalysisOutput:
+    try:
+        res = _full_analysis(brand=payload.brand)
+        return FullAnalysisOutput(result=json.dumps(res, ensure_ascii=False), source='brand_mcp', status=ToolStatus.OK)
+    except Exception as e:
+        return FullAnalysisOutput.unavailable(source='brand_mcp', reason=str(e))
+
+full_analysis_tool = Tool(
+    name='full_analysis',
+    description='Runs deep engagement, sentiment, and product insights analysis. Call brand_report FIRST.',
+    input_model=FullAnalysisInput,
+    output_model=FullAnalysisOutput,
+    handler=_handle_full_analysis,
+)
+
+class RouteFileInput(BaseModel):
+    file_path: str
+    brand: str = ''
+
+class RouteFileOutput(ToolOutput):
+    result: str
+
+async def _handle_route_file(payload: RouteFileInput, ctx: ToolContext) -> RouteFileOutput:
+    try:
+        res = _route_file_to_tool(file_path=payload.file_path, brand=payload.brand)
+        return RouteFileOutput(result=json.dumps(res, ensure_ascii=False), source='brand_mcp', status=ToolStatus.OK)
+    except Exception as e:
+        return RouteFileOutput.unavailable(source='brand_mcp', reason=str(e))
+
+route_file_tool = Tool(
+    name='route_file_to_tool',
+    description='Read a local file precisely, analyze its structure, and route to the most suitable tool.',
+    input_model=RouteFileInput,
+    output_model=RouteFileOutput,
+    handler=_handle_route_file,
+)
+
+
 RESEARCH_TOOLS: list[Tool] = [
     web_search_tool,
     analyze_website_tool,
@@ -832,6 +911,9 @@ RESEARCH_TOOLS: list[Tool] = [
     get_reviews_tool,
     get_keywords_tool,
     get_competitor_ads_tool,
+    brand_report_tool,
+    full_analysis_tool,
+    route_file_tool,
 ]
 
 __all__ = [
