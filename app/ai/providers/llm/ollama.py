@@ -51,6 +51,7 @@ def build_chat_model(
         "num_predict": settings.llm_max_tokens,
         "keep_alive": settings.ollama_keep_alive,
         "client_kwargs": {"headers": _NGROK_HEADERS, "timeout": settings.ollama_timeout_seconds},
+        "async_client_kwargs": {"headers": _NGROK_HEADERS, "timeout": settings.ollama_timeout_seconds},
     }
     if settings.ollama_reasoning is not None:
         kwargs["reasoning"] = settings.ollama_reasoning

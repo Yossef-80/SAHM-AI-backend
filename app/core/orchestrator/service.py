@@ -23,8 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
-from app.core.orchestrator.graph import OrchestratorDeps, build_graph
-from app.core.orchestrator.state import initial_state
 from app.core.orchestrator.blocks import validate_blocks
 from app.db.models import AgentTask, Business, Conversation, Message
 from app.schemas.assistant import (
@@ -252,41 +250,28 @@ async def handle_message(
     if not conversation.title:
         conversation.title = request.message[:80]
 
-    deps = OrchestratorDeps(
-        db=db,
-        llm=llm,
-        fast_llm=fast_llm,
-        business_id=business.id,
-        workspace_id=business.workspace_id,
-        request_id=request_id,
-        forced_persona_id=request.persona_id,
-        event_queue=event_queue,
-    )
-    graph = build_graph(deps)
-    state = initial_state(
-        conversation_id=conversation.id,
-        business_id=business.id,
-        workspace_id=business.workspace_id,
-        user_message=routed_message,
-        request_id=request_id,
-        context=context,
-        messages=history,
-    )
     # LANGGRAPH UI BLOCKS OVERRIDE
     from app.ai.agents.orchestrator.brain import orchestrate
-    final_gui = orchestrate(routed_message)
-    blocks_raw = final_gui.model_dump()["blocks"] if final_gui else []
+    final_gui = await orchestrate(routed_message, history, event_queue)
+    blocks_raw = final_gui.model_dump(mode="json", by_alias=True)["blocks"] if final_gui else []
     final = {"blocks": blocks_raw}
     # END OVERRIDE
     blocks = validate_blocks(list(final.get("blocks") or []))
     agent_result = final.get("agent_result") or {}
 
-    content = ""
+    content_parts = []
     for block in blocks:
         if block.get("type") == "text":
-            content = str(block.get("text") or "")
-            break
+            content_parts.append(str(block.get("text") or ""))
+        elif block.get("type") == "findings":
+            content_parts.append(str(block.get("title") or ""))
+            for finding in block.get("findings", []):
+                content_parts.append("- " + str(finding.get("title") or "") + ": " + str(finding.get("description") or ""))
+    content = "\n".join(content_parts)
     if not content:
+        import json
+        content = json.dumps(blocks)
+    if not content or content == "[]":
         content = str(final.get("error") or "")
 
     await _persist_message(

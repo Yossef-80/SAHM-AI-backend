@@ -81,7 +81,7 @@ class AISettings(BaseSettings):
     #: ``None`` = don't send; ``False`` disables "thinking" on Qwen3-style models (faster).
     ollama_reasoning: bool | None = Field(None, validation_alias=_env("OLLAMA_REASONING"))
     ollama_timeout_seconds: float = Field(
-        300.0, validation_alias=_env("OLLAMA_TIMEOUT_SECONDS", "NGROK_TIMEOUT_SECONDS")
+        1000.0, validation_alias=_env("OLLAMA_TIMEOUT_SECONDS", "NGROK_TIMEOUT_SECONDS")
     )
 
     # ============================================================ OPENAI ====

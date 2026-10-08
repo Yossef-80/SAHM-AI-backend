@@ -92,7 +92,9 @@ async def post_message_stream(
             except (asyncio.CancelledError, Exception):
                 pass
             raise
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             yield _sse("error", {"message": "The assistant could not complete this request."})
 
     return StreamingResponse(

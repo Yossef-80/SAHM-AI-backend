@@ -12,3 +12,8 @@
 2026-10-05 11:55:43 | INFO    | provider.db | store_built | provider='sqlite' type='SqliteStore'
 2026-10-06 11:45:26 | INFO    | provider.db | store_built | provider='sqlite' type='SqliteStore'
 2026-10-06 12:26:50 | INFO    | provider.db | store_built | provider='sqlite' type='SqliteStore'
+2026-10-08 13:55:21 | INFO    | provider.db | store_built | provider='memory' type='InMemoryStore'
+2026-10-08 16:40:23 | INFO    | provider.db | store_built | provider='memory' type='InMemoryStore'
+2026-10-08 16:56:19 | INFO    | provider.db | store_built | provider='memory' type='InMemoryStore'
+2026-10-08 17:07:13 | INFO    | provider.db | store_built | provider='memory' type='InMemoryStore'
+2026-10-08 20:16:00 | INFO    | provider.db | store_built | provider='memory' type='InMemoryStore'

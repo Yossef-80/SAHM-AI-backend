@@ -1,14 +1,14 @@
 import requests
 import json
 import sys
-
+import os
 # Ensure UTF-8 output on Windows console
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # Replace this with your actual ngrok public URL
-NGROK_URL = "https://eleven-bulgur-curtsy.ngrok-free.dev" 
-NGROK_MODEL_ID = "hf.co/jc-builds/Qwen3.5-9B-VLM-Q4_K_M-GGUF:Q4_K_M"
+NGROK_URL = "https://eleven-bulgur-curtsy.ngrok-free.dev/"
+NGROK_MODEL_ID= "hf.co/Aldaris/Qwen3-8B-Q4_K_M-GGUF:Q4_K_M"
 
 print("Sending request to Ollama API...")
 
