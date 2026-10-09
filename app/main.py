@@ -28,6 +28,7 @@ from app.api import (
     integrations,
     memory,
     recommendations,
+    research,
     settings as settings_router,
     tasks,
     tools,
@@ -203,6 +204,7 @@ def create_app() -> FastAPI:
     app.include_router(integrations.router, prefix=prefix)
     app.include_router(tasks.router, prefix=prefix)
     app.include_router(tools.router, prefix=prefix)
+    app.include_router(research.router, prefix=prefix)
     # --- P2 configuration surface ---
     app.include_router(memory.router, prefix=prefix)
     app.include_router(settings_router.router, prefix=prefix)

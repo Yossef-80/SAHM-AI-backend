@@ -243,6 +243,7 @@ class Conversation(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(300), default="")
     # Sticky context: campaign_id / creative_id / insight_id.
     context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    summary: Mapped[str | None] = mapped_column(Text)
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",

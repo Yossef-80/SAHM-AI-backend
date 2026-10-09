@@ -18,8 +18,15 @@ class RoutingDecision(BaseModel):
     reason: str = Field(description="Why this agent was chosen.")
 
 from app.schemas.blocks import MessageWithBlocks
+from app.ai.memory.compressor import compress_history_messages
 
-async def orchestrate(prompt: str, history: list[dict[str, Any]], event_queue: asyncio.Queue[dict[str, Any]] | None = None) -> MessageWithBlocks | None:
+async def orchestrate(
+    prompt: str, 
+    history: list[dict[str, Any]], 
+    event_queue: asyncio.Queue[dict[str, Any]] | None = None,
+    user_context: str | None = None,
+    conversation_summary: str | None = None,
+) -> MessageWithBlocks | None:
     """The Brain that reads the prompt and routes it to the correct agent."""
     if event_queue:
         await event_queue.put({"type": "step_started", "step": "orchestrator", "detail": "Analyzing your prompt and deciding who to route it to..."})
@@ -41,7 +48,15 @@ CRITICAL RULE: If the user is asking a follow-up question (e.g. "what does point
     try:
         from langchain_core.messages import AIMessage
         chat_history = []
-        for msg in history:
+        if user_context and user_context.strip():
+            chat_history.append(SystemMessage(content=f"USER BRAND & BUSINESS PROFILE (Long-Term Memory):\n{user_context.strip()}"))
+
+        if conversation_summary and conversation_summary.strip():
+            chat_history.append(SystemMessage(content=f"PREVIOUS CONVERSATION SUMMARY (Earlier topics in this chat):\n{conversation_summary.strip()}"))
+
+        # Apply intelligent session history compression to prune token bloat
+        compact_history = compress_history_messages(history)
+        for msg in compact_history:
             if msg["role"] == "user":
                 chat_history.append(HumanMessage(content=msg["content"]))
             else:

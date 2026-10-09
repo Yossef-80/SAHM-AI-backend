@@ -1,57 +1,278 @@
-from typing import List, Optional
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+from __future__ import annotations
+
+import asyncio
+from typing import Any, List, Optional
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.db.models import Profile, Conversation, Message
+from app.db.session import session_scope
 from app.ai.providers.llm import get_llm
-from app.ai.enums import LLMProvider
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+def compress_history_messages(history: list[dict[str, Any]], max_chars: int = 900) -> list[dict[str, Any]]:
+    """
+    Intelligent Session Memory:
+    Compresses long assistant responses (>max_chars) in the working history
+    so subsequent turns don't blow up token budgets.
+    """
+    compact_history = []
+    for item in history:
+        role = item.get("role")
+        content = item.get("content") or ""
+        
+        # If assistant generated a massive response, distill it
+        if role == "assistant" and len(content) > max_chars:
+            lines = [line.strip() for line in content.split("\n") if line.strip()]
+            # Extract high-signal bullet points or headers
+            bullets = [line for line in lines if line.startswith(("-", "*", "•", "1.", "2.", "3.", "4.", "5.", "#"))]
+            if bullets:
+                compressed = "Summary of previous AI response:\n" + "\n".join(bullets[:8])
+            else:
+                compressed = content[:max_chars] + "... [summary truncated for context efficiency]"
+            
+            compact_history.append({
+                **item,
+                "content": compressed
+            })
+        else:
+            compact_history.append(item)
+            
+    return compact_history
+
 
 class IntelligentMemoryCompressor:
-    def __init__(self, db: AsyncSession):
-        self.db = db
-        # We use the system's default fast LLM for background compression
+    def __init__(self):
+        # Default fast LLM for background compression
         self.fast_llm = get_llm().chat
 
-    async def compress_latest_turn(self, conversation_id: str):
-        """
-        Compresses the latest AI message if it's too long, and cleans up junk.
-        (This is a conceptual implementation of the Intelligent Session Memory).
-        """
-        # In a real scenario, we'd fetch the latest uncompressed messages
-        # from the database, evaluate their token length, and rewrite them.
-        pass
-
-    async def update_global_profile(self, profile_id: str, recent_messages: List[str]):
+    async def update_global_profile(self, business_id: str) -> str | None:
         """
         Updates the global 500-token long-term memory for the user profile.
         Triggered after 3 minutes of inactivity.
         """
-        # 1. Fetch Profile
-        result = await self.db.execute(select(Profile).where(Profile.id == profile_id))
-        profile = result.scalar_one_or_none()
-        
-        if not profile:
-            return
+        async with session_scope() as db:
+            # 1. Fetch Profile for this business
+            stmt = select(Profile).where(Profile.business_id == business_id).limit(1)
+            profile = await db.scalar(stmt)
+            if not profile:
+                import uuid
+                profile = Profile(
+                    id=uuid.uuid4(),
+                    supabase_user_id=uuid.uuid4(),
+                    business_id=business_id,
+                    role="owner",
+                    user_context_summary=""
+                )
+                db.add(profile)
+                await db.flush()
 
-        old_summary = profile.user_context_summary or ""
-        
-        # 2. Run summarization
-        sys_msg = SystemMessage(content=(
-            "You are a background memory processor. Update the user profile summary "
-            "with the newly provided recent conversation details. Keep only permanent facts: "
-            "brand details, competitors, tone preferences, and major goals. Discard casual chat. "
-            "MAXIMUM 500 TOKENS. DO NOT EXCEED THIS LIMIT."
-        ))
-        
-        recent_text = "\n".join(recent_messages)
-        usr_msg = HumanMessage(content=f"Old Summary:\n{old_summary}\n\nRecent Chat to Extract From:\n{recent_text}")
-        
-        response = await self.fast_llm.ainvoke([sys_msg, usr_msg])
-        new_summary = response.content
-        
-        # 3. Save to DB
-        profile.user_context_summary = new_summary
-        await self.db.commit()
-        
-        return new_summary
+            old_summary = profile.user_context_summary or "No previous summary recorded."
+
+            # 2. Fetch recent messages for this business across conversations
+            conv_stmt = (
+                select(Conversation.id)
+                .where(Conversation.business_id == business_id)
+                .order_by(desc(Conversation.updated_at))
+                .limit(3)
+            )
+            conv_ids = (await db.execute(conv_stmt)).scalars().all()
+            if not conv_ids:
+                return None
+
+            msg_stmt = (
+                select(Message)
+                .where(Message.conversation_id.in_(conv_ids))
+                .order_by(desc(Message.created_at))
+                .limit(20)
+            )
+            recent_rows = (await db.execute(msg_stmt)).scalars().all()
+            if not recent_rows:
+                return None
+
+            recent_chat_lines = [
+                f"{r.role.upper()}: {r.content[:400]}"
+                for r in reversed(recent_rows)
+                if r.content
+            ]
+            recent_text = "\n".join(recent_chat_lines)
+
+            # 3. Prompt fast model for 500-token distillation
+            sys_msg = SystemMessage(content=(
+                "You are an expert AI memory distillation assistant for the SAHM Marketing OS.\n"
+                "Your job is to update the user's permanent profile background.\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "- Extract ONLY permanent facts: Brand Name, Industry/Niche, Target Audience, Brand Voice/Tone, "
+                "Known Competitors, Active Marketing Goals, and Budget Preferences.\n"
+                "- DISCARD casual pleasantries, transient questions, and repetitive chit-chat.\n"
+                "- MERGE the new conversation facts into the existing summary seamlessly.\n"
+                "- STRICT CONSTRAINT: MAXIMUM 500 TOKENS (under 250 words). Format as high-density bullet points."
+            ))
+
+            usr_msg = HumanMessage(content=(
+                f"=== CURRENT USER PROFILE SUMMARY ===\n{old_summary}\n\n"
+                f"=== RECENT CONVERSATION LOGS ===\n{recent_text}\n\n"
+                "Provide the updated, unified Long-Term Memory summary:"
+            ))
+
+            try:
+                response = await self.fast_llm.ainvoke([sys_msg, usr_msg])
+                if isinstance(response.content, list):
+                    new_summary = "\n".join([
+                        str(p.get("text", p) if isinstance(p, dict) else p)
+                        for p in response.content
+                    ]).strip()
+                else:
+                    new_summary = str(response.content).strip()
+
+                # 4. Save to DB
+                profile.user_context_summary = new_summary
+                await db.commit()
+                logger.info("ltm_profile_updated", extra={"business_id": business_id, "summary_len": len(new_summary)})
+                return new_summary
+            except Exception as e:
+                logger.error("ltm_update_failed", extra={"business_id": business_id, "error": str(e)})
+                return None
+
+
+class MemoryDebouncer:
+    """
+    Manages 3-minute debounce timers per business.
+    Every new message resets the 3-minute timer. When the user is inactive for 3 minutes,
+    the background compressor fires automatically.
+    """
+    def __init__(self, delay_seconds: int = 180):
+        self.delay_seconds = delay_seconds
+        self._timers: dict[str, asyncio.Task[None]] = {}
+        self.compressor = IntelligentMemoryCompressor()
+
+    def schedule_ltm_update(self, business_id: str):
+        """Schedule or reset the 3-minute inactivity timer."""
+        # Cancel any existing active timer for this business
+        existing_task = self._timers.get(business_id)
+        if existing_task and not existing_task.done():
+            existing_task.cancel()
+
+        # Start a new 3-minute countdown task
+        task = asyncio.create_task(self._countdown_and_execute(business_id))
+        self._timers[business_id] = task
+
+    async def _countdown_and_execute(self, business_id: str):
+        try:
+            await asyncio.sleep(self.delay_seconds)
+            logger.info("ltm_debounce_triggered", extra={"business_id": business_id})
+            await self.compressor.update_global_profile(business_id)
+        except asyncio.CancelledError:
+            # Timer was reset by a new incoming message; normal behavior
+            pass
+        except Exception as e:
+            logger.error("ltm_debounce_error", extra={"business_id": business_id, "error": str(e)})
+        finally:
+            if self._timers.get(business_id) is asyncio.current_task():
+                self._timers.pop(business_id, None)
+
+
+# Process-wide singleton debouncer
+memory_debouncer = MemoryDebouncer(delay_seconds=180)
+
+
+async def manage_session_memory_with_token_cap(
+    db: AsyncSession,
+    conversation: Conversation,
+    messages: list[Message],
+    max_tokens: int = 1500,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """
+    Manages chat session memory using a threshold token cap:
+    - Before reaching max_tokens: behaves like a normal chat agent, passing raw past questions and answers.
+    - When max_tokens is reached: summarizes the older conversation turns using the fast LLM,
+      persists the summary to `conversation.summary` in the database, and returns only the 
+      concise summary + the latest turns for the next question.
+    - Updates the summary next time the token threshold is exceeded in the same chat.
+    """
+    valid_msgs = [m for m in messages if m.role in ("user", "assistant") and m.content]
+    
+    # Calculate approximate tokens (~3.5 chars per token across English/Arabic)
+    total_chars = sum(len(m.content or "") for m in valid_msgs)
+    approx_tokens = int(total_chars / 3.5)
+
+    # 1. Normal mode: below max_tokens
+    if approx_tokens < max_tokens:
+        history = [
+            {
+                "role": m.role,
+                "content": m.content or "",
+                "persona_id": m.persona_id,
+                "blocks": m.blocks or [],
+            }
+            for m in valid_msgs
+        ]
+        return history, conversation.summary
+
+    # 2. Threshold exceeded: summarize older turns and keep only the latest turns
+    logger.info(
+        "session_memory_token_cap_exceeded", 
+        extra={"conversation_id": conversation.id, "tokens": approx_tokens, "max_tokens": max_tokens}
+    )
+
+    # Retain the last 2 messages (1 user, 1 assistant) for immediate conversational context
+    if len(valid_msgs) > 2:
+        older_msgs = valid_msgs[:-2]
+        recent_msgs = valid_msgs[-2:]
+    else:
+        older_msgs = valid_msgs[:-1]
+        recent_msgs = valid_msgs[-1:]
+
+    older_text = "\n".join([f"{m.role.upper()}: {m.content}" for m in older_msgs])
+    current_summary = conversation.summary or "No previous summary."
+
+    fast_llm = get_llm().chat
+    sys_prompt = SystemMessage(content=(
+        "You are an expert conversation memory assistant.\n"
+        "Summarize the past conversation history between the user and the AI assistant into a compact, "
+        "high-density summary (under 250 words).\n"
+        "CRITICAL RULES:\n"
+        "- Retain all essential user questions, stated goals, brand facts, numbers, competitor names, and key AI recommendations.\n"
+        "- Drop chit-chat, greetings, and temporary clarification loops.\n"
+        "- Merge this new conversation chunk seamlessly into the existing summary."
+    ))
+    usr_prompt = HumanMessage(content=(
+        f"=== EXISTING CHAT SUMMARY ===\n{current_summary}\n\n"
+        f"=== CONVERSATION TURNS TO SUMMARIZE ===\n{older_text}\n\n"
+        "Provide the updated, unified chat summary:"
+    ))
+
+    try:
+        response = await fast_llm.ainvoke([sys_prompt, usr_prompt])
+        if isinstance(response.content, list):
+            new_summary = "\n".join([
+                str(p.get("text", p) if isinstance(p, dict) else p)
+                for p in response.content
+            ]).strip()
+        else:
+            new_summary = str(response.content).strip()
+
+        # Update the database
+        conversation.summary = new_summary
+        await db.flush()
+        logger.info("conversation_summary_updated", extra={"conversation_id": conversation.id, "len": len(new_summary)})
+    except Exception as e:
+        logger.error("conversation_summary_failed", extra={"conversation_id": conversation.id, "error": str(e)})
+        new_summary = conversation.summary
+
+    # Return only recent turns + the summary
+    compact_history = [
+        {
+            "role": m.role,
+            "content": m.content or "",
+            "persona_id": m.persona_id,
+            "blocks": m.blocks or [],
+        }
+        for m in recent_msgs
+    ]
+    return compact_history, new_summary
+

@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
 from app.core.orchestrator.blocks import validate_blocks
-from app.db.models import AgentTask, Business, Conversation, Message
+from app.db.models import AgentTask, Business, Conversation, Message, Profile
 from app.schemas.assistant import (
     AssistantMessageRequest,
     AssistantMessageResponse,
@@ -215,26 +215,27 @@ async def handle_message(
         )
     conversation.context = context
 
-    # Keep a small recent window for the general-chat path. The current user
-    # message is appended below and by the chat node, so history excludes it.
-    history_rows = (
+    # Query conversation messages chronologically to evaluate token volume
+    msg_rows = (
         await db.execute(
             select(Message)
             .where(Message.conversation_id == conversation.id)
-            .order_by(Message.created_at.desc())
-            .limit(12)
+            .order_by(Message.created_at.asc())
         )
     ).scalars().all()
-    history = [
-        {
-            "role": item.role,
-            "content": item.content or "",
-            "persona_id": item.persona_id,
-            "blocks": item.blocks or [],
-        }
-        for item in reversed(history_rows)
-        if item.role in ("user", "assistant")
-    ]
+
+    # Manage session memory with configurable token threshold:
+    # Below threshold: passes raw past questions and answers like a normal chat agent.
+    # When threshold is reached: summarizes past turns into conversation.summary in DB,
+    # and only passes the summary + latest turns for this and subsequent turns.
+    from app.ai.memory.compressor import manage_session_memory_with_token_cap
+    history, conv_summary = await manage_session_memory_with_token_cap(
+        db,
+        conversation=conversation,
+        messages=list(msg_rows),
+        max_tokens=1500,
+    )
+
     # A bare "try again" is an instruction about the preceding user request.
     # Routing only that short phrase sent it to normal chat, where the model
     # could claim it was starting research without actually invoking a task.
@@ -250,9 +251,21 @@ async def handle_message(
     if not conversation.title:
         conversation.title = request.message[:80]
 
+    # Load Long-Term Memory (Profile.user_context_summary)
+    profile_row = await db.scalar(
+        select(Profile).where(Profile.business_id == business.id).limit(1)
+    )
+    user_context = profile_row.user_context_summary if profile_row else None
+
     # LANGGRAPH UI BLOCKS OVERRIDE
     from app.ai.agents.orchestrator.brain import orchestrate
-    final_gui = await orchestrate(routed_message, history, event_queue)
+    final_gui = await orchestrate(
+        routed_message, 
+        history, 
+        event_queue, 
+        user_context=user_context,
+        conversation_summary=conv_summary
+    )
     blocks_raw = final_gui.model_dump(mode="json", by_alias=True)["blocks"] if final_gui else []
     final = {"blocks": blocks_raw}
     # END OVERRIDE
@@ -284,6 +297,13 @@ async def handle_message(
         persona_id=str(agent_result.get("persona_id") or ""),
     )
     await db.commit()
+
+    # Trigger 3-minute inactivity debounced Long-Term Memory background update
+    try:
+        from app.ai.memory.compressor import memory_debouncer
+        memory_debouncer.schedule_ltm_update(business.id)
+    except Exception as exc:
+        _logger.warning("ltm_debouncer_schedule_failed", extra={"error": str(exc)})
 
     message = MessageSchema(
         id=_new_id("msg"),
