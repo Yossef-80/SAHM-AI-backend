@@ -128,8 +128,15 @@ class ResearchItemOut(BaseModel):
 # Prompt Instructions
 # =====================================================================
 
+DENSE_REPORT_PREFIX = (
+    "STRICT LENGTH & CONCISENESS LIMIT: Maximum 300 to 380 words total.\n"
+    "Deliver high-density bullet points with zero conversational filler. "
+    "Every line must contain specific facts, hooks, numbers, or tactical moves.\n\n"
+)
+
 TOOL_PROMPTS = {
     "analyze_website": (
+        DENSE_REPORT_PREFIX +
         "You are an expert Website & Conversion Rate Optimization Analyst for SAHM OS.\n"
         "Analyze the provided website extraction and structure your report into clean Markdown:\n"
         "## Overview & Brand Positioning\n"
@@ -140,6 +147,7 @@ TOOL_PROMPTS = {
         "Include a '## 🌐 Sources & References' section at the end with markdown links to the analyzed domain."
     ),
     "analyze_competitor": (
+        DENSE_REPORT_PREFIX +
         "You are a Senior Competitor Intelligence Strategist for SAHM OS.\n"
         "Analyze who is advertising to this audience and how using the verified web sources. Structure into clean Markdown:\n"
         "## Competitor Overview & Market Share in Egypt\n"
@@ -151,6 +159,7 @@ TOOL_PROMPTS = {
         "(List each referenced web source as a clickable markdown link: - [Source Title](URL))"
     ),
     "analyze_social_profile": (
+        DENSE_REPORT_PREFIX +
         "You are a Social Media Content Strategist for SAHM OS.\n"
         "Analyze this social profile based on real evidence and structure into clean Markdown:\n"
         "## Core Content Pillars & Themes\n"
@@ -162,6 +171,7 @@ TOOL_PROMPTS = {
         "(List all relevant profile and social references with clickable markdown links)"
     ),
     "analyze_reviews": (
+        DENSE_REPORT_PREFIX +
         "You are a Customer Experience & Sentiment Analyst for SAHM OS.\n"
         "Analyze customer feedback from web and review sources. Structure into clean Markdown:\n"
         "## Overall Sentiment Score & Review Trends\n"
@@ -173,6 +183,7 @@ TOOL_PROMPTS = {
         "(List review links, store listings, and discussion threads referenced)"
     ),
     "analyze_market": (
+        DENSE_REPORT_PREFIX +
         "You are a Macro Market & Industry Analyst for SAHM OS.\n"
         "Analyze market size, segments, and trends for this category in Egypt. Structure into clean Markdown:\n"
         "## Market Size & 2026 Growth Trajectory in Egypt\n"
@@ -184,6 +195,7 @@ TOOL_PROMPTS = {
         "(Cite industry reports, news articles, and market sources with markdown links)"
     ),
     "analyze_keywords": (
+        DENSE_REPORT_PREFIX +
         "You are an SEO & Search Intent Strategist for SAHM OS.\n"
         "Analyze search demand clusters and structure into clean Markdown:\n"
         "## High-Intent Transactional Keyword Clusters (High buying intent)\n"
@@ -195,6 +207,7 @@ TOOL_PROMPTS = {
         "(Include search references and relevant domain links)"
     ),
     "analyze_competitor_creatives": (
+        DENSE_REPORT_PREFIX +
         "You are an Elite Creative Director & Paid Ads Strategist for SAHM OS.\n"
         "Analyze competitor advertising creatives, ad formats, hooks, and promotional angles based on live market evidence.\n\n"
         "STRICT INSTRUCTION: Do NOT write a general corporate background or company history (that belongs to Competitor Research). "
@@ -222,6 +235,7 @@ TOOL_PROMPTS = {
         "(Cite Meta Ad Library and campaign references with markdown links)"
     ),
     "detect_market_gaps": (
+        DENSE_REPORT_PREFIX +
         "You are an Opportunity Spotter & Product-Market Fit Strategist for SAHM OS.\n"
         "Synthesize all accumulated research to date and rank unserved needs. Structure into clean Markdown:\n"
         "## Executive Opportunity Summary\n"
@@ -232,6 +246,7 @@ TOOL_PROMPTS = {
         "## 🌐 Sources & References"
     ),
     "generate_marketing_strategy": (
+        DENSE_REPORT_PREFIX +
         "You are a Chief Marketing Officer (CMO) for SAHM OS.\n"
         "Build an actionable 90-day marketing blueprint. Structure into clean Markdown:\n"
         "## Core Brand Positioning & The Unfair Advantage Hook\n"
@@ -332,14 +347,15 @@ async def list_research_items(
     results = []
     for r in rows:
         meta = r.metadata_ or {}
-        clean_text = extract_clean_text(r.text)
+        full_report = meta.get("full_report")
+        report_text = extract_clean_text(full_report if full_report else r.text)
         results.append(
             ResearchItemOut(
                 id=r.id,
                 tool=meta.get("tool", "analyze_competitor"),
                 query=meta.get("query", ""),
                 title=meta.get("title", "Research Item"),
-                summary=clean_text,
+                summary=report_text,
                 details=meta.get("details", {}),
                 saved_to_memory=True,
                 created_at=r.created_at.isoformat() if r.created_at else "",
@@ -515,7 +531,7 @@ async def run_research(
         f"Research Type: '{tool_type}'\n\n"
         f"{brand_context_block}"
         f"Verified Web & Market Evidence (with URLs):\n{raw_evidence}\n\n"
-        "Generate the complete structured intelligence report in clean Markdown.\n"
+        "Generate a dense, concise structured intelligence report (strictly under 380 words) in clean Markdown.\n"
         "Ground your findings in the provided evidence and list all sources in the '## 🌐 Sources & References' section as clickable markdown links."
     ))
 
@@ -540,7 +556,24 @@ async def run_research(
     memory_id = f"mem_res_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc)
 
-    # 4. Save to BrandMemoryItem
+    # Distill report into a compact memory note (strictly 80-120 words / ~100 tokens) for agent context
+    distill_sys = SystemMessage(content=(
+        "You are an AI Memory Distiller for SAHM OS.\n"
+        "Distill this research report into an ultra-compact brand memory note for AI marketing agents.\n"
+        "STRICT CONSTRAINT: Exactly 80 to 120 words maximum.\n"
+        "Focus only on key factual intelligence: competitor strengths/weaknesses, audience desires, price points, and winning creative angles.\n"
+        "Format as 3-4 dense bullet points. Zero conversational filler."
+    ))
+    distill_usr = HumanMessage(content=f"Research Title: {title}\nReport:\n{summary_text}")
+    try:
+        import asyncio
+        distill_res = await asyncio.to_thread(fast_llm.invoke, [distill_sys, distill_usr])
+        compact_memory_text = extract_clean_text(distill_res.content)
+    except Exception as e:
+        logger.warning("memory_distillation_fallback", extra={"error": str(e)})
+        compact_memory_text = summary_text[:400]
+
+    # 4. Save to BrandMemoryItem (compact text for low-token agent recall, full report in metadata)
     kind_map = {
         "analyze_competitor": "competitor_note",
         "analyze_competitor_creatives": "competitor_note",
@@ -557,11 +590,12 @@ async def run_research(
         id=memory_id,
         business_id=ws.business_id,
         kind=kind,
-        text=summary_text,
+        text=compact_memory_text,
         metadata_={
             "tool": tool_type,
             "query": query,
             "title": title,
+            "full_report": summary_text,
             "details": {
                 "subject": effective_query,
                 "tool": tool_type,
@@ -592,11 +626,11 @@ async def run_research(
         "You are the central brain memory manager for SAHM Marketing OS.\n"
         "Integrate this new research finding into the brand's permanent profile.\n"
         "Update the known competitors, audience learnings, and market opportunities.\n"
-        "STRICT CONSTRAINT: Keep under 500 tokens total in high-density bullet points. Output plain markdown only."
+        "STRICT CONSTRAINT: Keep under 300 tokens total in high-density bullet points. Output plain markdown only."
     ))
     ltm_usr = HumanMessage(content=(
         f"CURRENT LTM PROFILE:\n{old_summary}\n\n"
-        f"NEW RESEARCH INTEL TO INTEGRATE:\nTitle: {title}\nSummary Preview: {summary_text[:700]}\n\n"
+        f"NEW RESEARCH INTEL TO INTEGRATE:\nTitle: {title}\nCompact Finding: {compact_memory_text}\n\n"
         "Return the updated, unified Long-Term Memory:"
     ))
     try:
