@@ -613,6 +613,7 @@ class Profile(Base, TimestampMixin):
         String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True, nullable=False
     )
     role: Mapped[str] = mapped_column(String(20), default="member", index=True, nullable=False)
+    user_context_summary: Mapped[str | None] = mapped_column(Text)
 
 
 class ToolSettings(Base, TimestampMixin):

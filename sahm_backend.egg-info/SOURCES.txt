@@ -119,10 +119,7 @@ app/core/memory/embeddings.py
 app/core/memory/store.py
 app/core/orchestrator/__init__.py
 app/core/orchestrator/blocks.py
-app/core/orchestrator/graph.py
-app/core/orchestrator/router.py
 app/core/orchestrator/service.py
-app/core/orchestrator/state.py
 app/core/tools/__init__.py
 app/core/tools/base.py
 app/core/tools/connectors.py
@@ -175,7 +172,6 @@ tests/test_config_surface.py
 tests/test_contract.py
 tests/test_deployment_ops.py
 tests/test_llm_layer.py
-tests/test_orchestrator.py
 tests/test_profile_field_families.py
 tests/test_registry_policy.py
 tests/test_runtime.py
