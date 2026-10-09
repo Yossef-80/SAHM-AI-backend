@@ -101,7 +101,12 @@ class IntelligentMemoryCompressor:
             ]
             recent_text = "\n".join(recent_chat_lines)
 
-            # 3. Prompt fast model for 500-token distillation
+            # 3. Prompt fast model for configurable token distillation
+            from app.ai.settings import get_ai_settings
+            ai_settings = get_ai_settings()
+            max_profile_tokens = ai_settings.memory_global_profile_max_tokens
+            max_words = int(max_profile_tokens * 0.75)
+
             sys_msg = SystemMessage(content=(
                 "You are an expert AI memory distillation assistant for the SAHM Marketing OS.\n"
                 "Your job is to update the user's permanent profile background.\n"
@@ -110,7 +115,7 @@ class IntelligentMemoryCompressor:
                 "Known Competitors, Active Marketing Goals, and Budget Preferences.\n"
                 "- DISCARD casual pleasantries, transient questions, and repetitive chit-chat.\n"
                 "- MERGE the new conversation facts into the existing summary seamlessly.\n"
-                "- STRICT CONSTRAINT: MAXIMUM 500 TOKENS (under 250 words). Format as high-density bullet points."
+                f"- STRICT CONSTRAINT: MAXIMUM {max_profile_tokens} TOKENS (under {max_words} words). Format as high-density bullet points."
             ))
 
             usr_msg = HumanMessage(content=(
@@ -141,23 +146,29 @@ class IntelligentMemoryCompressor:
 
 class MemoryDebouncer:
     """
-    Manages 3-minute debounce timers per business.
-    Every new message resets the 3-minute timer. When the user is inactive for 3 minutes,
+    Manages configurable inactivity debounce timers per business.
+    Every new message resets the countdown timer. When the user is inactive for the duration,
     the background compressor fires automatically.
     """
-    def __init__(self, delay_seconds: int = 180):
+    def __init__(self, delay_seconds: int | None = None):
+        if delay_seconds is None:
+            try:
+                from app.ai.settings import get_ai_settings
+                delay_seconds = get_ai_settings().memory_ltm_debounce_seconds
+            except Exception:
+                delay_seconds = 180
         self.delay_seconds = delay_seconds
         self._timers: dict[str, asyncio.Task[None]] = {}
         self.compressor = IntelligentMemoryCompressor()
 
     def schedule_ltm_update(self, business_id: str):
-        """Schedule or reset the 3-minute inactivity timer."""
+        """Schedule or reset the inactivity timer."""
         # Cancel any existing active timer for this business
         existing_task = self._timers.get(business_id)
         if existing_task and not existing_task.done():
             existing_task.cancel()
 
-        # Start a new 3-minute countdown task
+        # Start a new countdown task
         task = asyncio.create_task(self._countdown_and_execute(business_id))
         self._timers[business_id] = task
 
@@ -177,23 +188,36 @@ class MemoryDebouncer:
 
 
 # Process-wide singleton debouncer
-memory_debouncer = MemoryDebouncer(delay_seconds=180)
+memory_debouncer = MemoryDebouncer()
 
 
 async def manage_session_memory_with_token_cap(
     db: AsyncSession,
     conversation: Conversation,
     messages: list[Message],
-    max_tokens: int = 1500,
+    max_tokens: int | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]:
     """
-    Manages chat session memory using a threshold token cap:
+    Manages chat session memory using a configurable threshold token cap:
     - Before reaching max_tokens: behaves like a normal chat agent, passing raw past questions and answers.
     - When max_tokens is reached: summarizes the older conversation turns using the fast LLM,
       persists the summary to `conversation.summary` in the database, and returns only the 
       concise summary + the latest turns for the next question.
     - Updates the summary next time the token threshold is exceeded in the same chat.
     """
+    if max_tokens is None:
+        try:
+            from app.ai.settings import get_ai_settings
+            max_tokens = get_ai_settings().memory_session_max_tokens
+        except Exception:
+            max_tokens = 1500
+
+    try:
+        from app.ai.settings import get_ai_settings
+        retain_count = get_ai_settings().memory_retain_recent_turns
+    except Exception:
+        retain_count = 2
+
     valid_msgs = [m for m in messages if m.role in ("user", "assistant") and m.content]
     
     # Calculate approximate tokens (~3.5 chars per token across English/Arabic)
@@ -219,10 +243,10 @@ async def manage_session_memory_with_token_cap(
         extra={"conversation_id": conversation.id, "tokens": approx_tokens, "max_tokens": max_tokens}
     )
 
-    # Retain the last 2 messages (1 user, 1 assistant) for immediate conversational context
-    if len(valid_msgs) > 2:
-        older_msgs = valid_msgs[:-2]
-        recent_msgs = valid_msgs[-2:]
+    # Retain the configured number of recent messages for immediate conversational context
+    if len(valid_msgs) > retain_count:
+        older_msgs = valid_msgs[:-retain_count]
+        recent_msgs = valid_msgs[-retain_count:]
     else:
         older_msgs = valid_msgs[:-1]
         recent_msgs = valid_msgs[-1:]

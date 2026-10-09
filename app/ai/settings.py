@@ -124,6 +124,13 @@ class AISettings(BaseSettings):
     sqlite_path: str = Field("./var/ai_memory.sqlite", validation_alias=_env("AI_SQLITE_PATH"))
     postgres_url: str | None = Field(None, validation_alias=_env("AI_POSTGRES_URL"))
 
+    # ============================================================ MEMORY ====
+    memory_session_max_tokens: int = Field(1500, validation_alias=_env("MEMORY_SESSION_MAX_TOKENS"))
+    memory_ltm_debounce_seconds: int = Field(180, validation_alias=_env("MEMORY_LTM_DEBOUNCE_SECONDS"))
+    memory_item_max_tokens: int = Field(120, validation_alias=_env("MEMORY_ITEM_MAX_TOKENS"))
+    memory_global_profile_max_tokens: int = Field(300, validation_alias=_env("MEMORY_GLOBAL_PROFILE_MAX_TOKENS"))
+    memory_retain_recent_turns: int = Field(2, validation_alias=_env("MEMORY_RETAIN_RECENT_TURNS"))
+
     # =========================================================== REVIEWS ====
     google_places_api_key: str | None = Field(None, validation_alias=_env("GOOGLE_PLACES_API_KEY"))
     apify_api_token: str | None = Field(None, validation_alias=_env("APIFY_API_TOKEN", "APIFY_TOKEN"))

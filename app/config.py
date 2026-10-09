@@ -141,6 +141,18 @@ class Settings(BaseSettings):
     # Wall-clock cap for a single agent run, seconds.
     agent_run_timeout_seconds: float = 180.0
 
+    # -------------------------------------------------------------- memory ----
+    # Max tokens in active chat history before older turns are summarized into DB
+    memory_session_max_tokens: int = 1500
+    # Inactivity delay in seconds before updating global profile LTM in background (180s = 3 min)
+    memory_ltm_debounce_seconds: int = 180
+    # Maximum tokens cap for distilled BrandMemoryItem.text
+    memory_item_max_tokens: int = 120
+    # Maximum tokens cap for global Profile.user_context_summary
+    memory_global_profile_max_tokens: int = 300
+    # Number of recent turns to retain raw when session is summarized
+    memory_retain_recent_turns: int = 2
+
     # ---------------------------------------------------------- embeddings ---
     embedding_provider: Literal["mock", "openai"] = "mock"
     embedding_model: str = "mock-embed-1"

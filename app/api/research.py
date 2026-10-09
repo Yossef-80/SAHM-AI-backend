@@ -556,11 +556,13 @@ async def run_research(
     memory_id = f"mem_res_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc)
 
-    # Distill report into a compact memory note (strictly 80-120 words / ~100 tokens) for agent context
+    # Distill report into a compact memory note for agent context
+    item_tokens_limit = ai_settings.memory_item_max_tokens
+    item_words_limit = int(item_tokens_limit * 0.8)
     distill_sys = SystemMessage(content=(
         "You are an AI Memory Distiller for SAHM OS.\n"
         "Distill this research report into an ultra-compact brand memory note for AI marketing agents.\n"
-        "STRICT CONSTRAINT: Exactly 80 to 120 words maximum.\n"
+        f"STRICT CONSTRAINT: Exactly {max(40, item_words_limit - 30)} to {item_words_limit} words maximum (under {item_tokens_limit} tokens).\n"
         "Focus only on key factual intelligence: competitor strengths/weaknesses, audience desires, price points, and winning creative angles.\n"
         "Format as 3-4 dense bullet points. Zero conversational filler."
     ))
@@ -622,11 +624,12 @@ async def run_research(
         await db.flush()
 
     old_summary = extract_clean_text(profile.user_context_summary or "")
+    profile_tokens_limit = ai_settings.memory_global_profile_max_tokens
     ltm_sys = SystemMessage(content=(
         "You are the central brain memory manager for SAHM Marketing OS.\n"
         "Integrate this new research finding into the brand's permanent profile.\n"
         "Update the known competitors, audience learnings, and market opportunities.\n"
-        "STRICT CONSTRAINT: Keep under 300 tokens total in high-density bullet points. Output plain markdown only."
+        f"STRICT CONSTRAINT: Keep under {profile_tokens_limit} tokens total in high-density bullet points. Output plain markdown only."
     ))
     ltm_usr = HumanMessage(content=(
         f"CURRENT LTM PROFILE:\n{old_summary}\n\n"

@@ -233,7 +233,6 @@ async def handle_message(
         db,
         conversation=conversation,
         messages=list(msg_rows),
-        max_tokens=1500,
     )
 
     # A bare "try again" is an instruction about the preceding user request.
