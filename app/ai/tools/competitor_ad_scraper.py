@@ -17,7 +17,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.settings import settings
+from app.ai.settings import get_ai_settings
+
 from app.db.models import BrandMemoryItem
 
 logger = logging.getLogger(__name__)
@@ -87,9 +88,10 @@ def build_summary(name: str, n_ads: int, keywords: list[tuple[str, int]], images
 
 
 async def _scrape(page_url: str) -> list[dict]:
-    if not settings.apify_api_token:
+    token = get_ai_settings().apify_api_token
+    if not token:
         raise RuntimeError("APIFY_API_TOKEN is not configured.")
-    client = ApifyClientAsync(settings.apify_api_token)
+    client = ApifyClientAsync(token)
     run = await client.actor(ACTOR_ID).call(
         run_input={"startUrls": [{"url": page_url}], "resultsLimit": MAX_ADS},
         timeout_secs=300,
