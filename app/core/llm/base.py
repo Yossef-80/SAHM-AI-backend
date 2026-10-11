@@ -252,6 +252,34 @@ class BaseLLMClient(ABC):
         temperature: float = 0.4,
     ) -> LLMResult:
         started = time.monotonic()
+        from app.core.logging import get_logger
+        llm_trace = get_logger("app.llm.trace")
+
+        formatted_messages = [
+            {
+                "role": m.role,
+                "content": m.content,
+                "tool_calls": [tc.model_dump() for tc in m.tool_calls] if m.tool_calls else None,
+                "tool_call_id": m.tool_call_id,
+            }
+            for m in messages
+        ]
+        tool_names = [t.name for t in tools] if tools else []
+
+        llm_trace.info(
+            f"[LLM PROMPT - SENDING] Model '{self.model}' | Tier: {tier}",
+            extra={
+                "model": self.model,
+                "tier": tier,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "system_prompt": system,
+                "messages": formatted_messages,
+                "tools_offered": tool_names,
+                "response_schema": response_schema.__name__ if response_schema else None,
+            },
+        )
+
         result = await self._call_with_retries(
             system=system,
             messages=messages,
@@ -266,6 +294,21 @@ class BaseLLMClient(ABC):
         if result.usage.model == "":
             result.usage.model = self.model
         self._log_usage(result)
+
+        tool_calls_req = [tc.model_dump() for tc in result.tool_calls] if result.tool_calls else []
+        llm_trace.info(
+            f"[LLM RESPONSE - RECEIVED] Model '{result.model}' in {result.latency_ms}ms "
+            f"(Tokens: in={result.usage.tokens_in}, out={result.usage.tokens_out})",
+            extra={
+                "model": result.model,
+                "latency_ms": result.latency_ms,
+                "tokens_in": result.usage.tokens_in,
+                "tokens_out": result.usage.tokens_out,
+                "text_response": result.text,
+                "tool_calls_requested": tool_calls_req,
+                "parsed": result.parsed.model_dump(mode="json") if result.parsed else None,
+            },
+        )
         return result
 
     # -- internals -----------------------------------------------------------

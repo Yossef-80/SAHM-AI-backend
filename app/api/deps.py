@@ -117,48 +117,39 @@ async def get_principal(request: Request, db: SessionDep, settings: SettingsDep)
     if token is None:
         return None
 
-    # If Supabase Auth is not enabled, fall back to legacy session auth
-    if not settings.use_supabase_auth:
-        # Legacy path - kept for gradual migration
-        cached_user_id = getattr(request.state, "auth_user_id", None)
-        if cached_user_id:
-            user = await db.get(User, cached_user_id)
-            if user is None:
-                return None
-            return await load_principal(db, user)
+    # 1. Supabase Auth path (when token is a 3-part JWT)
+    if settings.use_supabase_auth and token.count(".") == 2:
+        try:
+            claims = await verify_supabase_token(token)
+            supabase_user_id = claims.get("sub")
+            email = claims.get("email")
+            full_name = claims.get("user_metadata", {}).get("full_name") or claims.get("user_metadata", {}).get("name")
 
-        user = await resolve_session(db, token)
+            if supabase_user_id and email:
+                profile = await get_or_create_profile(db, supabase_user_id, email, full_name)
+                principal = await load_principal_from_profile(db, profile)
+                return Principal(
+                    user_id=principal.user_id,
+                    email=email,
+                    full_name=full_name,
+                    memberships=principal.memberships,
+                )
+        except SupabaseAuthError:
+            pass
+
+    # 2. Database session auth path (opaque session token stored in PostgreSQL)
+    cached_user_id = getattr(request.state, "auth_user_id", None)
+    if cached_user_id:
+        user = await db.get(User, cached_user_id)
         if user is None:
             return None
-        await db.commit()
         return await load_principal(db, user)
 
-    # Supabase Auth path
-    try:
-        claims = await verify_supabase_token(token)
-    except SupabaseAuthError:
+    user = await resolve_session(db, token)
+    if user is None:
         return None
-
-    supabase_user_id = claims.get("sub")
-    email = claims.get("email")
-    full_name = claims.get("user_metadata", {}).get("full_name") or claims.get("user_metadata", {}).get("name")
-
-    if not supabase_user_id or not email:
-        return None
-
-    # Get or create local profile
-    profile = await get_or_create_profile(db, supabase_user_id, email, full_name)
-    principal = await load_principal_from_profile(db, profile)
-
-    # Override email/full_name from JWT claims (source of truth)
-    principal = Principal(
-        user_id=principal.user_id,
-        email=email,
-        full_name=full_name,
-        memberships=principal.memberships,
-    )
-
-    return principal
+    await db.commit()
+    return await load_principal(db, user)
 
 
 #: Optional authentication. ``None`` when the request carried no valid token.

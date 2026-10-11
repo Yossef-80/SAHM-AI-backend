@@ -1,0 +1,2098 @@
+2026-10-11 23:22:50.157 | WARNING | app.main                 | [req=-] | insecure_runtime_configuration
+    * detail: TOKEN_ENCRYPTION_KEY is unset: falling back to the published dev key. Stored tokens are only as private as this repository.
+2026-10-11 23:22:50.157 | INFO    | app.core.tools.registry  | [req=-] | tools_registered
+    * count: 16
+    * tools: web_search,analyze_website,get_social_profile,get_reviews,get_keywords,get_competitor_ads,brand_report,full_analysis,route_file_to_tool,get_brand_context,save_learning,get_campaign_insights,get_breakdowns,analyze_reference_creative,generate_image,create_recommendation
+2026-10-11 23:22:50.179 | INFO    | app.db.session           | [req=-] | db_engine_created
+    * dialect: postgresql
+2026-10-11 23:22:52.373 | INFO    | app.db.trace             | [req=-] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT pg_catalog.pg_class.relname 
+      FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+      WHERE pg_catalog.pg_class.relname IN ($7::VARCHAR, $8::VARCHAR, $9::VARCHAR, $10::VARCHAR, $11::VARCHAR, $12::VARCHAR, $13::VARCHAR, $14::VARCHAR, $15::VARCHAR, $16::VARCHAR, $17::VARCHAR, $18::VARCHAR, $19::VARCHAR, $20::VARCHAR, $21::VARCHAR, $22::VARCHAR, $23::VARCHAR, $24::VARCHAR, $25::VARCHAR, $26::VARCHAR, $27::VARCHAR) AND pg_catalog.pg_class.relkind = ANY (ARRAY[$1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != $6::VARCHAR
+    * parameters: ('r', 'p', 'f', 'v', 'm', 'pg_catalog', 'businesses', 'brand_profiles', 'brand_memory_items', 'conversations', 'messages', 'campaigns', 'creatives', 'insights', 'recommendations', 'audit_log', 'persona_overrides', 'agent_tasks', 'agent_tool_calls', 'integrations', 'users', 'memberships', 'sessions', 'profiles', 'tool_settings', 'llm_provider_settings', 'usage_records')
+    * executemany: False
+2026-10-11 23:22:53.817 | INFO    | app.db.trace             | [req=-] | [DATABASE - SELECT RESULT] Completed in 1444ms (rows: 21)
+    * operation: SELECT
+    * duration_ms: 1444
+    * rowcount: 21
+2026-10-11 23:22:54.142 | INFO    | app.db.session           | [req=-] | db_schema_created
+    * dialect: postgresql
+2026-10-11 23:22:54.143 | INFO    | app.main                 | [req=-] | schema_creation_performed
+    * reason: dev
+    * schema_source: create_all
+2026-10-11 23:22:54.143 | INFO    | app.main                 | [req=-] | app_started
+    * environment: dev
+    * llm_provider_fast: mock
+    * llm_provider_strong: mock
+    * database: postgresql+asyncpg
+    * require_auth: False
+2026-10-11 23:24:18.337 | INFO    | app.main                 | [req=req_26ab74f2421f47f7] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/conversations
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.339 | INFO    | app.main                 | [req=req_26ab74f2421f47f7] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/conversations (1ms)
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 1
+2026-10-11 23:24:18.340 | INFO    | app.main                 | [req=req_16888ce3baa243c1] | [ROUTING - INCOMING] OPTIONS /api/v1/campaigns
+    * method: OPTIONS
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.341 | INFO    | app.main                 | [req=req_76a4bd0c1af54912] | [ROUTING - INCOMING] OPTIONS /api/v1/creatives
+    * method: OPTIONS
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.342 | INFO    | app.main                 | [req=req_3b1e19e656ac4c41] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/conversations/conv_0d6a02f946c64c549270
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_0d6a02f946c64c549270
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.343 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.343 | INFO    | app.main                 | [req=req_16888ce3baa243c1] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/campaigns (2ms)
+    * method: OPTIONS
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 2
+2026-10-11 23:24:18.346 | INFO    | app.main                 | [req=req_76a4bd0c1af54912] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/creatives (4ms)
+    * method: OPTIONS
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 4
+2026-10-11 23:24:18.348 | INFO    | app.main                 | [req=req_3b1e19e656ac4c41] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/conversations/conv_0d6a02f946c64c549270 (5ms)
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_0d6a02f946c64c549270
+    * status: 200
+    * duration_ms: 5
+2026-10-11 23:24:18.349 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.350 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/creatives
+    * method: GET
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.358 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_0d6a02f946c64c549270
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_0d6a02f946c64c549270
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:18.878 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:24:19.236 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:24:19.299 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:24:19.359 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 481ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 481
+    * rowcount: 1
+2026-10-11 23:24:19.361 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:19.362 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:24:19.654 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 418ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 418
+    * rowcount: 1
+2026-10-11 23:24:19.655 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:19.664 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 364ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 364
+    * rowcount: 1
+2026-10-11 23:24:19.665 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:19.666 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 304ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 304
+    * rowcount: 1
+2026-10-11 23:24:19.667 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 24, 19, 666601, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:24:19.790 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 428ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 428
+    * rowcount: 1
+2026-10-11 23:24:19.791 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:19.913 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 258ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 258
+    * rowcount: 1
+2026-10-11 23:24:19.915 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 24, 19, 914494, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:24:19.915 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 250ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 250
+    * rowcount: 1
+2026-10-11 23:24:19.916 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 24, 19, 916112, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:24:19.916 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 249ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 249
+    * rowcount: 1
+2026-10-11 23:24:20.042 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 251ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 251
+    * rowcount: 1
+2026-10-11 23:24:20.043 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 24, 20, 42943, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:24:20.127 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 212ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 212
+    * rowcount: 1
+2026-10-11 23:24:20.232 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 316ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 316
+    * rowcount: 1
+2026-10-11 23:24:20.341 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 298ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 298
+    * rowcount: 1
+2026-10-11 23:24:20.503 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:20.641 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:20.707 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 204ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 204
+    * rowcount: 1
+2026-10-11 23:24:20.709 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:20.771 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:20.855 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 214ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 214
+    * rowcount: 1
+2026-10-11 23:24:20.856 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:20.857 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:20.970 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 260ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 260
+    * rowcount: 1
+2026-10-11 23:24:20.972 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:20.995 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 223ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 223
+    * rowcount: 1
+2026-10-11 23:24:20.996 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:21.085 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 228ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 228
+    * rowcount: 1
+2026-10-11 23:24:21.086 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.089 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 232ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 232
+    * rowcount: 1
+2026-10-11 23:24:21.090 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:21.192 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 219ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 219
+    * rowcount: 1
+2026-10-11 23:24:21.195 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.228 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 231ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 231
+    * rowcount: 1
+2026-10-11 23:24:21.228 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.325 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 239ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 239
+    * rowcount: 1
+2026-10-11 23:24:21.327 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.328 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 237ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 237
+    * rowcount: 1
+2026-10-11 23:24:21.328 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.414 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 218ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 218
+    * rowcount: 0
+2026-10-11 23:24:21.425 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.445 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 216ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 216
+    * rowcount: 1
+2026-10-11 23:24:21.446 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.565 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 238ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 238
+    * rowcount: 0
+2026-10-11 23:24:21.567 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.568 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 239ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 239
+    * rowcount: 1
+2026-10-11 23:24:21.570 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.688 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 242ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 242
+    * rowcount: 0
+2026-10-11 23:24:21.689 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:21.806 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 235ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 235
+    * rowcount: 0
+2026-10-11 23:24:21.807 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:22.173 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 747ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 747
+    * rowcount: 2
+2026-10-11 23:24:22.176 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:22.342 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 774ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 774
+    * rowcount: 2
+2026-10-11 23:24:22.343 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:22.399 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 223ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 223
+    * rowcount: 0
+2026-10-11 23:24:22.400 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:24:22.401 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.business_id = $1::VARCHAR ORDER BY conversations.updated_at DESC
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:22.513 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 823ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 823
+    * rowcount: 2
+2026-10-11 23:24:22.513 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:22.559 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 215ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 215
+    * rowcount: 0
+2026-10-11 23:24:22.559 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:24:22.560 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.id = $1::VARCHAR AND conversations.business_id = $2::VARCHAR
+    * parameters: ('conv_0d6a02f946c64c549270', 'biz_2b69ca4ecf694365a53c')
+    * executemany: False
+2026-10-11 23:24:22.634 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 232ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 232
+    * rowcount: 2
+2026-10-11 23:24:22.636 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR, $2::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e', 'conv_0d6a02f946c64c549270')
+    * executemany: False
+2026-10-11 23:24:22.657 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 849ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 849
+    * rowcount: 2
+2026-10-11 23:24:22.657 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:22.735 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 221ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 221
+    * rowcount: 0
+2026-10-11 23:24:22.736 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:24:22.737 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.id, campaigns.business_id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id = $1::VARCHAR ORDER BY campaigns.created_at DESC
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:22.785 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 224ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 224
+    * rowcount: 1
+2026-10-11 23:24:22.786 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_0d6a02f946c64c549270',)
+    * executemany: False
+2026-10-11 23:24:22.902 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 244ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 244
+    * rowcount: 0
+2026-10-11 23:24:22.903 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:24:22.906 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT creatives.id, creatives.business_id, creatives.campaign_id, creatives.persona_id, creatives.task_name, creatives.kind, creatives.url, creatives.prompt, creatives.aspect_ratio, creatives.provider, creatives.model, creatives.style_spec, creatives.reference_analysis_id, creatives.status, creatives.created_at, creatives.updated_at 
+      FROM creatives 
+      WHERE creatives.business_id = $1::VARCHAR ORDER BY creatives.created_at DESC 
+       LIMIT $2::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 100)
+    * executemany: False
+2026-10-11 23:24:23.008 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 271ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 271
+    * rowcount: 0
+2026-10-11 23:24:23.009 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (4659ms)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 4659
+2026-10-11 23:24:23.062 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 276ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 276
+    * rowcount: 2
+2026-10-11 23:24:23.065 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_0d6a02f946c64c549270 (4706ms)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_0d6a02f946c64c549270
+    * status: 200
+    * duration_ms: 4706
+2026-10-11 23:24:23.209 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 303ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 303
+    * rowcount: 0
+2026-10-11 23:24:23.209 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives (4859ms)
+    * method: GET
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 4859
+2026-10-11 23:24:23.228 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 592ms (rows: 30)
+    * operation: SELECT
+    * duration_ms: 592
+    * rowcount: 30
+2026-10-11 23:24:23.230 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (4887ms)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 4887
+2026-10-11 23:24:25.597 | INFO    | app.main                 | [req=req_4d546607efc7476c] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:25.598 | INFO    | app.main                 | [req=req_4d546607efc7476c] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e (0ms)
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * status: 200
+    * duration_ms: 0
+2026-10-11 23:24:25.601 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:24:26.107 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:24:26.325 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 218ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 218
+    * rowcount: 1
+2026-10-11 23:24:26.326 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:26.440 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 113ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 113
+    * rowcount: 1
+2026-10-11 23:24:26.441 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 24, 26, 440884, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:24:26.557 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 116ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 116
+    * rowcount: 1
+2026-10-11 23:24:26.942 | INFO    | app.db.session           | [req=-] | db_engine_created
+    * dialect: postgresql
+2026-10-11 23:24:27.079 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:27.297 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 218ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 218
+    * rowcount: 1
+2026-10-11 23:24:27.298 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:24:27.401 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 102ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 102
+    * rowcount: 1
+2026-10-11 23:24:27.402 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:27.517 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 115ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 115
+    * rowcount: 1
+2026-10-11 23:24:27.518 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:27.631 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 112ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 112
+    * rowcount: 0
+2026-10-11 23:24:27.632 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:27.852 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 219ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 219
+    * rowcount: 2
+2026-10-11 23:24:27.853 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:24:27.955 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 101ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 101
+    * rowcount: 0
+2026-10-11 23:24:27.956 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:24:27.957 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.id = $1::VARCHAR AND conversations.business_id = $2::VARCHAR
+    * parameters: ('conv_55c666bd812e45f6b25e', 'biz_2b69ca4ecf694365a53c')
+    * executemany: False
+2026-10-11 23:24:28.077 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 120ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 120
+    * rowcount: 1
+2026-10-11 23:24:28.078 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:24:28.588 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 509ms (rows: 28)
+    * operation: SELECT
+    * duration_ms: 509
+    * rowcount: 28
+2026-10-11 23:24:28.593 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e (2991ms)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * status: 200
+    * duration_ms: 2991
+2026-10-11 23:24:29.039 | INFO    | app.db.trace             | [req=-] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.id, brand_memory_items.business_id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items
+    * parameters: ()
+    * executemany: False
+2026-10-11 23:24:30.276 | INFO    | app.db.trace             | [req=-] | [DATABASE - SELECT RESULT] Completed in 1236ms (rows: 27)
+    * operation: SELECT
+    * duration_ms: 1236
+    * rowcount: 27
+2026-10-11 23:24:30.279 | INFO    | app.db.trace             | [req=-] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT profiles.id, profiles.supabase_user_id, profiles.business_id, profiles.role, profiles.user_context_summary, profiles.created_at, profiles.updated_at 
+      FROM profiles 
+       LIMIT $1::INTEGER
+    * parameters: (1,)
+    * executemany: False
+2026-10-11 23:24:30.514 | INFO    | app.db.trace             | [req=-] | [DATABASE - SELECT RESULT] Completed in 234ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 234
+    * rowcount: 1
+2026-10-11 23:25:20.170 | INFO    | app.main                 | [req=req_a20605eca50446b4] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/message/stream
+    * method: OPTIONS
+    * path: /api/v1/assistant/message/stream
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:25:20.171 | INFO    | app.main                 | [req=req_a20605eca50446b4] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/message/stream (0ms)
+    * method: OPTIONS
+    * path: /api/v1/assistant/message/stream
+    * status: 200
+    * duration_ms: 0
+2026-10-11 23:25:20.173 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] POST /api/v1/assistant/message/stream
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body:
+      {
+        "conversationId": "conv_55c666bd812e45f6b25e",
+        "message": "@web_analizer: https://www.bathandbodyworks.com.eg/en/shop-candles/all-candles"
+      }
+2026-10-11 23:25:20.840 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:25:21.748 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 907ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 907
+    * rowcount: 1
+2026-10-11 23:25:21.748 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:25:22.083 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 334ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 334
+    * rowcount: 1
+2026-10-11 23:25:22.084 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 25, 22, 84208, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:25:22.323 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 239ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 239
+    * rowcount: 1
+2026-10-11 23:25:22.942 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:25:23.232 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 290ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 290
+    * rowcount: 1
+2026-10-11 23:25:23.233 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:25:23.455 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 221ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 221
+    * rowcount: 1
+2026-10-11 23:25:23.456 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:25:23.577 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 120ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 120
+    * rowcount: 1
+2026-10-11 23:25:23.578 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:25:23.696 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 118ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 118
+    * rowcount: 0
+2026-10-11 23:25:23.697 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:25:23.838 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 141ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 141
+    * rowcount: 2
+2026-10-11 23:25:23.839 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:25:23.943 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 103ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 103
+    * rowcount: 0
+2026-10-11 23:25:23.944 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:25:23.946 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT llm_provider_settings.id, llm_provider_settings.business_id, llm_provider_settings.fast_provider, llm_provider_settings.fast_model, llm_provider_settings.fast_base_url, llm_provider_settings.fast_api_key_enc, llm_provider_settings.fast_extra_headers_enc, llm_provider_settings.strong_provider, llm_provider_settings.strong_model, llm_provider_settings.strong_base_url, llm_provider_settings.strong_api_key_enc, llm_provider_settings.strong_extra_headers_enc, llm_provider_settings.updated_by, llm_provider_settings.created_at, llm_provider_settings.updated_at 
+      FROM llm_provider_settings 
+      WHERE llm_provider_settings.business_id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:25:24.342 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 396ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 396
+    * rowcount: 0
+2026-10-11 23:25:24.344 | INFO    | app.core.llm.router      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | llm_client_built
+    * tier: strong
+    * provider: mock
+    * model: mock-strong-1
+    * base_url_configured: False
+    * extra_header_names:
+      []
+2026-10-11 23:25:24.345 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT llm_provider_settings.id, llm_provider_settings.business_id, llm_provider_settings.fast_provider, llm_provider_settings.fast_model, llm_provider_settings.fast_base_url, llm_provider_settings.fast_api_key_enc, llm_provider_settings.fast_extra_headers_enc, llm_provider_settings.strong_provider, llm_provider_settings.strong_model, llm_provider_settings.strong_base_url, llm_provider_settings.strong_api_key_enc, llm_provider_settings.strong_extra_headers_enc, llm_provider_settings.updated_by, llm_provider_settings.created_at, llm_provider_settings.updated_at 
+      FROM llm_provider_settings 
+      WHERE llm_provider_settings.business_id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:25:24.697 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 352ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 352
+    * rowcount: 0
+2026-10-11 23:25:24.697 | INFO    | app.core.llm.router      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | llm_client_built
+    * tier: fast
+    * provider: mock
+    * model: mock-fast-1
+    * base_url_configured: False
+    * extra_header_names:
+      []
+2026-10-11 23:25:24.699 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 POST /api/v1/assistant/message/stream (4525ms)
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * status: 200
+    * duration_ms: 4525
+2026-10-11 23:25:24.700 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.id = $1::VARCHAR
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:25:26.560 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 1860ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 1860
+    * rowcount: 1
+2026-10-11 23:25:26.562 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:25:27.689 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 1126ms (rows: 28)
+    * operation: SELECT
+    * duration_ms: 1126
+    * rowcount: 28
+2026-10-11 23:25:27.693 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.id, messages.conversation_id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id = $1::VARCHAR ORDER BY messages.created_at ASC
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:25:28.242 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 548ms (rows: 28)
+    * operation: SELECT
+    * duration_ms: 548
+    * rowcount: 28
+2026-10-11 23:25:28.781 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | session_memory_token_cap_exceeded
+    * conversation_id: conv_55c666bd812e45f6b25e
+    * tokens: 9691
+    * max_tokens: 2000
+2026-10-11 23:25:28.875 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:25:28.876 | WARNING | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | Direct use of automatic function calling (AFC) in AsyncModels.generate_content is not recommended. Instead, we recommend to use AFC in AsyncChat.send_message. Similarly, direct use of AFC in AsyncModels.generate_content_stream is not recommended. Instead, we recommend to use AFC in AsyncChat.send_message_stream.
+2026-10-11 23:25:31.219 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:31.235 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE conversations SET summary=$1::VARCHAR, updated_at=now() WHERE conversations.id = $2::VARCHAR
+    * parameters: ('- **User Goal:** Starting a candle brand in Egypt ("براند شموع في مصر").\n- **Key Recommendations & Progress:**\n  - Outlined the 5 core steps to start: Market study, materials/quality, design/packaging, legalities, and marketing/sales.\n  - **Market Study (دراسة السوق):**\n    1. *Competitor Analysis:* Categorized into Luxury/Premium (Maison Marie, Roshan Candles, Pia Scents, priced 600-1000+ EGP), Mid-Range (active on Instagram/Facebook and Bazaars like Le Marche), and Niche/Handcrafted.\n    2. *Target Audiences:* Home Decor Enthusiasts, Wellness & Self-Care seekers, and Gift Shoppers.\n    3. *Product & Material Trends / Gaps:* Focus on non-toxic natural soy/beeswax, wooden/cotton wicks, strong scent throw, and upcycling.\n    4. *Pricing Strategy:* Factoring in COGS with a 2.5x to 3x markup.\n  - **Materials & Selection (اختيار وتحديد الخامات):**\n    1. *Wax:* **Soy Wax** selected as the primary natural, eco-friendly, clean-burning choice.\n    2. *Fragrances:* Candle-specific Fragrance Oils recommended.\n    3. *Wicks:* **Classic Cotton Wick** selected for reliability and smooth burn.\n    4. *Containers:* **Heat-resistant Glass** selected (cylindrical jars with metal/wooden lids or open tumblers).\n  - **Branding & Naming (تحديد الهوية والاسم):**\n    - Explored 4 competitor-inspired naming directions (European/Latin, Direct/Descriptive, Sensory & Wellness, Artisanal & Cozy).\n    - Suggested multiple name options across styles (e.g., Aura Candles, Hush & Wick, Dafé/دافئ, Nawart, Velvet Flame, Serene Glow).\n  - **Next Steps:** Finalizing the brand name selection and moving into visual identity, labeling, packaging design, and wholesale sourcing in Egypt.', 'conv_55c666bd812e45f6b25e')
+    * executemany: False
+2026-10-11 23:25:31.642 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE RESULT] Completed in 406ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 406
+    * rowcount: 1
+2026-10-11 23:25:31.643 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | conversation_summary_updated
+    * conversation_id: conv_55c666bd812e45f6b25e
+    * tokens: 482
+2026-10-11 23:25:31.645 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT] Executing query
+    * operation: INSERT
+    * statement: INSERT INTO messages (id, conversation_id, role, content, blocks, task_id, persona_id) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::JSON, $6::VARCHAR, $7::VARCHAR) RETURNING messages.created_at
+    * parameters: ('msg_84ed406bd30b406da94c', 'conv_55c666bd812e45f6b25e', 'user', '@web_analizer: https://www.bathandbodyworks.com.eg/en/shop-candles/all-candles', '[{"type": "text", "text": "@web_analizer: https://www.bathandbodyworks.com.eg/en/shop-candles/all-candles"}]', None, None)
+    * executemany: False
+2026-10-11 23:25:32.035 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT RESULT] Completed in 390ms (rows: 1)
+    * operation: INSERT
+    * duration_ms: 390
+    * rowcount: 1
+2026-10-11 23:25:32.037 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT profiles.id, profiles.supabase_user_id, profiles.business_id, profiles.role, profiles.user_context_summary, profiles.created_at, profiles.updated_at 
+      FROM profiles 
+      WHERE profiles.business_id = $1::VARCHAR 
+       LIMIT $2::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 1)
+    * executemany: False
+2026-10-11 23:25:32.399 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 361ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 361
+    * rowcount: 1
+2026-10-11 23:25:32.400 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.text 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id = $1::VARCHAR AND brand_memory_items.kind = $2::VARCHAR 
+       LIMIT $3::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 'strategy_blueprint', 1)
+    * executemany: False
+2026-10-11 23:25:32.731 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 330ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 330
+    * rowcount: 1
+2026-10-11 23:25:32.903 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:25:34.711 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:35.916 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:36.443 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: GET https://www.bathandbodyworks.com.eg/en/shop-candles/all-candles "HTTP/1.1 200 OK"
+2026-10-11 23:25:37.741 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:39.521 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://api.tavily.com/search "HTTP/1.1 200 OK"
+2026-10-11 23:25:39.554 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:25:39.555 | WARNING | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | Direct use of automatic function calling (AFC) in Models.generate_content is not recommended. Instead, we recommend to use AFC in Chat.send_message. Similarly, direct use of AFC in Models.generate_content_stream is not recommended. Instead, we recommend to use AFC in Chat.send_message_stream.
+2026-10-11 23:25:40.407 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:41.511 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:44.384 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://api.tavily.com/search "HTTP/1.1 200 OK"
+2026-10-11 23:25:44.422 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:25:45.191 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:46.343 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:48.196 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://api.tavily.com/search "HTTP/1.1 200 OK"
+2026-10-11 23:25:48.226 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:25:49.182 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:50.382 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:51.969 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://api.tavily.com/search "HTTP/1.1 200 OK"
+2026-10-11 23:25:52.027 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:25:54.033 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:58.944 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:25:59.005 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:26:03.044 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:26:03.051 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT] Executing query
+    * operation: INSERT
+    * statement: INSERT INTO messages (id, conversation_id, role, content, blocks, task_id, persona_id) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::JSON, $6::VARCHAR, $7::VARCHAR) RETURNING messages.created_at
+    * parameters: ('msg_cf7a6a344f93434595a7', 'conv_55c666bd812e45f6b25e', 'assistant', 'خطوة ممتازة جداً إنك بصيت على **Bath & Body Works (باث آند بودي وركس)**، لأنه يُعتبر "المرجع" أو المعيار العالمي (Benchmark) لأسواق الشموع المعطرة في مصر والعالم العربي (بتوكيل مجموعة الشايع).\n\nتعال نحلل وضعهم في السوق المصري، أسعارهم، وإزاي تفيد براندك الجديد:\n\n### 1. نبذة عن Bath & Body Works في مصر\nنبذة عن Bath & Body Works في مصر\n- طبيعة البراند: \n- الخامات: \n### 2. أسعارهم في السوق المصري حالياً\nبسبب تسعير الشركات الكبرى المرتبط بالعملة والماركتينج الدولي، شموع Bath & Body Works في مصر تعتبر في **الفئة الفاخرة المرتفعة (High-End / Luxury)**:\nأسعارهم في السوق المصري حالياً\n- الشموع الكبيرة (3-Wick Candles - الحجم الأساسي): \n- الشموع الصغيرة (Single Wick): \n---\n\n### إزاي تستفيد من النقطة دي وأنت بتعمل براندك الخاص؟\nإزاي تستفيد من النقطة دي وأنت بتعمل براندك الخاص؟\n- العميل المستهدف عارف الجودة: \n- التركيز على قوة الرائحة (Scent Throw): \n- التسعير الخاص ببراندك: \nإيه رأيك في مقارنة الأسعار دي؟ وهل حابب نركز في الخطوة الجاية على **تحديد أسماء مقترحة لبراندك** أو **شكل التصميم والتغليف (Packaging)** اللي ينافس في الفئة دي؟', '[{"id": null, "type": "text", "text": "\\u062e\\u0637\\u0648\\u0629 \\u0645\\u0645\\u062a\\u0627\\u0632\\u0629 \\u062c\\u062f\\u0627\\u064b \\u0625\\u0646\\u0643 \\u0628\\u0635\\u064a\\u062a \\u0639\\u0644\\u0649 **Bath & Body Works (\\u0628\\u0627\\u062b \\u0622\\u0646\\u062f \\u0628\\u0648\\u062f\\u064a \\u0648\\u0631\\u0643\\u0633)**\\u060c \\u0644\\u0623\\u0646\\u0647 \\u064a\\u064f\\u0639\\u062a\\u0628\\u0631 \\"\\u0627\\u0644\\u0645\\u0631\\u062c\\u0639\\" \\u0623\\u0648 \\u0627\\u0644\\u0645\\u0639\\u064a\\u0627\\u0631 \\u0627\\u0644\\u0639\\u0627\\u0644\\u0645\\u064a (Benchmark) \\u0644\\u0623\\u0633\\u0648\\u0627\\u0642 \\u0627\\u0644\\u0634\\u0645\\u0648\\u0639 \\u0627\\u0644\\u0645\\u0639\\u0637\\u0631\\u0629 \\u0641\\u064a \\u0645\\u0635\\u0631 \\u0648\\u0627\\u0644\\u0639\\u0627\\u0644\\u0645 \\u0627\\u0644\\u0639\\u0631\\u0628\\u064a (\\u0628\\u062a\\u0648\\u0643\\u064a\\u0644 \\u0645\\u062c\\u0645\\u0648\\u0639\\u0629 \\u0627\\u0644\\u0634\\u0627\\u064a\\u0639).\\n\\n\\u062a\\u0639\\u0627\\u0644 \\u0646\\u062d\\u0644\\u0644 \\u0648\\u0636\\u0639\\u0647\\u0645 \\u0641\\u064a \\u0627\\u0644\\u0633\\u0648\\u0642 \\u0627\\u0644\\u0645\\u0635\\u0631\\u064a\\u060c \\u0623\\u0633\\u0639\\u0627\\u0631\\u0647\\u0645\\u060c \\u0648\\u0625\\u0632\\u0627\\u064a \\u062a\\u0641\\u064a\\u062f \\u0628\\u0631\\u0627\\u0646\\u062f\\u0643 \\u0627\\u0644\\u062c\\u062f\\u064a\\u062f:\\n\\n### 1. \\u0646\\u0628\\u0630\\u0629 \\u0639\\u0646 Bath & Body Works \\u0641\\u064a \\u0645\\u0635\\u0631"}, {"id": null, "type": "findings", "title": "\\u0646\\u0628\\u0630\\u0629 \\u0639\\u0646 Bath & Body Works \\u0641\\u064a \\u0645\\u0635\\u0631", "findings": [{"title": "\\u0637\\u0628\\u064a\\u0639\\u0629 \\u0627\\u0644\\u0628\\u0631\\u0627\\u0646\\u062f", "detail": "\\u0628\\u0631\\u0627\\u0646\\u062f \\u0623\\u0645\\u0631\\u064a\\u0643\\u064a \\u0639\\u0627\\u0644\\u0645\\u064a \\u0636\\u062e\\u0645\\u060c \\u0645\\u0639\\u0631\\u0648\\u0641 \\u0628\\u0642\\u0648\\u0629 \\u0627\\u0644\\u0640 Scent Throw (\\u0631\\u0627\\u0626\\u062d\\u0629 \\u0627\\u0644\\u0634\\u0645\\u0639\\u0629 \\u0628\\u062a\\u0645\\u0644\\u0649 \\u0627\\u0644\\u0628\\u064a\\u062a \\u0643\\u0644\\u0647)\\u060c \\u0648\\u0627\\u0644\\u0634\\u0645\\u0648\\u0639 \\u0627\\u0644\\u0634\\u0647\\u064a\\u0631\\u0629 \\u0628\\u062a\\u0627\\u0639\\u062a\\u0647\\u0645 \\u0623\\u0628\\u0648 3 \\u0641\\u062a\\u0644\\u0627\\u062a (3-Wick Candles)\\u060c \\u0648\\u0627\\u0644\\u0639\\u0644\\u0628 \\u0627\\u0644\\u0645\\u0639\\u062f\\u0646\\u064a\\u0629 \\u0623\\u0648 \\u0627\\u0644\\u0632\\u062c\\u0627\\u062c\\u064a\\u0629 \\u0630\\u0627\\u062a \\u0627\\u0644\\u062a\\u0635\\u0645\\u064a\\u0645\\u0627\\u062a \\u0627\\u0644\\u0645\\u0648\\u0633\\u0645\\u064a\\u0629 \\u0627\\u0644\\u062c\\u0630\\u0627\\u0628\\u0629.", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u062e\\u0627\\u0645\\u0627\\u062a", "detail": "\\u0628\\u064a\\u0633\\u062a\\u062e\\u062f\\u0645\\u0648\\u0627 \\u0645\\u062e\\u0644\\u0651\\u0637 \\u0634\\u0645\\u0639 \\u0628\\u0627\\u0631\\u0627\\u0641\\u064a\\u0646 \\u0645\\u0639 \\u0646\\u0633\\u0628\\u0629 \\u0635\\u0648\\u064a\\u0627 (\\u0645\\u0634 \\u0635\\u0648\\u064a\\u0627 \\u0637\\u0628\\u064a\\u0639\\u064a 100%\\u060c \\u0644\\u0643\\u0646 \\u0645\\u0635\\u0645\\u0645 \\u0628\\u062d\\u0631\\u0641\\u064a\\u0629 \\u0639\\u0634\\u0627\\u0646 \\u064a\\u062f\\u064a \\u0642\\u0648\\u0629 \\u0627\\u0646\\u062a\\u0634\\u0627\\u0631 \\u0639\\u0627\\u0644\\u064a\\u0629 \\u062c\\u062f\\u0627\\u064b \\u0644\\u0644\\u0631\\u0627\\u0626\\u062d\\u0629).", "confidence": null, "source": null, "evidence": []}]}, {"id": null, "type": "text", "text": "### 2. \\u0623\\u0633\\u0639\\u0627\\u0631\\u0647\\u0645 \\u0641\\u064a \\u0627\\u0644\\u0633\\u0648\\u0642 \\u0627\\u0644\\u0645\\u0635\\u0631\\u064a \\u062d\\u0627\\u0644\\u064a\\u0627\\u064b\\n\\u0628\\u0633\\u0628\\u0628 \\u062a\\u0633\\u0639\\u064a\\u0631 \\u0627\\u0644\\u0634\\u0631\\u0643\\u0627\\u062a \\u0627\\u0644\\u0643\\u0628\\u0631\\u0649 \\u0627\\u0644\\u0645\\u0631\\u062a\\u0628\\u0637 \\u0628\\u0627\\u0644\\u0639\\u0645\\u0644\\u0629 \\u0648\\u0627\\u0644\\u0645\\u0627\\u0631\\u0643\\u062a\\u064a\\u0646\\u062c \\u0627\\u0644\\u062f\\u0648\\u0644\\u064a\\u060c \\u0634\\u0645\\u0648\\u0639 Bath & Body Works \\u0641\\u064a \\u0645\\u0635\\u0631 \\u062a\\u0639\\u062a\\u0628\\u0631 \\u0641\\u064a **\\u0627\\u0644\\u0641\\u0626\\u0629 \\u0627\\u0644\\u0641\\u0627\\u062e\\u0631\\u0629 \\u0627\\u0644\\u0645\\u0631\\u062a\\u0641\\u0639\\u0629 (High-End / Luxury)**:"}, {"id": null, "type": "findings", "title": "\\u0623\\u0633\\u0639\\u0627\\u0631\\u0647\\u0645 \\u0641\\u064a \\u0627\\u0644\\u0633\\u0648\\u0642 \\u0627\\u0644\\u0645\\u0635\\u0631\\u064a \\u062d\\u0627\\u0644\\u064a\\u0627\\u064b", "findings": [{"title": "\\u0627\\u0644\\u0634\\u0645\\u0648\\u0639 \\u0627\\u0644\\u0643\\u0628\\u064a\\u0631\\u0629 (3-Wick Candles - \\u0627\\u0644\\u062d\\u062c\\u0645 \\u0627\\u0644\\u0623\\u0633\\u0627\\u0633\\u064a)", "detail": "\\u0623\\u0633\\u0639\\u0627\\u0631\\u0647\\u0627 \\u0639\\u0627\\u062f\\u0629 \\u0628\\u062a\\u062a\\u0631\\u0627\\u0648\\u062d \\u0641\\u064a \\u0627\\u0644\\u0633\\u0648\\u0642 \\u0627\\u0644\\u0645\\u0635\\u0631\\u064a \\u0628\\u064a\\u0646 **650 \\u0625\\u0644\\u0649 \\u0623\\u0643\\u062b\\u0631 \\u0645\\u0646 950 \\u062c\\u0646\\u064a\\u0647 \\u0645\\u0635\\u0631\\u064a** (\\u0648\\u062d\\u0633\\u0628 \\u062d\\u062c\\u0645 \\u0627\\u0644\\u0639\\u0631\\u0648\\u0636 \\u0648\\u0627\\u0644\\u0645\\u0648\\u0633\\u0645 \\u0645\\u0645\\u0643\\u0646 \\u062a\\u0648\\u0635\\u0644 \\u0644\\u0623\\u0631\\u0642\\u0627\\u0645 \\u0623\\u0639\\u0644\\u0649 \\u0628\\u0639\\u062f \\u0627\\u0644\\u062a\\u0639\\u0648\\u064a\\u0645\\u0627\\u062a \\u0648\\u062a\\u063a\\u064a\\u0631\\u0627\\u062a \\u0627\\u0644\\u0623\\u0633\\u0639\\u0627\\u0631).", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u0634\\u0645\\u0648\\u0639 \\u0627\\u0644\\u0635\\u063a\\u064a\\u0631\\u0629 (Single Wick)", "detail": "\\u0628\\u062a\\u0643\\u0648\\u0646 \\u0641\\u064a \\u062d\\u062f\\u0648\\u062f **350 \\u0625\\u0644\\u0649 500 \\u062c\\u0646\\u064a\\u0647 \\u0645\\u0635\\u0631\\u064a**.", "confidence": null, "source": null, "evidence": []}]}, {"id": null, "type": "text", "text": "---\\n\\n### \\u0625\\u0632\\u0627\\u064a \\u062a\\u0633\\u062a\\u0641\\u064a\\u062f \\u0645\\u0646 \\u0627\\u0644\\u0646\\u0642\\u0637\\u0629 \\u062f\\u064a \\u0648\\u0623\\u0646\\u062a \\u0628\\u062a\\u0639\\u0645\\u0644 \\u0628\\u0631\\u0627\\u0646\\u062f\\u0643 \\u0627\\u0644\\u062e\\u0627\\u0635\\u061f"}, {"id": null, "type": "findings", "title": "\\u0625\\u0632\\u0627\\u064a \\u062a\\u0633\\u062a\\u0641\\u064a\\u062f \\u0645\\u0646 \\u0627\\u0644\\u0646\\u0642\\u0637\\u0629 \\u062f\\u064a \\u0648\\u0623\\u0646\\u062a \\u0628\\u062a\\u0639\\u0645\\u0644 \\u0628\\u0631\\u0627\\u0646\\u062f\\u0643 \\u0627\\u0644\\u062e\\u0627\\u0635\\u061f", "findings": [{"title": "\\u0627\\u0644\\u0639\\u0645\\u064a\\u0644 \\u0627\\u0644\\u0645\\u0633\\u062a\\u0647\\u062f\\u0641 \\u0639\\u0627\\u0631\\u0641 \\u0627\\u0644\\u062c\\u0648\\u062f\\u0629", "detail": "\\u0644\\u0645\\u0627 \\u0627\\u0644\\u0639\\u0645\\u064a\\u0644 \\u0641\\u064a \\u0645\\u0635\\u0631 \\u064a\\u0634\\u0645 \\u0631\\u0627\\u0626\\u062d\\u0629 \\u0642\\u0648\\u064a\\u0629 \\u0648\\u062b\\u0627\\u0628\\u062a\\u0629 \\u0644\\u0640 Bath & Body Works \\u0648\\u064a\\u062f\\u0641\\u0639 \\u0641\\u064a\\u0647\\u0627 800 \\u0623\\u0648 900 \\u062c\\u0646\\u064a\\u0647\\u060c \\u0647\\u0648 \\u0628\\u064a\\u0628\\u0642\\u0649 \\u0645\\u062a\\u0639\\u0648\\u062f \\u0639\\u0644\\u0649 \\"\\u0627\\u0644\\u062a\\u062c\\u0631\\u0628\\u0629 \\u0627\\u0644\\u062d\\u0633\\u064a\\u0629\\". \\u0644\\u0645\\u0627 \\u062a\\u064a\\u062c\\u064a \\u062a\\u0642\\u062f\\u0645 \\u0644\\u0647 \\u0628\\u0631\\u0627\\u0646\\u062f \\u0645\\u062d\\u0644\\u064a \\u0628\\u0635\\u0648\\u064a\\u0627 \\u0637\\u0628\\u064a\\u0639\\u064a 100% (\\u0623\\u0648 \\u0635\\u0648\\u064a\\u0627 \\u0646\\u0642\\u064a \\u0635\\u062f\\u064a\\u0642 \\u0644\\u0644\\u0628\\u064a\\u0626\\u0629) \\u0648\\u0628\\u0633\\u0639\\u0631 \\u062a\\u0646\\u0627\\u0641\\u0633\\u064a (\\u0645\\u062b\\u0644\\u0627\\u064b **400 \\u0644\\u0640 600 \\u062c\\u0646\\u064a\\u0647** \\u0644\\u0644\\u0641\\u0626\\u0629 \\u0627\\u0644\\u0645\\u062a\\u0648\\u0633\\u0637\\u0629/\\u0627\\u0644\\u0639\\u0627\\u0644\\u064a\\u0629)\\u060c \\u0623\\u0646\\u062a \\u0628\\u062a\\u0642\\u062f\\u0645 \\u0644\\u0647 **\\u0628\\u062f\\u064a\\u0644 \\u0630\\u0643\\u064a \\u0648\\u0623\\u0631\\u062e\\u0635 \\u0644\\u0646\\u0641\\u0633 \\u0627\\u0644\\u0641\\u062e\\u0627\\u0645\\u0629**\\u060c \\u0645\\u0639 \\u0645\\u064a\\u0632\\u0629 \\u0625\\u0646 \\u0645\\u0646\\u062a\\u062c\\u0643 \\u0637\\u0628\\u064a\\u0639\\u064a (Eco-friendly / Soy Wax) \\u0648\\u0645\\u0634 \\u0628\\u064a\\u0637\\u0644\\u0639 \\u062f\\u062e\\u0646\\u0629 \\u0633\\u0648\\u062f\\u0627\\u0621 \\u0632\\u064a \\u0627\\u0644\\u0628\\u0627\\u0631\\u0627\\u0641\\u064a\\u0646 \\u0627\\u0644\\u062a\\u0642\\u0644\\u064a\\u062f\\u064a.", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u062a\\u0631\\u0643\\u064a\\u0632 \\u0639\\u0644\\u0649 \\u0642\\u0648\\u0629 \\u0627\\u0644\\u0631\\u0627\\u0626\\u062d\\u0629 (Scent Throw)", "detail": "\\u0623\\u0643\\u0628\\u0631 \\u0634\\u0643\\u0648\\u0649 \\u0639\\u0646\\u062f \\u0627\\u0644\\u0646\\u0627\\u0633 \\u0645\\u0646 \\u0628\\u0639\\u0636 \\u0627\\u0644\\u0628\\u0631\\u0627\\u0646\\u062f\\u0627\\u062a \\u0627\\u0644\\u0645\\u062d\\u0644\\u064a\\u0629 \\u0625\\u0646 \\u0631\\u0627\\u0626\\u062d\\u0629 \\u0627\\u0644\\u0634\\u0645\\u0639\\u0629 \\u0648\\u0647\\u064a \\u0645\\u0637\\u0641\\u064a\\u0629 \\u062d\\u0644\\u0648\\u0629\\u060c \\u0628\\u0633 \\u0648\\u0647\\u064a \\u0645\\u0648\\u0644\\u0639\\u0629 \\u0645\\u0634 \\u0628\\u062a\\u0637\\u0644\\u0639 \\u0631\\u0627\\u0626\\u062d\\u0629 \\u0643\\u0641\\u0627\\u064a\\u0629. \\u062f\\u0631\\u0627\\u0633\\u0629 \\u0645\\u0646\\u062a\\u062c\\u0627\\u062a \\u0632\\u064a Bath & Body Works \\u0628\\u062a\\u0639\\u0644\\u0645\\u0643 \\u0623\\u0647\\u0645\\u064a\\u0629 \\u0627\\u0633\\u062a\\u062e\\u062f\\u0627\\u0645 \\u0632\\u064a\\u0648\\u062a \\u0639\\u0637\\u0631\\u064a\\u0629 \\u0645\\u0631\\u0643\\u0632\\u0629 \\u0648\\u0645\\u062e\\u0635\\u0635\\u0629 \\u0644\\u0644\\u0634\\u0645\\u0648\\u0639 (Fragrance Oils) \\u0628\\u0646\\u0633\\u0628 \\u0635\\u062d\\u064a\\u062d\\u0629 (\\u0645\\u062b\\u0644\\u0627\\u064b 8% \\u0644\\u0640 10%).", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u062a\\u0633\\u0639\\u064a\\u0631 \\u0627\\u0644\\u062e\\u0627\\u0635 \\u0628\\u0628\\u0631\\u0627\\u0646\\u062f\\u0643", "detail": "\\u0644\\u0648 \\u0647\\u062a\\u0628\\u062f\\u0623 \\u0628\\u0628\\u0631\\u0627\\u0646\\u062f \\u0645\\u062d\\u0644\\u064a\\u060c **\\u0645\\u0646 \\u0627\\u0644\\u062e\\u0637\\u0623 \\u062a\\u0645\\u0627\\u0645\\u0627\\u064b** \\u0625\\u0646\\u0643 \\u062a\\u0633\\u0639\\u0631 \\u0632\\u064a Bath & Body Works \\u0641\\u064a \\u0627\\u0644\\u0628\\u062f\\u0627\\u064a\\u0629 \\u0644\\u0623\\u0646\\u0643 \\u0644\\u0633\\u0647 \\u0628\\u062a\\u0633\\u0646\\u064a \\u0627\\u0633\\u0645\\u0643. \\u0627\\u0644\\u0633\\u0639\\u0631 \\u0627\\u0644\\u0622\\u0645\\u0646 \\u0648\\u0627\\u0644\\u0645\\u0631\\u0628\\u062d \\u0644\\u064a\\u0643 (\\u0628\\u0646\\u0627\\u0621\\u064b \\u0639\\u0644\\u0649 \\u062a\\u0643\\u0644\\u0641\\u062a\\u0643 \\u0648\\u0636\\u0627\\u0631\\u0628 \\u0627\\u0644\\u062a\\u0643\\u0644\\u0641\\u0629 \\u0641\\u064a 2.5 \\u0623\\u0648 3) \\u0647\\u064a\\u0643\\u0648\\u0646 \\u0641\\u064a \\u0646\\u0637\\u0627\\u0642 **380 \\u0625\\u0644\\u0649 600 \\u062c\\u0646\\u064a\\u0647** \\u0644\\u0644\\u0634\\u0645\\u0639\\u0629 \\u0627\\u0644\\u0645\\u062a\\u0648\\u0633\\u0637\\u0629/\\u0627\\u0644\\u0643\\u0628\\u064a\\u0631\\u0629 \\u0627\\u0644\\u0645\\u0635\\u0646\\u0648\\u0639\\u0629 \\u0628\\u062d\\u0631\\u0641\\u064a\\u0629\\u060c \\u0648\\u062f\\u0647 \\u0647\\u064a\\u062f\\u064a\\u0643 \\u0645\\u064a\\u0632\\u0629 \\u062a\\u0646\\u0627\\u0641\\u0633\\u064a\\u0629 \\u0636\\u062e\\u0645\\u0629 \\u0642\\u062f\\u0627\\u0645 \\u0627\\u0644\\u0623\\u0633\\u0639\\u0627\\u0631 \\u0627\\u0644\\u0645\\u0631\\u062a\\u0641\\u0639\\u0629 \\u0644\\u0644\\u0628\\u0631\\u0627\\u0646\\u062f\\u0627\\u062a \\u0627\\u0644\\u0639\\u0627\\u0644\\u0645\\u064a\\u0629 \\u0627\\u0644\\u0645\\u0633\\u062a\\u0648\\u0631\\u062f\\u0629.", "confidence": null, "source": null, "evidence": []}]}, {"id": null, "type": "text", "text": "\\u0625\\u064a\\u0647 \\u0631\\u0623\\u064a\\u0643 \\u0641\\u064a \\u0645\\u0642\\u0627\\u0631\\u0646\\u0629 \\u0627\\u0644\\u0623\\u0633\\u0639\\u0627\\u0631 \\u062f\\u064a\\u061f \\u0648\\u0647\\u0644 \\u062d\\u0627\\u0628\\u0628 \\u0646\\u0631\\u0643\\u0632 \\u0641\\u064a \\u0627\\u0644\\u062e\\u0637\\u0648\\u0629 \\u0627\\u0644\\u062c\\u0627\\u064a\\u0629 \\u0639\\u0644\\u0649 **\\u062a\\u062d\\u062f\\u064a\\u062f \\u0623\\u0633\\u0645\\u0627\\u0621 \\u0645\\u0642\\u062a\\u0631\\u062d\\u0629 \\u0644\\u0628\\u0631\\u0627\\u0646\\u062f\\u0643** \\u0623\\u0648 **\\u0634\\u0643\\u0644 \\u0627\\u0644\\u062a\\u0635\\u0645\\u064a\\u0645 \\u0648\\u0627\\u0644\\u062a\\u063a\\u0644\\u064a\\u0641 (Packaging)** \\u0627\\u0644\\u0644\\u064a \\u064a\\u0646\\u0627\\u0641\\u0633 \\u0641\\u064a \\u0627\\u0644\\u0641\\u0626\\u0629 \\u062f\\u064a\\u061f"}]', None, '')
+    * executemany: False
+2026-10-11 23:26:03.289 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT RESULT] Completed in 238ms (rows: 1)
+    * operation: INSERT
+    * duration_ms: 238
+    * rowcount: 1
+2026-10-11 23:26:14.020 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:26:14.661 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:26:14.902 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 241ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 241
+    * rowcount: 1
+2026-10-11 23:26:14.904 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:15.062 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 158ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 158
+    * rowcount: 1
+2026-10-11 23:26:15.063 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 26, 15, 63441, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:26:15.298 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 235ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 235
+    * rowcount: 1
+2026-10-11 23:26:16.304 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:16.651 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 347ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 347
+    * rowcount: 1
+2026-10-11 23:26:16.653 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:16.785 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 131ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 131
+    * rowcount: 1
+2026-10-11 23:26:16.787 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:17.071 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 283ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 283
+    * rowcount: 1
+2026-10-11 23:26:17.073 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:17.202 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 129ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 129
+    * rowcount: 0
+2026-10-11 23:26:17.204 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:17.354 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 150ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 150
+    * rowcount: 2
+2026-10-11 23:26:17.355 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:17.506 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 150ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 150
+    * rowcount: 0
+2026-10-11 23:26:17.507 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:26:17.507 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.id = $1::VARCHAR AND conversations.business_id = $2::VARCHAR
+    * parameters: ('conv_55c666bd812e45f6b25e', 'biz_2b69ca4ecf694365a53c')
+    * executemany: False
+2026-10-11 23:26:17.702 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 194ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 194
+    * rowcount: 1
+2026-10-11 23:26:17.703 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:26:18.491 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 787ms (rows: 30)
+    * operation: SELECT
+    * duration_ms: 787
+    * rowcount: 30
+2026-10-11 23:26:18.493 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e (4472ms)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * status: 200
+    * duration_ms: 4472
+2026-10-11 23:26:18.499 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:26:18.936 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:26:19.155 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 218ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 218
+    * rowcount: 1
+2026-10-11 23:26:19.156 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:19.272 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 116ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 116
+    * rowcount: 1
+2026-10-11 23:26:19.273 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 26, 19, 273724, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:26:19.395 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 121ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 121
+    * rowcount: 1
+2026-10-11 23:26:19.934 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:20.145 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 211ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 211
+    * rowcount: 1
+2026-10-11 23:26:20.147 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:20.262 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 115ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 115
+    * rowcount: 1
+2026-10-11 23:26:20.263 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:20.375 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 111ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 111
+    * rowcount: 1
+2026-10-11 23:26:20.376 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:20.495 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 119ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 119
+    * rowcount: 0
+2026-10-11 23:26:20.496 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:20.626 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 129ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 129
+    * rowcount: 2
+2026-10-11 23:26:20.628 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:20.738 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 110ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 110
+    * rowcount: 0
+2026-10-11 23:26:20.739 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:26:20.739 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.business_id = $1::VARCHAR ORDER BY conversations.updated_at DESC
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:20.850 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 110ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 110
+    * rowcount: 2
+2026-10-11 23:26:20.851 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR, $2::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e', 'conv_0d6a02f946c64c549270')
+    * executemany: False
+2026-10-11 23:26:21.425 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 574ms (rows: 32)
+    * operation: SELECT
+    * duration_ms: 574
+    * rowcount: 32
+2026-10-11 23:26:21.426 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (2926ms)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 2926
+2026-10-11 23:26:55.687 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] POST /api/v1/assistant/message/stream
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body:
+      {
+        "conversationId": "conv_55c666bd812e45f6b25e",
+        "message": "طيب بنائا علي اسعار الناس ديه تقترح عليا بالي انا عايز اعمله اسعر بكام علشان ابقي منافس"
+      }
+2026-10-11 23:26:56.142 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:26:56.358 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 216ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 216
+    * rowcount: 1
+2026-10-11 23:26:56.359 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:56.485 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 125ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 125
+    * rowcount: 1
+2026-10-11 23:26:56.486 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 26, 56, 485767, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:26:56.596 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 110ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 110
+    * rowcount: 1
+2026-10-11 23:26:57.125 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:57.352 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 227ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 227
+    * rowcount: 1
+2026-10-11 23:26:57.354 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:26:57.475 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 121ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 121
+    * rowcount: 1
+2026-10-11 23:26:57.476 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:57.595 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 118ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 118
+    * rowcount: 1
+2026-10-11 23:26:57.596 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:57.703 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 107ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 107
+    * rowcount: 0
+2026-10-11 23:26:57.704 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:57.829 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 124ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 124
+    * rowcount: 2
+2026-10-11 23:26:57.831 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:58.005 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 174ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 174
+    * rowcount: 0
+2026-10-11 23:26:58.005 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:26:58.006 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT llm_provider_settings.id, llm_provider_settings.business_id, llm_provider_settings.fast_provider, llm_provider_settings.fast_model, llm_provider_settings.fast_base_url, llm_provider_settings.fast_api_key_enc, llm_provider_settings.fast_extra_headers_enc, llm_provider_settings.strong_provider, llm_provider_settings.strong_model, llm_provider_settings.strong_base_url, llm_provider_settings.strong_api_key_enc, llm_provider_settings.strong_extra_headers_enc, llm_provider_settings.updated_by, llm_provider_settings.created_at, llm_provider_settings.updated_at 
+      FROM llm_provider_settings 
+      WHERE llm_provider_settings.business_id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:58.238 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 232ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 232
+    * rowcount: 0
+2026-10-11 23:26:58.239 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT llm_provider_settings.id, llm_provider_settings.business_id, llm_provider_settings.fast_provider, llm_provider_settings.fast_model, llm_provider_settings.fast_base_url, llm_provider_settings.fast_api_key_enc, llm_provider_settings.fast_extra_headers_enc, llm_provider_settings.strong_provider, llm_provider_settings.strong_model, llm_provider_settings.strong_base_url, llm_provider_settings.strong_api_key_enc, llm_provider_settings.strong_extra_headers_enc, llm_provider_settings.updated_by, llm_provider_settings.created_at, llm_provider_settings.updated_at 
+      FROM llm_provider_settings 
+      WHERE llm_provider_settings.business_id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:26:58.347 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 107ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 107
+    * rowcount: 0
+2026-10-11 23:26:58.348 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 POST /api/v1/assistant/message/stream (2661ms)
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * status: 200
+    * duration_ms: 2661
+2026-10-11 23:26:58.349 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.id = $1::VARCHAR
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:26:58.566 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 217ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 217
+    * rowcount: 1
+2026-10-11 23:26:58.568 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:26:59.038 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 470ms (rows: 30)
+    * operation: SELECT
+    * duration_ms: 470
+    * rowcount: 30
+2026-10-11 23:26:59.039 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.id, messages.conversation_id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id = $1::VARCHAR ORDER BY messages.created_at ASC
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:26:59.570 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 530ms (rows: 30)
+    * operation: SELECT
+    * duration_ms: 530
+    * rowcount: 30
+2026-10-11 23:26:59.574 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | session_memory_token_cap_exceeded
+    * conversation_id: conv_55c666bd812e45f6b25e
+    * tokens: 10360
+    * max_tokens: 2000
+2026-10-11 23:26:59.602 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:27:01.523 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:27:01.526 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE conversations SET summary=$1::VARCHAR, updated_at=now() WHERE conversations.id = $2::VARCHAR
+    * parameters: ('- **User Goal:** Starting a candle brand in Egypt ("براند شموع في مصر").\n- **Key Recommendations & Progress:**\n  - Outlined the 5 core steps to start: Market study, materials/quality, design/packaging, legalities, and marketing/sales.\n  - **Market Study (دراسة السوق):**\n    1. *Competitor Analysis:* Analyzed major Egyptian competitors (Luxury/Premium like Maison Marie, Roshan Candles, Pia Scents, priced 600-1000+ EGP; Mid-Range like Bubblzz, Aromatica, LOCKEN, active on social media and Bazaars like Le Marche; and Niche/Handcrafted).\n    2. *Target Audiences:* Home Decor Enthusiasts, Wellness & Self-Care seekers, and Gift Shoppers.\n    3. *Product & Material Trends / Gaps:* Focus on non-toxic natural soy/beeswax, wooden/cotton wicks, strong scent throw, and upcycling.\n    4. *Pricing Strategy:* Factoring in COGS with a 2.5x to 3x markup, targeting safe entry-level price points.\n  - **Materials & Selection (اختيار وتحديد الخامات):**\n    1. *Wax:* **Soy Wax** selected as the primary natural, eco-friendly, clean-burning choice.\n    2. *Fragrances:* Candle-specific Fragrance Oils recommended.\n    3. *Wicks:* **Classic Cotton Wick** selected for reliability and smooth burn.\n    4. *Containers:* **Heat-resistant Glass** selected (cylindrical jars with metal/wooden lids or open tumblers).\n  - **Branding & Naming (تحديد الهوية والاسم):**\n    - Explored 4 competitor-inspired naming directions (European/Latin, Direct/Descriptive, Sensory & Wellness, Artisanal & Cozy).\n    - Suggested multiple name options across styles (e.g., Aura Candles, Hush & Wick, Dafé/دافئ, Nawart, Velvet Flame, Serene Glow).\n  - **Next Steps:** Finalizing the brand name selection and moving into visual identity, labeling, packaging design, and wholesale sourcing in Egypt.', 'conv_55c666bd812e45f6b25e')
+    * executemany: False
+2026-10-11 23:27:01.743 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE RESULT] Completed in 217ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 217
+    * rowcount: 1
+2026-10-11 23:27:01.745 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | conversation_summary_updated
+    * conversation_id: conv_55c666bd812e45f6b25e
+    * tokens: 503
+2026-10-11 23:27:01.746 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT] Executing query
+    * operation: INSERT
+    * statement: INSERT INTO messages (id, conversation_id, role, content, blocks, task_id, persona_id) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::JSON, $6::VARCHAR, $7::VARCHAR) RETURNING messages.created_at
+    * parameters: ('msg_20551e1c3ac94672be86', 'conv_55c666bd812e45f6b25e', 'user', 'طيب بنائا علي اسعار الناس ديه تقترح عليا بالي انا عايز اعمله اسعر بكام علشان ابقي منافس', '[{"type": "text", "text": "\\u0637\\u064a\\u0628 \\u0628\\u0646\\u0627\\u0626\\u0627 \\u0639\\u0644\\u064a \\u0627\\u0633\\u0639\\u0627\\u0631 \\u0627\\u0644\\u0646\\u0627\\u0633 \\u062f\\u064a\\u0647 \\u062a\\u0642\\u062a\\u0631\\u062d \\u0639\\u0644\\u064a\\u0627 \\u0628\\u0627\\u0644\\u064a \\u0627\\u0646\\u0627 \\u0639\\u0627\\u064a\\u0632 \\u0627\\u0639\\u0645\\u0644\\u0647 \\u0627\\u0633\\u0639\\u0631 \\u0628\\u0643\\u0627\\u0645 \\u0639\\u0644\\u0634\\u0627\\u0646 \\u0627\\u0628\\u0642\\u064a \\u0645\\u0646\\u0627\\u0641\\u0633"}]', None, None)
+    * executemany: False
+2026-10-11 23:27:01.972 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT RESULT] Completed in 226ms (rows: 1)
+    * operation: INSERT
+    * duration_ms: 226
+    * rowcount: 1
+2026-10-11 23:27:01.974 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT profiles.id, profiles.supabase_user_id, profiles.business_id, profiles.role, profiles.user_context_summary, profiles.created_at, profiles.updated_at 
+      FROM profiles 
+      WHERE profiles.business_id = $1::VARCHAR 
+       LIMIT $2::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 1)
+    * executemany: False
+2026-10-11 23:27:02.201 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 226ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 226
+    * rowcount: 1
+2026-10-11 23:27:02.202 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.text 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id = $1::VARCHAR AND brand_memory_items.kind = $2::VARCHAR 
+       LIMIT $3::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 'strategy_blueprint', 1)
+    * executemany: False
+2026-10-11 23:27:02.423 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 221ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 221
+    * rowcount: 1
+2026-10-11 23:27:02.457 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:27:03.437 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | ltm_debounce_triggered
+    * business_id: biz_2b69ca4ecf694365a53c
+2026-10-11 23:27:03.554 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:27:03.866 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT max(messages.created_at) AS max_1 
+      FROM messages JOIN conversations ON messages.conversation_id = conversations.id 
+      WHERE conversations.business_id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:04.204 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 338ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 338
+    * rowcount: 1
+2026-10-11 23:27:04.205 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT profiles.id, profiles.supabase_user_id, profiles.business_id, profiles.role, profiles.user_context_summary, profiles.created_at, profiles.updated_at 
+      FROM profiles 
+      WHERE profiles.business_id = $1::VARCHAR 
+       LIMIT $2::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 1)
+    * executemany: False
+2026-10-11 23:27:04.418 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 213ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 213
+    * rowcount: 1
+2026-10-11 23:27:04.420 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id 
+      FROM conversations 
+      WHERE conversations.business_id = $1::VARCHAR ORDER BY conversations.updated_at DESC 
+       LIMIT $2::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 3)
+    * executemany: False
+2026-10-11 23:27:04.557 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:27:04.644 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 224ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 224
+    * rowcount: 2
+2026-10-11 23:27:04.646 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.id, messages.conversation_id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($2::VARCHAR, $3::VARCHAR) ORDER BY messages.created_at DESC 
+       LIMIT $1::INTEGER
+    * parameters: (20, 'conv_55c666bd812e45f6b25e', 'conv_0d6a02f946c64c549270')
+    * executemany: False
+2026-10-11 23:27:05.311 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 665ms (rows: 20)
+    * operation: SELECT
+    * duration_ms: 665
+    * rowcount: 20
+2026-10-11 23:27:05.314 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:27:06.349 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://api.tavily.com/search "HTTP/1.1 200 OK"
+2026-10-11 23:27:06.400 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:27:07.372 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:27:07.373 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:27:07.378 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.id, brand_memory_items.business_id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id = $1::VARCHAR AND brand_memory_items.kind = $2::VARCHAR 
+       LIMIT $3::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 'strategy_blueprint', 1)
+    * executemany: False
+2026-10-11 23:27:07.619 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 241ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 241
+    * rowcount: 1
+2026-10-11 23:27:07.621 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE brand_memory_items SET text=$1::VARCHAR, metadata=$2::JSON WHERE brand_memory_items.id = $3::VARCHAR
+    * parameters: ('- Finalize the brand name and identity direction (evaluating minimalist English/Calming styles vs. European/Latin roots vs. Warm Arabic concepts).\n- Determine specific packaging and container specifications (focusing on heat-resistant glass jars with potential options for metal or wooden lids).\n- Establish product formulation standards (soy wax paired with classic cotton wicks).\n- Conduct ongoing competitive landscape analysis (benchmarking local indie players and international brands like Bath & Body Works for pricing, positioning, and assortment inspiration).', '{"active_plans": "- Finalize the brand name and identity direction (evaluating minimalist English/Calming styles vs. European/Latin roots vs. Warm Arabic concepts).\\n- Determine specific packaging and container specifications (focusing on heat-resistant glass jars with potential options for metal or wooden lids).\\n- Establish product formulation standards (soy wax paired with classic cotton wicks).\\n- Conduct ongoing competitive landscape analysis (benchmarking local indie players and international brands like Bath & Body Works for pricing, positioning, and assortment inspiration).", "source": "ltm_compressor", "created_at": "2026-10-11T20:11:09.435131+00:00", "updated_at": "2026-10-11T20:27:07.619909+00:00"}', 'mem_plan_ba3c879d057b')
+    * executemany: False
+2026-10-11 23:27:07.857 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE RESULT] Completed in 236ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 236
+    * rowcount: 1
+2026-10-11 23:27:07.859 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE profiles SET user_context_summary=$1::VARCHAR, updated_at=now() WHERE profiles.id = $2::UUID
+    * parameters: ('- Brand Name: Unnamed (Planning stage)\n- Industry/Sector: Scented and Decorative Candles / Home Fragrance (Focused on Soy Wax, classical cotton wicks, and heat-resistant glass containers)\n- Geography/Country: Egypt (with primary urban fulfillment zones including Cairo, Giza, and Alexandria)\n- Target Audience: Home decor enthusiasts, fragrance lovers, wellness seekers, and consumers desiring attainable luxury, emotional wellness, sensory escapism, and local artisanal craftsmanship\n- Pricing Policy: Segmented across three distinct market tiers:\n  - Entry-level/Mass: EGP 300 to 350 (represented by regional indie brands like Flamingo and Areej Aromatherapy)\n  - Mid-range: EGP 382 to 590 (represented by regional indie brands like Bubblzz, LOCKEN, and Aromatica)\n  - Luxury: Up to EGP 950 (represented by regional indie brands like Pia Scents; benchmarked against international giants like Bath & Body Works)\n- Known Competitors & Market Players: Bath & Body Works, Egyptian and regional multi-brand marketplaces and indie brands including Source Beauty, Pia Scents, Bubblzz, Areej Aromatherapy, Flamingo, Splendour, LOCKEN, and Aromatica\n- Product Assortment Characteristics: Premium soy wax compositions, clean aesthetic profiles, prolonged burn times, diverse scent profiles spanning warm vanilla, soothing lavender, pumpkin cinnamon, fresh linen, and regional oud blends', UUID('bd10c9c7-9809-4016-954c-d0bc434fc638'))
+    * executemany: False
+2026-10-11 23:27:08.085 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - UPDATE RESULT] Completed in 225ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 225
+    * rowcount: 1
+2026-10-11 23:27:08.285 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | ltm_profile_updated
+    * business_id: biz_2b69ca4ecf694365a53c
+    * facts_tokens: 311
+    * plans_tokens: 99
+2026-10-11 23:27:13.127 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:27:13.193 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:27:17.707 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:27:17.713 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT] Executing query
+    * operation: INSERT
+    * statement: INSERT INTO messages (id, conversation_id, role, content, blocks, task_id, persona_id) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::JSON, $6::VARCHAR, $7::VARCHAR) RETURNING messages.created_at
+    * parameters: ('msg_a62df2a65071462484e9', 'conv_55c666bd812e45f6b25e', 'assistant', 'بناءً على موقع Bath & Body Works في السوق المصري (والذي يمثل الشريحة "العالمية الفاخرة المستوردة" بأسعار مرتفعة جداً نتيجة البراندينج، الاستيراد، والجمارك)، وبناءً على خريطة المنافسين المحليين اللي درسناها قبل كده (زي Pia Scents, Bubblzz, LOCKEN, Aromatica)... \n\nتعالوا نعمل استراتيجية تسعير ذكية جداً (Pricing Strategy) لبراندك الجديد اللي بيعتمد على الصويا واكس (Soy Wax) والتصنيع المحلي (Made in Egypt) بجودة عالية:\nأولاً: فهم وضع المنافسين في السوق المصري حالياً\n- الفئة الفاخرة المستوردة (Global Luxury): \n- الفئة الفاخرة المحلية (Local Luxury): \n- الفئة المتوسطة المنافسة (Mid-Range): \n- الفئة الاقتصادية/الابتدائية (Entry-Level): \nثانياً: اقتراحات الأسعار لبراندك (عشان تبقي منافس ومحقق هامش ربح ممتاز)\n\nبما إنك لسه براند ناشئ (Startup)، الخطأ الأكبر هو إنك تنافس Bath & Body Works في السعر الأعلى، وفي نفس الوقت غلط ترخص منتجك أوي لو خاماتك (الصويا واكس، الفتيل القطني، والبرطمان الزجاجي الشيك) مكلفة. \n\nالاستراتيجية الأصح: استهداف الفئة المتوسطة إلى شبه الفاخرة (Mid-to-Upper Mid) لتقديم "القيمة مقابل السعر" (Value for Money) مع إحساس بالـ Luxury.\n\nإليك مقترح تفصيلي لأسعار التجزئة (Retail Prices):\nمقترحات أسعار التجزئة\n- 1. الشمعة المتوسطة / الأساسية (Standard Jar - حوالي 180 إلى 200 جرام صويا واكس): \n- 2. الشمعة الكبيرة (Large Jar / Double Wick - حوالي 300 إلى 350 جرام): \n- 3. الحجم الصغير / التسترات أو الهدايا (Mini/Travel Tin or Jar - حوالي 100 جرام): \nثالثاً: معادلة الحماية وضمان الربحية (كيف تحسب سعرك بالظبط؟)\n\nقبل ما تستقر على السعر النهائي، لازم تطبق القاعدة دي بدقة:\nسعر البيع للعميل = (تكلفة الخامات المباشرة: شمع + زيت عطري + فتيل + برطمان + لافتة/باكيجينج) × 3\n\n- ليه × 3؟\n  - الثلث الأول يغطي التكلفة الفعلية للمنتج.\n  - الثلث الثاني يغطي مصروفات التشغيل (التغليف الإضافي للشحن، الإعلانات على السوشيال ميديا، عمولات منصات البيع أو البازارات).\n  - الثلث الثالث هو صافي أرباحك الذي تستثمره لتطوير البراند.\nرابعاً: نصيحة تسويقية تنافس بها عمالقة مثل Bath & Body Works\n- القصة (Storytelling): \n- الروائح المخصصة (Signature Scents): \n- التغليف الراقي (Unboxing Experience): ', '[{"id": null, "type": "text", "text": "\\u0628\\u0646\\u0627\\u0621\\u064b \\u0639\\u0644\\u0649 \\u0645\\u0648\\u0642\\u0639 Bath & Body Works \\u0641\\u064a \\u0627\\u0644\\u0633\\u0648\\u0642 \\u0627\\u0644\\u0645\\u0635\\u0631\\u064a (\\u0648\\u0627\\u0644\\u0630\\u064a \\u064a\\u0645\\u062b\\u0644 \\u0627\\u0644\\u0634\\u0631\\u064a\\u062d\\u0629 \\"\\u0627\\u0644\\u0639\\u0627\\u0644\\u0645\\u064a\\u0629 \\u0627\\u0644\\u0641\\u0627\\u062e\\u0631\\u0629 \\u0627\\u0644\\u0645\\u0633\\u062a\\u0648\\u0631\\u062f\\u0629\\" \\u0628\\u0623\\u0633\\u0639\\u0627\\u0631 \\u0645\\u0631\\u062a\\u0641\\u0639\\u0629 \\u062c\\u062f\\u0627\\u064b \\u0646\\u062a\\u064a\\u062c\\u0629 \\u0627\\u0644\\u0628\\u0631\\u0627\\u0646\\u062f\\u064a\\u0646\\u062c\\u060c \\u0627\\u0644\\u0627\\u0633\\u062a\\u064a\\u0631\\u0627\\u062f\\u060c \\u0648\\u0627\\u0644\\u062c\\u0645\\u0627\\u0631\\u0643)\\u060c \\u0648\\u0628\\u0646\\u0627\\u0621\\u064b \\u0639\\u0644\\u0649 \\u062e\\u0631\\u064a\\u0637\\u0629 \\u0627\\u0644\\u0645\\u0646\\u0627\\u0641\\u0633\\u064a\\u0646 \\u0627\\u0644\\u0645\\u062d\\u0644\\u064a\\u064a\\u0646 \\u0627\\u0644\\u0644\\u064a \\u062f\\u0631\\u0633\\u0646\\u0627\\u0647\\u0627 \\u0642\\u0628\\u0644 \\u0643\\u062f\\u0647 (\\u0632\\u064a Pia Scents, Bubblzz, LOCKEN, Aromatica)... \\n\\n\\u062a\\u0639\\u0627\\u0644\\u0648\\u0627 \\u0646\\u0639\\u0645\\u0644 \\u0627\\u0633\\u062a\\u0631\\u0627\\u062a\\u064a\\u062c\\u064a\\u0629 \\u062a\\u0633\\u0639\\u064a\\u0631 \\u0630\\u0643\\u064a\\u0629 \\u062c\\u062f\\u0627\\u064b (Pricing Strategy) \\u0644\\u0628\\u0631\\u0627\\u0646\\u062f\\u0643 \\u0627\\u0644\\u062c\\u062f\\u064a\\u062f \\u0627\\u0644\\u0644\\u064a \\u0628\\u064a\\u0639\\u062a\\u0645\\u062f \\u0639\\u0644\\u0649 \\u0627\\u0644\\u0635\\u0648\\u064a\\u0627 \\u0648\\u0627\\u0643\\u0633 (Soy Wax) \\u0648\\u0627\\u0644\\u062a\\u0635\\u0646\\u064a\\u0639 \\u0627\\u0644\\u0645\\u062d\\u0644\\u064a (Made in Egypt) \\u0628\\u062c\\u0648\\u062f\\u0629 \\u0639\\u0627\\u0644\\u064a\\u0629:"}, {"id": null, "type": "findings", "title": "\\u0623\\u0648\\u0644\\u0627\\u064b: \\u0641\\u0647\\u0645 \\u0648\\u0636\\u0639 \\u0627\\u0644\\u0645\\u0646\\u0627\\u0641\\u0633\\u064a\\u0646 \\u0641\\u064a \\u0627\\u0644\\u0633\\u0648\\u0642 \\u0627\\u0644\\u0645\\u0635\\u0631\\u064a \\u062d\\u0627\\u0644\\u064a\\u0627\\u064b", "findings": [{"title": "\\u0627\\u0644\\u0641\\u0626\\u0629 \\u0627\\u0644\\u0641\\u0627\\u062e\\u0631\\u0629 \\u0627\\u0644\\u0645\\u0633\\u062a\\u0648\\u0631\\u062f\\u0629 (Global Luxury)", "detail": "\\u0632\\u064a Bath & Body Works (\\u0627\\u0644\\u0634\\u0645\\u0648\\u0639 \\u0627\\u0644\\u0640 3-Wick \\u0627\\u0644\\u0643\\u0628\\u064a\\u0631\\u0629 \\u0647\\u0646\\u0627\\u0643 \\u0628\\u062a\\u0639\\u062f\\u064a \\u0627\\u0644\\u0640 1000 \\u0625\\u0644\\u0649 1500+ \\u062c\\u0646\\u064a\\u0647 \\u062d\\u0633\\u0628 \\u0627\\u0644\\u0639\\u0631\\u0648\\u0636 \\u0648\\u0627\\u0644\\u0627\\u0631\\u062a\\u0641\\u0627\\u0639 \\u0627\\u0644\\u062c\\u0646\\u0648\\u0646\\u064a \\u0644\\u0644\\u0623\\u0633\\u0639\\u0627\\u0631).", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u0641\\u0626\\u0629 \\u0627\\u0644\\u0641\\u0627\\u062e\\u0631\\u0629 \\u0627\\u0644\\u0645\\u062d\\u0644\\u064a\\u0629 (Local Luxury)", "detail": "\\u0632\\u064a Pia Scents (\\u0628\\u062a\\u0648\\u0635\\u0644 \\u0644\\u062d\\u062f 950 \\u062c\\u0646\\u064a\\u0647).", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u0641\\u0626\\u0629 \\u0627\\u0644\\u0645\\u062a\\u0648\\u0633\\u0637\\u0629 \\u0627\\u0644\\u0645\\u0646\\u0627\\u0641\\u0633\\u0629 (Mid-Range)", "detail": "\\u0632\\u064a Bubblzz, LOCKEN, Aromatica (\\u0645\\u0646 382 \\u0625\\u0644\\u0649 590 \\u062c\\u0646\\u064a\\u0647).", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u0641\\u0626\\u0629 \\u0627\\u0644\\u0627\\u0642\\u062a\\u0635\\u0627\\u062f\\u064a\\u0629/\\u0627\\u0644\\u0627\\u0628\\u062a\\u062f\\u0627\\u0626\\u064a\\u0629 (Entry-Level)", "detail": "\\u0632\\u064a Flamingo, Areej (\\u0645\\u0646 300 \\u0625\\u0644\\u0649 350 \\u062c\\u0646\\u064a\\u0647).", "confidence": null, "source": null, "evidence": []}]}, {"id": null, "type": "text", "text": "\\u062b\\u0627\\u0646\\u064a\\u0627\\u064b: \\u0627\\u0642\\u062a\\u0631\\u0627\\u062d\\u0627\\u062a \\u0627\\u0644\\u0623\\u0633\\u0639\\u0627\\u0631 \\u0644\\u0628\\u0631\\u0627\\u0646\\u062f\\u0643 (\\u0639\\u0634\\u0627\\u0646 \\u062a\\u0628\\u0642\\u064a \\u0645\\u0646\\u0627\\u0641\\u0633 \\u0648\\u0645\\u062d\\u0642\\u0642 \\u0647\\u0627\\u0645\\u0634 \\u0631\\u0628\\u062d \\u0645\\u0645\\u062a\\u0627\\u0632)\\n\\n\\u0628\\u0645\\u0627 \\u0625\\u0646\\u0643 \\u0644\\u0633\\u0647 \\u0628\\u0631\\u0627\\u0646\\u062f \\u0646\\u0627\\u0634\\u0626 (Startup)\\u060c \\u0627\\u0644\\u062e\\u0637\\u0623 \\u0627\\u0644\\u0623\\u0643\\u0628\\u0631 \\u0647\\u0648 \\u0625\\u0646\\u0643 \\u062a\\u0646\\u0627\\u0641\\u0633 Bath & Body Works \\u0641\\u064a \\u0627\\u0644\\u0633\\u0639\\u0631 \\u0627\\u0644\\u0623\\u0639\\u0644\\u0649\\u060c \\u0648\\u0641\\u064a \\u0646\\u0641\\u0633 \\u0627\\u0644\\u0648\\u0642\\u062a \\u063a\\u0644\\u0637 \\u062a\\u0631\\u062e\\u0635 \\u0645\\u0646\\u062a\\u062c\\u0643 \\u0623\\u0648\\u064a \\u0644\\u0648 \\u062e\\u0627\\u0645\\u0627\\u062a\\u0643 (\\u0627\\u0644\\u0635\\u0648\\u064a\\u0627 \\u0648\\u0627\\u0643\\u0633\\u060c \\u0627\\u0644\\u0641\\u062a\\u064a\\u0644 \\u0627\\u0644\\u0642\\u0637\\u0646\\u064a\\u060c \\u0648\\u0627\\u0644\\u0628\\u0631\\u0637\\u0645\\u0627\\u0646 \\u0627\\u0644\\u0632\\u062c\\u0627\\u062c\\u064a \\u0627\\u0644\\u0634\\u064a\\u0643) \\u0645\\u0643\\u0644\\u0641\\u0629. \\n\\n\\u0627\\u0644\\u0627\\u0633\\u062a\\u0631\\u0627\\u062a\\u064a\\u062c\\u064a\\u0629 \\u0627\\u0644\\u0623\\u0635\\u062d: \\u0627\\u0633\\u062a\\u0647\\u062f\\u0627\\u0641 \\u0627\\u0644\\u0641\\u0626\\u0629 \\u0627\\u0644\\u0645\\u062a\\u0648\\u0633\\u0637\\u0629 \\u0625\\u0644\\u0649 \\u0634\\u0628\\u0647 \\u0627\\u0644\\u0641\\u0627\\u062e\\u0631\\u0629 (Mid-to-Upper Mid) \\u0644\\u062a\\u0642\\u062f\\u064a\\u0645 \\"\\u0627\\u0644\\u0642\\u064a\\u0645\\u0629 \\u0645\\u0642\\u0627\\u0628\\u0644 \\u0627\\u0644\\u0633\\u0639\\u0631\\" (Value for Money) \\u0645\\u0639 \\u0625\\u062d\\u0633\\u0627\\u0633 \\u0628\\u0627\\u0644\\u0640 Luxury.\\n\\n\\u0625\\u0644\\u064a\\u0643 \\u0645\\u0642\\u062a\\u0631\\u062d \\u062a\\u0641\\u0635\\u064a\\u0644\\u064a \\u0644\\u0623\\u0633\\u0639\\u0627\\u0631 \\u0627\\u0644\\u062a\\u062c\\u0632\\u0626\\u0629 (Retail Prices):"}, {"id": null, "type": "findings", "title": "\\u0645\\u0642\\u062a\\u0631\\u062d\\u0627\\u062a \\u0623\\u0633\\u0639\\u0627\\u0631 \\u0627\\u0644\\u062a\\u062c\\u0632\\u0626\\u0629", "findings": [{"title": "1. \\u0627\\u0644\\u0634\\u0645\\u0639\\u0629 \\u0627\\u0644\\u0645\\u062a\\u0648\\u0633\\u0637\\u0629 / \\u0627\\u0644\\u0623\\u0633\\u0627\\u0633\\u064a\\u0629 (Standard Jar - \\u062d\\u0648\\u0627\\u0644\\u064a 180 \\u0625\\u0644\\u0649 200 \\u062c\\u0631\\u0627\\u0645 \\u0635\\u0648\\u064a\\u0627 \\u0648\\u0627\\u0643\\u0633)", "detail": "\\u0627\\u0644\\u0645\\u0648\\u0627\\u0635\\u0641\\u0627\\u062a: \\u0628\\u0631\\u0637\\u0645\\u0627\\u0646 \\u0632\\u062c\\u0627\\u062c\\u064a \\u0628\\u063a\\u0637\\u0627\\u0621 \\u0645\\u062d\\u0643\\u0645 (\\u062e\\u0634\\u0628 \\u0623\\u0648 \\u0645\\u0639\\u062f\\u0646)\\u060c \\u0641\\u062a\\u064a\\u0644 \\u0642\\u0637\\u0646\\u064a\\u060c \\u0645\\u062f\\u0629 \\u0627\\u062d\\u062a\\u0631\\u0627\\u0642 \\u0645\\u0646 35 \\u0644\\u0640 45 \\u0633\\u0627\\u0639\\u0629. \\u0627\\u0644\\u0633\\u0639\\u0631 \\u0627\\u0644\\u0645\\u0642\\u062a\\u0631\\u062d \\u0644\\u0644\\u0645\\u0646\\u0627\\u0641\\u0633\\u0629: \\u0645\\u0646 400 \\u0625\\u0644\\u0649 480 \\u062c\\u0646\\u064a\\u0647 \\u0645\\u0635\\u0631\\u064a. \\u0644\\u064a\\u0647 \\u0627\\u0644\\u0633\\u0639\\u0631 \\u062f\\u0647\\u061f \\u0623\\u0642\\u0644 \\u0628\\u0643\\u062a\\u064a\\u0631 \\u0645\\u0646 Bath & Body Works \\u0648\\u0627\\u0644\\u0645\\u062d\\u0644\\u064a \\u0627\\u0644\\u0641\\u0627\\u062e\\u0631 \\u0623\\u0648\\u064a\\u060c \\u0648\\u0641\\u064a \\u0646\\u0641\\u0633 \\u0627\\u0644\\u0648\\u0642\\u062a \\u0628\\u064a\\u063a\\u0637\\u0649 \\u062a\\u0643\\u0644\\u0641\\u0629 \\u0627\\u0644\\u062e\\u0627\\u0645\\u0627\\u062a (\\u0627\\u0644\\u0635\\u0648\\u064a\\u0627 \\u0623\\u063a\\u0644\\u0649 \\u0645\\u0646 \\u0627\\u0644\\u0628\\u0631\\u0627\\u0641\\u064a\\u0646) \\u0648\\u064a\\u062f\\u064a\\u0643 \\u0647\\u0627\\u0645\\u0634 \\u0631\\u0628\\u062d \\u0645\\u062d\\u062a\\u0631\\u0645 (Markup \\u0645\\u0646 2.5x \\u0644\\u0640 3x).", "confidence": null, "source": null, "evidence": []}, {"title": "2. \\u0627\\u0644\\u0634\\u0645\\u0639\\u0629 \\u0627\\u0644\\u0643\\u0628\\u064a\\u0631\\u0629 (Large Jar / Double Wick - \\u062d\\u0648\\u0627\\u0644\\u064a 300 \\u0625\\u0644\\u0649 350 \\u062c\\u0631\\u0627\\u0645)", "detail": "\\u0627\\u0644\\u0645\\u0648\\u0627\\u0635\\u0641\\u0627\\u062a: \\u0628\\u0631\\u0637\\u0645\\u0627\\u0646 \\u0623\\u0643\\u0628\\u0631\\u060c \\u0628\\u0641\\u062a\\u064a\\u0644\\u064a\\u0646 (Double Wick) \\u0639\\u0634\\u0627\\u0646 \\u0627\\u0646\\u062a\\u0634\\u0627\\u0631 \\u0627\\u0644\\u0631\\u0627\\u0626\\u062d\\u0629 (Scent Throw) \\u064a\\u0643\\u0648\\u0646 \\u0623\\u0642\\u0648\\u0649\\u060c \\u0632\\u064a \\u0641\\u0643\\u0631\\u0629 \\u0627\\u0644\\u0640 3-Wick \\u0628\\u0633 \\u0628\\u062d\\u062c\\u0645 \\u0645\\u0646\\u0627\\u0633\\u0628 \\u0644\\u0644\\u0645\\u0635\\u0631\\u064a\\u064a\\u0646 \\u0648\\u0628\\u0641\\u062a\\u064a\\u0644\\u064a\\u0646. \\u0627\\u0644\\u0633\\u0639\\u0631 \\u0627\\u0644\\u0645\\u0642\\u062a\\u0631\\u062d \\u0644\\u0644\\u0645\\u0646\\u0627\\u0641\\u0633\\u0629: \\u0645\\u0646 650 \\u0625\\u0644\\u0649 750 \\u062c\\u0646\\u064a\\u0647 \\u0645\\u0635\\u0631\\u064a. \\u0644\\u064a\\u0647 \\u0627\\u0644\\u0633\\u0639\\u0631 \\u062f\\u0647\\u061f \\u0628\\u062f\\u064a\\u0644 \\u0645\\u0645\\u062a\\u0627\\u0632 \\u0648\\u0639\\u0645\\u0644\\u064a \\u0644\\u0644\\u064a \\u0628\\u064a\\u062d\\u0628\\u0648\\u0627 \\u0634\\u0645\\u0648\\u0639 Bath & Body Works \\u0627\\u0644\\u0643\\u0628\\u064a\\u0631\\u0629 \\u0628\\u0633 \\u0645\\u0634 \\u0639\\u0627\\u064a\\u0632\\u064a\\u0646 \\u064a\\u062f\\u0641\\u0639\\u0648\\u0627 \\u0623\\u0631\\u0642\\u0627\\u0645 \\u0641\\u0644\\u0643\\u064a\\u0629 \\u0641\\u064a \\u0634\\u0645\\u0639\\u0629 \\u0645\\u0633\\u062a\\u0648\\u0631\\u062f\\u0629.", "confidence": null, "source": null, "evidence": []}, {"title": "3. \\u0627\\u0644\\u062d\\u062c\\u0645 \\u0627\\u0644\\u0635\\u063a\\u064a\\u0631 / \\u0627\\u0644\\u062a\\u0633\\u062a\\u0631\\u0627\\u062a \\u0623\\u0648 \\u0627\\u0644\\u0647\\u062f\\u0627\\u064a\\u0627 (Mini/Travel Tin or Jar - \\u062d\\u0648\\u0627\\u0644\\u064a 100 \\u062c\\u0631\\u0627\\u0645)", "detail": "\\u0627\\u0644\\u0645\\u0648\\u0627\\u0635\\u0641\\u0627\\u062a: \\u0639\\u0644\\u0628\\u0629 \\u0635\\u0641\\u064a\\u062d (Tin) \\u0623\\u0648 \\u0628\\u0631\\u0637\\u0645\\u0627\\u0646 \\u0635\\u063a\\u064a\\u0631 \\u0644\\u0644\\u0633\\u0641\\u0631 \\u0623\\u0648 \\u0627\\u0644\\u062a\\u062c\\u0631\\u0628\\u0629. \\u0627\\u0644\\u0633\\u0639\\u0631 \\u0627\\u0644\\u0645\\u0642\\u062a\\u0631\\u062d \\u0644\\u0644\\u0645\\u0646\\u0627\\u0641\\u0633\\u0629: \\u0645\\u0646 200 \\u0625\\u0644\\u0649 250 \\u062c\\u0646\\u064a\\u0647 \\u0645\\u0635\\u0631\\u064a. \\u0644\\u064a\\u0647 \\u0627\\u0644\\u0633\\u0639\\u0631 \\u062f\\u0647\\u061f \\u062f\\u0647 \\u0628\\u064a\\u0643\\u0648\\u0646 \\"Entry Point\\" \\u0623\\u0648 \\u0628\\u0627\\u0628 \\u062f\\u062e\\u064a\\u0644 \\u0644\\u0644\\u0639\\u0645\\u064a\\u0644 \\u0627\\u0644\\u0644\\u064a \\u062e\\u0627\\u064a\\u0641 \\u064a\\u062c\\u0631\\u0628 \\u0628\\u0631\\u0627\\u0646\\u062f \\u062c\\u062f\\u064a\\u062f \\u0644\\u0623\\u0648\\u0644 \\u0645\\u0631\\u0629\\u060c \\u0623\\u0648 \\u0644\\u0639\\u0631\\u0648\\u0636 \\u0627\\u0644\\u0640 Giveaways \\u0648\\u0627\\u0644\\u0628\\u0627\\u0632\\u0627\\u0631\\u0627\\u062a.", "confidence": null, "source": null, "evidence": []}]}, {"id": null, "type": "text", "text": "\\u062b\\u0627\\u0644\\u062b\\u0627\\u064b: \\u0645\\u0639\\u0627\\u062f\\u0644\\u0629 \\u0627\\u0644\\u062d\\u0645\\u0627\\u064a\\u0629 \\u0648\\u0636\\u0645\\u0627\\u0646 \\u0627\\u0644\\u0631\\u0628\\u062d\\u064a\\u0629 (\\u0643\\u064a\\u0641 \\u062a\\u062d\\u0633\\u0628 \\u0633\\u0639\\u0631\\u0643 \\u0628\\u0627\\u0644\\u0638\\u0628\\u0637\\u061f)\\n\\n\\u0642\\u0628\\u0644 \\u0645\\u0627 \\u062a\\u0633\\u062a\\u0642\\u0631 \\u0639\\u0644\\u0649 \\u0627\\u0644\\u0633\\u0639\\u0631 \\u0627\\u0644\\u0646\\u0647\\u0627\\u0626\\u064a\\u060c \\u0644\\u0627\\u0632\\u0645 \\u062a\\u0637\\u0628\\u0642 \\u0627\\u0644\\u0642\\u0627\\u0639\\u062f\\u0629 \\u062f\\u064a \\u0628\\u062f\\u0642\\u0629:\\n\\u0633\\u0639\\u0631 \\u0627\\u0644\\u0628\\u064a\\u0639 \\u0644\\u0644\\u0639\\u0645\\u064a\\u0644 = (\\u062a\\u0643\\u0644\\u0641\\u0629 \\u0627\\u0644\\u062e\\u0627\\u0645\\u0627\\u062a \\u0627\\u0644\\u0645\\u0628\\u0627\\u0634\\u0631\\u0629: \\u0634\\u0645\\u0639 + \\u0632\\u064a\\u062a \\u0639\\u0637\\u0631\\u064a + \\u0641\\u062a\\u064a\\u0644 + \\u0628\\u0631\\u0637\\u0645\\u0627\\u0646 + \\u0644\\u0627\\u0641\\u062a\\u0629/\\u0628\\u0627\\u0643\\u064a\\u062c\\u064a\\u0646\\u062c) \\u00d7 3\\n\\n- \\u0644\\u064a\\u0647 \\u00d7 3\\u061f\\n  - \\u0627\\u0644\\u062b\\u0644\\u062b \\u0627\\u0644\\u0623\\u0648\\u0644 \\u064a\\u063a\\u0637\\u064a \\u0627\\u0644\\u062a\\u0643\\u0644\\u0641\\u0629 \\u0627\\u0644\\u0641\\u0639\\u0644\\u064a\\u0629 \\u0644\\u0644\\u0645\\u0646\\u062a\\u062c.\\n  - \\u0627\\u0644\\u062b\\u0644\\u062b \\u0627\\u0644\\u062b\\u0627\\u0646\\u064a \\u064a\\u063a\\u0637\\u064a \\u0645\\u0635\\u0631\\u0648\\u0641\\u0627\\u062a \\u0627\\u0644\\u062a\\u0634\\u063a\\u064a\\u0644 (\\u0627\\u0644\\u062a\\u063a\\u0644\\u064a\\u0641 \\u0627\\u0644\\u0625\\u0636\\u0627\\u0641\\u064a \\u0644\\u0644\\u0634\\u062d\\u0646\\u060c \\u0627\\u0644\\u0625\\u0639\\u0644\\u0627\\u0646\\u0627\\u062a \\u0639\\u0644\\u0649 \\u0627\\u0644\\u0633\\u0648\\u0634\\u064a\\u0627\\u0644 \\u0645\\u064a\\u062f\\u064a\\u0627\\u060c \\u0639\\u0645\\u0648\\u0644\\u0627\\u062a \\u0645\\u0646\\u0635\\u0627\\u062a \\u0627\\u0644\\u0628\\u064a\\u0639 \\u0623\\u0648 \\u0627\\u0644\\u0628\\u0627\\u0632\\u0627\\u0631\\u0627\\u062a).\\n  - \\u0627\\u0644\\u062b\\u0644\\u062b \\u0627\\u0644\\u062b\\u0627\\u0644\\u062b \\u0647\\u0648 \\u0635\\u0627\\u0641\\u064a \\u0623\\u0631\\u0628\\u0627\\u062d\\u0643 \\u0627\\u0644\\u0630\\u064a \\u062a\\u0633\\u062a\\u062b\\u0645\\u0631\\u0647 \\u0644\\u062a\\u0637\\u0648\\u064a\\u0631 \\u0627\\u0644\\u0628\\u0631\\u0627\\u0646\\u062f."}, {"id": null, "type": "findings", "title": "\\u0631\\u0627\\u0628\\u0639\\u0627\\u064b: \\u0646\\u0635\\u064a\\u062d\\u0629 \\u062a\\u0633\\u0648\\u064a\\u0642\\u064a\\u0629 \\u062a\\u0646\\u0627\\u0641\\u0633 \\u0628\\u0647\\u0627 \\u0639\\u0645\\u0627\\u0644\\u0642\\u0629 \\u0645\\u062b\\u0644 Bath & Body Works", "findings": [{"title": "\\u0627\\u0644\\u0642\\u0635\\u0629 (Storytelling)", "detail": "\\u0631\\u0643\\u0632 \\u0625\\u0646 \\u0634\\u0645\\u0639\\u062a\\u0643 \\u0645\\u0635\\u0646\\u0648\\u0639\\u0629 \\u0645\\u0646 \\u0635\\u0648\\u064a\\u0627 \\u0637\\u0628\\u064a\\u0639\\u064a\\u0629 100% (\\u062e\\u0627\\u0644\\u064a\\u0629 \\u0645\\u0646 \\u0633\\u0645\\u0648\\u0645 \\u0627\\u0644\\u0628\\u0631\\u0627\\u0641\\u064a\\u0646 \\u0627\\u0644\\u0644\\u064a \\u0645\\u0648\\u062c\\u0648\\u062f\\u0629 \\u0641\\u064a \\u0628\\u0639\\u0636 \\u0627\\u0644\\u0634\\u0645\\u0648\\u0639 \\u0627\\u0644\\u062a\\u062c\\u0627\\u0631\\u064a\\u0629 \\u0627\\u0644\\u0631\\u062e\\u064a\\u0635\\u0629).", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u0631\\u0648\\u0627\\u0626\\u062d \\u0627\\u0644\\u0645\\u062e\\u0635\\u0635\\u0629 (Signature Scents)", "detail": "\\u0642\\u062f\\u0645 \\u0631\\u0648\\u0627\\u0626\\u062d \\u0628\\u062a\\u062e\\u0627\\u0637\\u0628 \\u0627\\u0644\\u0630\\u0648\\u0642 \\u0627\\u0644\\u0645\\u0635\\u0631\\u064a \\u0648\\u0627\\u0644\\u0639\\u0631\\u0628\\u064a (\\u0645\\u062b\\u0644 \\u0645\\u0632\\u064a\\u062c \\u0627\\u0644\\u0641\\u0627\\u0646\\u064a\\u0644\\u064a\\u0627 \\u0627\\u0644\\u062f\\u0627\\u0641\\u0626\\u0629\\u060c \\u0627\\u0644\\u0639\\u0646\\u0628\\u0631\\u060c \\u0623\\u0648 \\u0627\\u0644\\u0631\\u0648\\u0627\\u0626\\u062d \\u0627\\u0644\\u0645\\u0647\\u062f\\u0626\\u0629 \\u0644\\u0644\\u062a\\u0648\\u062a\\u0631) \\u0628\\u062c\\u0648\\u062f\\u0629 \\u0639\\u0637\\u0631\\u064a\\u0629 \\u0639\\u0627\\u0644\\u064a\\u0629 (Scent Throw \\u0642\\u0648\\u064a).", "confidence": null, "source": null, "evidence": []}, {"title": "\\u0627\\u0644\\u062a\\u063a\\u0644\\u064a\\u0641 \\u0627\\u0644\\u0631\\u0627\\u0642\\u064a (Unboxing Experience)", "detail": "\\u0627\\u0647\\u062a\\u0645 \\u062c\\u062f\\u0627\\u064b \\u0628\\u0634\\u0643\\u0644 \\u0627\\u0644\\u0628\\u0648\\u0643\\u0633 \\u0648\\u0643\\u0631\\u062a \\u0627\\u0644\\u0625\\u0647\\u062f\\u0627\\u0621\\u060c \\u0644\\u0623\\u0646 \\u062c\\u0632\\u0621 \\u0643\\u0628\\u064a\\u0631 \\u0645\\u0646 \\u0634\\u0631\\u0627\\u0621 \\u0627\\u0644\\u0634\\u0645\\u0648\\u0639 \\u0641\\u064a \\u0645\\u0635\\u0631 \\u0628\\u064a\\u0643\\u0648\\u0646 \\u0628\\u063a\\u0631\\u0636 \\u0627\\u0644\\u0647\\u062f\\u0627\\u064a\\u0627 (Gifting).", "confidence": null, "source": null, "evidence": []}]}]', None, '')
+    * executemany: False
+2026-10-11 23:27:17.912 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - INSERT RESULT] Completed in 198ms (rows: 1)
+    * operation: INSERT
+    * duration_ms: 198
+    * rowcount: 1
+2026-10-11 23:27:28.207 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:27:29.049 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:27:29.459 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 409ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 409
+    * rowcount: 1
+2026-10-11 23:27:29.460 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:27:29.663 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 202ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 202
+    * rowcount: 1
+2026-10-11 23:27:29.664 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 27, 29, 663750, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:27:29.784 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 120ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 120
+    * rowcount: 1
+2026-10-11 23:27:30.366 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:27:30.593 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 226ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 226
+    * rowcount: 1
+2026-10-11 23:27:30.594 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:27:30.701 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 107ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 107
+    * rowcount: 1
+2026-10-11 23:27:30.702 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:30.813 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 110ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 110
+    * rowcount: 1
+2026-10-11 23:27:30.813 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:30.929 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 116ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 116
+    * rowcount: 0
+2026-10-11 23:27:30.931 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:31.049 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 118ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 118
+    * rowcount: 2
+2026-10-11 23:27:31.050 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:31.165 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 114ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 114
+    * rowcount: 0
+2026-10-11 23:27:31.165 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:27:31.166 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.id = $1::VARCHAR AND conversations.business_id = $2::VARCHAR
+    * parameters: ('conv_55c666bd812e45f6b25e', 'biz_2b69ca4ecf694365a53c')
+    * executemany: False
+2026-10-11 23:27:31.395 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 228ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 228
+    * rowcount: 1
+2026-10-11 23:27:31.396 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e',)
+    * executemany: False
+2026-10-11 23:27:32.073 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 677ms (rows: 32)
+    * operation: SELECT
+    * duration_ms: 677
+    * rowcount: 32
+2026-10-11 23:27:32.076 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e (3868ms)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_55c666bd812e45f6b25e
+    * status: 200
+    * duration_ms: 3868
+2026-10-11 23:27:32.085 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-11 23:27:32.496 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip, sessions.expires_at, sessions.last_used_at, sessions.revoked_at, sessions.created_at 
+      FROM sessions 
+      WHERE sessions.token_hash = $1::VARCHAR
+    * parameters: ('61ebd48fe855af8417bb919e7fbd28f1726278292e90b904a541c2bdaf9d1d63',)
+    * executemany: False
+2026-10-11 23:27:32.724 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 227ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 227
+    * rowcount: 1
+2026-10-11 23:27:32.725 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:27:32.861 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 135ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 135
+    * rowcount: 1
+2026-10-11 23:27:32.862 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE] Executing query
+    * operation: UPDATE
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+    * parameters: (datetime.datetime(2026, 10, 11, 20, 27, 32, 861859, tzinfo=datetime.timezone.utc), 'ses_73f4d19200174b5ba7d7ab15')
+    * executemany: False
+2026-10-11 23:27:32.985 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - UPDATE RESULT] Completed in 123ms (rows: 1)
+    * operation: UPDATE
+    * duration_ms: 123
+    * rowcount: 1
+2026-10-11 23:27:33.534 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:27:33.745 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 210ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 210
+    * rowcount: 1
+2026-10-11 23:27:33.746 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+    * parameters: ('usr_076b2252a6844e5eab03e393',)
+    * executemany: False
+2026-10-11 23:27:33.872 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 126ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 126
+    * rowcount: 1
+2026-10-11 23:27:33.873 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT businesses.id, businesses.workspace_id, businesses.name, businesses.industry, businesses.website_url, businesses.country, businesses.language, businesses.currency, businesses.monthly_budget, businesses.daily_token_budget, businesses.created_at, businesses.updated_at 
+      FROM businesses 
+      WHERE businesses.id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:33.996 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 123ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 123
+    * rowcount: 1
+2026-10-11 23:27:33.997 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_profiles.business_id, brand_profiles.id, brand_profiles.brand_voice, brand_profiles.visual_style, brand_profiles.target_audience, brand_profiles.key_offers, brand_profiles.goals, brand_profiles.competitors, brand_profiles.created_at, brand_profiles.updated_at 
+      FROM brand_profiles 
+      WHERE brand_profiles.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:34.165 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 167ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 167
+    * rowcount: 0
+2026-10-11 23:27:34.165 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:34.302 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 136ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 136
+    * rowcount: 2
+2026-10-11 23:27:34.303 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT campaigns.business_id, campaigns.id, campaigns.name, campaigns.status, campaigns.objective, campaigns.channel, campaigns.budget, campaigns.currency, campaigns.start_date, campaigns.end_date, campaigns.target_audience, campaigns.meta_campaign_id, campaigns.notes, campaigns.created_at, campaigns.updated_at 
+      FROM campaigns 
+      WHERE campaigns.business_id IN ($1::VARCHAR)
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:34.414 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd] | [DATABASE - SELECT RESULT] Completed in 111ms (rows: 0)
+    * operation: SELECT
+    * duration_ms: 111
+    * rowcount: 0
+2026-10-11 23:27:34.415 | INFO    | app.api.deps             | [req=req_d9d51629c2a24efd] | workspace_resolved_from_membership
+    * user_id: usr_076b2252a6844e5eab03e393
+    * requested_workspace: biz_2b69ca4ecf694365a53c
+    * granted_role: owner
+2026-10-11 23:27:34.415 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id, conversations.business_id, conversations.title, conversations.context, conversations.summary, conversations.created_at, conversations.updated_at 
+      FROM conversations 
+      WHERE conversations.business_id = $1::VARCHAR ORDER BY conversations.updated_at DESC
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:27:34.641 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 225ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 225
+    * rowcount: 2
+2026-10-11 23:27:34.642 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.conversation_id, messages.id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($1::VARCHAR, $2::VARCHAR) ORDER BY messages.created_at
+    * parameters: ('conv_55c666bd812e45f6b25e', 'conv_0d6a02f946c64c549270')
+    * executemany: False
+2026-10-11 23:27:35.346 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 704ms (rows: 34)
+    * operation: SELECT
+    * duration_ms: 704
+    * rowcount: 34
+2026-10-11 23:27:35.347 | INFO    | app.main                 | [req=req_d9d51629c2a24efd] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (3262ms)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 3262
+2026-10-11 23:28:18.020 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | ltm_debounce_triggered
+    * business_id: biz_2b69ca4ecf694365a53c
+2026-10-11 23:28:18.450 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT max(messages.created_at) AS max_1 
+      FROM messages JOIN conversations ON messages.conversation_id = conversations.id 
+      WHERE conversations.business_id = $1::VARCHAR
+    * parameters: ('biz_2b69ca4ecf694365a53c',)
+    * executemany: False
+2026-10-11 23:28:18.786 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 335ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 335
+    * rowcount: 1
+2026-10-11 23:28:18.787 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT profiles.id, profiles.supabase_user_id, profiles.business_id, profiles.role, profiles.user_context_summary, profiles.created_at, profiles.updated_at 
+      FROM profiles 
+      WHERE profiles.business_id = $1::VARCHAR 
+       LIMIT $2::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 1)
+    * executemany: False
+2026-10-11 23:28:18.900 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 113ms (rows: 1)
+    * operation: SELECT
+    * duration_ms: 113
+    * rowcount: 1
+2026-10-11 23:28:18.901 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT conversations.id 
+      FROM conversations 
+      WHERE conversations.business_id = $1::VARCHAR ORDER BY conversations.updated_at DESC 
+       LIMIT $2::INTEGER
+    * parameters: ('biz_2b69ca4ecf694365a53c', 3)
+    * executemany: False
+2026-10-11 23:28:19.137 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 235ms (rows: 2)
+    * operation: SELECT
+    * duration_ms: 235
+    * rowcount: 2
+2026-10-11 23:28:19.138 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT] Executing query
+    * operation: SELECT
+    * statement:
+      SELECT messages.id, messages.conversation_id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($2::VARCHAR, $3::VARCHAR) ORDER BY messages.created_at DESC 
+       LIMIT $1::INTEGER
+    * parameters: (20, 'conv_55c666bd812e45f6b25e', 'conv_0d6a02f946c64c549270')
+    * executemany: False
+2026-10-11 23:28:19.930 | INFO    | app.db.trace             | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | [DATABASE - SELECT RESULT] Completed in 791ms (rows: 20)
+    * operation: SELECT
+    * duration_ms: 791
+    * rowcount: 20
+2026-10-11 23:28:19.932 | INFO    | google_genai.models      | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | AFC is enabled with max remote calls: 10.
+2026-10-11 23:28:21.830 | INFO    | httpx                    | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-11 23:28:21.832 | INFO    | app.ai.memory.compressor | [req=req_d9d51629c2a24efd | biz=biz_2b69ca4ecf694365a53c] | ltm_profile_unchanged_noop
+    * business_id: biz_2b69ca4ecf694365a53c

@@ -21,7 +21,9 @@ KARIM_TOOLS = [get_brand_context_tool, submit_performance_report]
 
 KARIM_PROMPT = """You are Karim, the Analyst.
 Your goal is to analyze campaign metrics and health.
-You must call submit_performance_report to submit your final results!"""
+You must call submit_performance_report to submit your final results!
+
+OUTPUT CONTRACT: Answer only from stored data. No recommendations, no campaign CTAs."""
 
 def call_model(state: KarimState, config: RunnableConfig) -> dict:
     messages = state["messages"]

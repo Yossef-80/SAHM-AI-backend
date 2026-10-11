@@ -10,6 +10,8 @@ from __future__ import annotations
 import contextvars
 import json
 import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 import sys
 import time
 from typing import Any
@@ -62,6 +64,48 @@ class ContextFilter(logging.Filter):
         record.workspace_id = _workspace_id.get()
         record.business_id = _business_id.get()
         return True
+
+
+class TraceTextFormatter(logging.Formatter):
+    """Clean, human-readable trace log formatter with timestamps and context."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created)) + f".{int(record.msecs):03d}"
+        req_id = getattr(record, "request_id", None) or "-"
+        biz_id = getattr(record, "business_id", None) or "-"
+
+        ctx_parts = [f"req={req_id}"]
+        if biz_id != "-":
+            ctx_parts.append(f"biz={biz_id}")
+        ctx_str = f"[{' | '.join(ctx_parts)}]"
+
+        msg = record.getMessage()
+        extra = getattr(record, "extra", None)
+        if isinstance(extra, dict):
+            extra = redact(extra)
+
+        header = f"{ts} | {record.levelname:<7} | {record.name:<24} | {ctx_str} | {msg}"
+        lines = [header]
+
+        if extra:
+            for k, v in extra.items():
+                if isinstance(v, (dict, list)):
+                    try:
+                        v_str = json.dumps(v, ensure_ascii=False, indent=2)
+                        indented = "\n".join(f"      {line}" for line in v_str.splitlines())
+                        lines.append(f"    * {k}:\n{indented}")
+                    except Exception:
+                        lines.append(f"    * {k}: {v}")
+                elif isinstance(v, str) and "\n" in v:
+                    indented = "\n".join(f"      {line}" for line in v.splitlines())
+                    lines.append(f"    * {k}:\n{indented}")
+                else:
+                    lines.append(f"    * {k}: {v}")
+
+        if record.exc_info:
+            lines.append(self.formatException(record.exc_info))
+
+        return "\n".join(lines)
 
 
 class JsonFormatter(logging.Formatter):
@@ -167,6 +211,11 @@ _SENSITIVE_KEYS = frozenset(
         # Not a credential, but logging it would let anyone reading logs
         # fingerprint a customer and correlate their traffic across requests.
         "rate_limit_key",
+        # --- LLM provider settings (P5.5 audit) ----------------------------
+        "fast_api_key_enc",
+        "fast_extra_headers_enc",
+        "strong_api_key_enc",
+        "strong_extra_headers_enc",
     }
 )
 
@@ -192,17 +241,41 @@ def redact(data: Any) -> Any:
     return data
 
 
-def configure_logging(level: str = "INFO", as_json: bool = True) -> None:
+def configure_logging(
+    level: str = "INFO",
+    as_json: bool = True,
+    log_file: str | Path | None = "logs/trace.log",
+) -> None:
+    """Configure both stdout and rotating file logging for full tracing."""
     global configured
     root = logging.getLogger()
     root.setLevel(level.upper())
     for existing in list(root.handlers):
         root.removeHandler(existing)
-    handler = logging.StreamHandler(sys.stdout)
-    handler.addFilter(ContextFilter())
-    handler.setFormatter(JsonFormatter() if as_json else logging.Formatter("%(message)s"))
-    root.addHandler(handler)
+
+    # 1. Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.addFilter(ContextFilter())
+    console_handler.setFormatter(JsonFormatter() if as_json else TraceTextFormatter())
+    root.addHandler(console_handler)
+
+    # 2. File handler: always saves full structured trace history to logs/trace.log
+    if log_file:
+        file_path = Path(log_file)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            file_path, maxBytes=30 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        )
+        file_handler.addFilter(ContextFilter())
+        file_handler.setFormatter(TraceTextFormatter())
+        root.addHandler(file_handler)
+
     configured = True
+
+
+def log_trace(category: str, message: str, **fields: Any) -> None:
+    """Convenience helper to log categorized trace messages."""
+    get_logger(f"trace.{category.lower()}").info(f"[{category.upper()}] {message}", extra=fields)
 
 
 class _LoggerAdapter(logging.LoggerAdapter):

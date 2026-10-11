@@ -6,6 +6,7 @@ canned data.
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -177,16 +178,52 @@ def create_app() -> FastAPI:
         request_id = request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex[:16]}"
         bind_request_id(request_id)
         request.state.request_id = request_id
+
+        query_params = dict(request.query_params)
+        client_host = request.client.host if request.client else "unknown"
+        body_preview = None
+
+        content_type = request.headers.get("content-type", "")
+        if (
+            request.method in {"POST", "PUT", "PATCH"}
+            and not content_type.startswith("multipart/")
+        ):
+            try:
+                raw_body = await request.body()
+                if raw_body and len(raw_body) < 100_000:
+                    try:
+                        from app.core.logging import redact
+                        parsed = json.loads(raw_body.decode("utf-8", errors="replace"))
+                        body_preview = redact(parsed)
+                    except Exception:
+                        text_val = raw_body.decode("utf-8", errors="replace")
+                        body_preview = text_val[:300] + ("..." if len(text_val) > 300 else "")
+            except Exception:
+                pass
+
+        _logger.info(
+            f"[ROUTING - INCOMING] {request.method} {request.url.path}",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "query": query_params,
+                "client": client_host,
+                "body": body_preview,
+            },
+        )
+
         started = time.monotonic()
         response = await call_next(request)
+        duration_ms = int((time.monotonic() - started) * 1000)
         response.headers["x-request-id"] = request_id
+
         _logger.info(
-            "http_request",
+            f"[ROUTING - OUTGOING] {response.status_code} {request.method} {request.url.path} ({duration_ms}ms)",
             extra={
                 "method": request.method,
                 "path": request.url.path,
                 "status": response.status_code,
-                "duration_ms": int((time.monotonic() - started) * 1000),
+                "duration_ms": duration_ms,
             },
         )
         return response

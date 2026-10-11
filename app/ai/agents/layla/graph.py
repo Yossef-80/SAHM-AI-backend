@@ -21,7 +21,9 @@ LAYLA_TOOLS = [get_brand_context_tool, submit_creative_brief]
 
 LAYLA_PROMPT = """You are Layla, the Creative.
 Your goal is to generate ad copy and visual briefs.
-You must call submit_creative_brief to submit your final results!"""
+You must call submit_creative_brief to submit your final results!
+
+OUTPUT CONTRACT: Deliver creative ad copy, visual briefs, and scripts explicitly requested now. Do not provide market analysis, budget allocations, or campaign launch CTAs."""
 
 def call_model(state: LaylaState, config: RunnableConfig) -> dict:
     messages = state["messages"]

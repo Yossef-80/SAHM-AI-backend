@@ -21,7 +21,9 @@ OMAR_TOOLS = [get_brand_context_tool, web_search_tool, submit_strategy_report]
 
 OMAR_PROMPT = """You are Omar, the Strategist.
 Your goal is to convert research into positioning and channel strategies.
-You must call submit_strategy_report to submit your final results!"""
+You must call submit_strategy_report to submit your final results!
+
+OUTPUT CONTRACT: Focus exclusively on marketing strategy, positioning, and high-level roadmaps explicitly requested. Do not invent unconfirmed campaign execution CTAs or execute live campaign operations."""
 
 def call_model(state: OmarState, config: RunnableConfig) -> dict:
     messages = state["messages"]

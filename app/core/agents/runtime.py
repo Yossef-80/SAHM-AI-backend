@@ -48,7 +48,7 @@ from app.core.errors import (
 )
 from app.core.llm.base import LLMClient, LLMResult, Msg, ToolCall, format_validation_error
 from app.core.llm.router import get_llm
-from app.core.logging import get_logger
+from app.core.logging import get_logger, redact
 from app.core.tools.base import Tool, ToolContext, log_tool_call
 from app.core.tools.registry import get_tools_for
 from app.core.usage import RunUsageTracker, check_budget, record_usage
@@ -884,6 +884,7 @@ async def _run_one_tool(
 ) -> tuple[ToolCallRecord, Any]:
     """Validate and run a single tool call, honouring the allowlist."""
     started = time.monotonic()
+    persona_name = persona.name if hasattr(persona, "name") else str(persona)
 
     # Autonomy gate (D1) runs BEFORE anything is executed, and before the
     # allowlist check, because the two answer different questions: "may this
@@ -951,10 +952,16 @@ async def _run_one_tool(
             {"status": "blocked", "detail": reason},
         )
 
+    tool_logger = _logger
+
     try:
         payload = tool.input_model.model_validate(call.arguments)
     except ValidationError as exc:
         reason = f"invalid input for '{call.name}': {format_validation_error(exc)}"
+        tool_logger.warning(
+            f"[TOOL CALL - INVALID] '{call.name}': {reason}",
+            extra={"tool": call.name, "arguments": redact(dict(call.arguments)), "error": reason},
+        )
         return (
             ToolCallRecord(
                 tool=call.name,
@@ -967,12 +974,34 @@ async def _run_one_tool(
             {"status": "error", "detail": reason},
         )
 
+    tool_logger.info(
+        f"[TOOL CALL - START] Executing '{call.name}' (persona: {persona_name})",
+        extra={
+            "tool": call.name,
+            "call_id": call.id,
+            "persona": persona_name,
+            "arguments": redact(dict(call.arguments)),
+        },
+    )
+
     try:
         output = await tool.handler(payload, ctx)
         raw_status = getattr(output, "status", None)
         status = _status_value(raw_status)
         summary = _tool_result_summary(output)
         duration = int((time.monotonic() - started) * 1000)
+        tool_logger.info(
+            f"[TOOL RESULT - SUCCESS] '{call.name}' completed in {duration}ms (status: {status})",
+            extra={
+                "tool": call.name,
+                "call_id": call.id,
+                "persona": persona_name,
+                "status": status,
+                "duration_ms": duration,
+                "summary": summary,
+                "output": redact(output.model_dump(mode="json") if hasattr(output, "model_dump") else str(output)),
+            },
+        )
         await log_tool_call(
             ctx,
             tool=call.name,
@@ -993,9 +1022,17 @@ async def _run_one_tool(
         )
     except Exception as exc:
         reason = f"{type(exc).__name__}: {exc}"
-        _logger.warning(
-            "tool_handler_failed",
-            extra={"tool": call.name, "error": reason, "request_id": request_id},
+        duration = int((time.monotonic() - started) * 1000)
+        tool_logger.error(
+            f"[TOOL RESULT - ERROR] '{call.name}' failed in {duration}ms: {reason}",
+            extra={
+                "tool": call.name,
+                "call_id": call.id,
+                "persona": persona_name,
+                "duration_ms": duration,
+                "error": reason,
+                "request_id": request_id,
+            },
         )
         return (
             ToolCallRecord(
@@ -1003,7 +1040,7 @@ async def _run_one_tool(
                 input=dict(call.arguments),
                 output_summary=reason,
                 status="error",
-                duration_ms=int((time.monotonic() - started) * 1000),
+                duration_ms=duration,
                 error=reason,
             ),
             {"status": "error", "detail": reason},

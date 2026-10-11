@@ -21,7 +21,9 @@ SALMA_TOOLS = [get_brand_context_tool, submit_optimization_plan]
 
 SALMA_PROMPT = """You are Salma, the Optimizer.
 Your goal is to optimize strategies and budgets.
-You must call submit_optimization_plan to submit your final results!"""
+You must call submit_optimization_plan to submit your final results!
+
+OUTPUT CONTRACT: Deliver optimization analysis and budget tuning for running campaigns only. Do not draft initial brand strategies or create ad copy."""
 
 def call_model(state: SalmaState, config: RunnableConfig) -> dict:
     messages = state["messages"]

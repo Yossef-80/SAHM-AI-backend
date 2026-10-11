@@ -573,7 +573,12 @@ async def run_research(
         compact_memory_text = extract_clean_text(distill_res.content)
     except Exception as e:
         logger.warning("memory_distillation_fallback", extra={"error": str(e)})
-        compact_memory_text = summary_text[:400]
+    from app.ai.memory.compressor import enforce_token_cap
+    compact_memory_text = await enforce_token_cap(
+        compact_memory_text,
+        item_tokens_limit,
+        context_label=f"research_item_{memory_id}",
+    )
 
     # 4. Save to BrandMemoryItem (compact text for low-token agent recall, full report in metadata)
     kind_map = {
@@ -611,7 +616,7 @@ async def run_research(
     )
     db.add(mem_item)
 
-    # 5. Integrate into Brain / Long-Term Memory (Profile.user_context_summary)
+    # 5. Integrate into Brain / Long-Term Memory (Profile.user_context_summary - FACTS ONLY)
     if not profile:
         profile = Profile(
             id=uuid.uuid4(),
@@ -627,19 +632,25 @@ async def run_research(
     profile_tokens_limit = ai_settings.memory_global_profile_max_tokens
     ltm_sys = SystemMessage(content=(
         "You are the central brain memory manager for SAHM Marketing OS.\n"
-        "Integrate this new research finding into the brand's permanent profile.\n"
-        "Update the known competitors, audience learnings, and market opportunities.\n"
+        "Integrate this new research finding into the brand's permanent BRAND FACTS profile.\n"
+        "Update ONLY permanent descriptive facts: known competitors, industry niche, audience, and market facts.\n"
+        "STRICTLY FORBIDDEN: Do not add active marketing goals, ad angles, campaigns, or budgets here.\n"
         f"STRICT CONSTRAINT: Keep under {profile_tokens_limit} tokens total in high-density bullet points. Output plain markdown only."
     ))
     ltm_usr = HumanMessage(content=(
-        f"CURRENT LTM PROFILE:\n{old_summary}\n\n"
+        f"CURRENT LTM PROFILE (FACTS ONLY):\n{old_summary}\n\n"
         f"NEW RESEARCH INTEL TO INTEGRATE:\nTitle: {title}\nCompact Finding: {compact_memory_text}\n\n"
-        "Return the updated, unified Long-Term Memory:"
+        "Return the updated, unified Long-Term Memory (Brand Facts only):"
     ))
     try:
         import asyncio
         ltm_res = await asyncio.to_thread(fast_llm.invoke, [ltm_sys, ltm_usr])
-        profile.user_context_summary = extract_clean_text(ltm_res.content)
+        integrated_facts = extract_clean_text(ltm_res.content)
+        profile.user_context_summary = await enforce_token_cap(
+            integrated_facts,
+            profile_tokens_limit,
+            context_label=f"research_ltm_{ws.business_id}",
+        )
     except Exception as e:
         logger.warning("profile_ltm_integration_skipped", extra={"error": str(e)})
 

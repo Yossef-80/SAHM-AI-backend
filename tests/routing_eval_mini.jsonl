@@ -1,0 +1,6 @@
+{"prompt": "make a search about haj arafa and what is him strengths and weaknesses", "expected_agent": "nour", "note": "historical failure case: explicit request to search external competitor"}
+{"prompt": "Who are our competitors and what are their offers?", "expected_agent": "karim", "note": "historical failure case: memory recall of already researched competitors"}
+{"prompt": "عايز اعمل حملة اعلانية", "expected_agent": "omar", "note": "historical failure case: strategy/campaign creation request"}
+{"prompt": "اكتبلي اسكريبت إعلان 15 ثانية", "expected_agent": "layla", "note": "historical failure case: commercial video script"}
+{"prompt": "ظبط توزيع الميزانية على الحملات الشغالة", "expected_agent": "salma", "note": "historical failure case: live campaign budget reallocation"}
+{"prompt": "ايه الي تعرفه عني", "expected_agent": "chat", "note": "historical failure case: stored profile inquiry"}

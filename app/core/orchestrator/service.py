@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
 from app.core.orchestrator.blocks import validate_blocks
-from app.db.models import AgentTask, Business, Conversation, Message, Profile
+from app.db.models import AgentTask, Business, Conversation, Message, Profile, BrandMemoryItem
 from app.schemas.assistant import (
     AssistantMessageRequest,
     AssistantMessageResponse,
@@ -45,6 +45,8 @@ def _now() -> datetime:
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:20]}"
 
+
+_IN_FLIGHT_NEW_CONVERSATIONS: dict[str, tuple[str, str, float]] = {}
 
 _RETRY_MESSAGE = re.compile(
     r"\s*(?:please\s+)?(?:try\s+again|try\s+once\s+more|retry(?:\s+that)?|"
@@ -68,6 +70,124 @@ def _resolve_retry_message(message: str, history: list[dict[str, Any]]) -> str:
     if not previous:
         return message
     return f"Please retry the previous request: {previous}"
+
+
+def _gate_campaign_action_cards(
+    blocks: list[dict[str, Any]],
+    *,
+    user_message: str,
+    conversation_context: dict[str, Any],
+    user_context: str | None,
+    business_budget: float | None = None,
+    history: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Server-side gate on CREATE_CAMPAIGN Action Cards.
+    
+    Strip any action_card of type CREATE_CAMPAIGN UNLESS ALL hold:
+    (a) routed intent for THIS turn was strategy/campaign creation,
+    (b) required prefill fields are actually known: budget, objective, audience (from conversation or brand facts),
+    (c) the user has explicitly confirmed campaign creation in this conversation.
+    
+    If (b) fails but (a) holds: replaces the card with a question_with_options block.
+    If (a) does not hold: strips the card completely.
+    Logs every stripped card (agent/reason) for auditing.
+    """
+    gated_blocks: list[dict[str, Any]] = []
+    
+    # 1. Check (a): campaign creation intent in this turn
+    campaign_keywords = [
+        "create campaign", "launch campaign", "start campaign", "make campaign",
+        "new campaign", "حملة اعلانية", "اعمل حملة", "انشئ حملة", "ابدأ حملة",
+        "اطلق حملة", "عمل حملة", "حمله اعلانيه", "نموذج للحمله"
+    ]
+    has_campaign_intent = any(kw in user_message.lower() for kw in campaign_keywords)
+
+    # 2. Check (c): explicit confirmation in this conversation
+    explicit_confirmation_keywords = [
+        "yes create", "confirm campaign", "launch the campaign", "go ahead and create",
+        "ابدأ الحملة", "انشئ الحملة", "اطلق الحملة", "أكد انشاء الحملة", "موافق اعمل الحملة",
+        "يلا نبدأ الحملة", "أكد", "confirm"
+    ]
+    is_explicit_confirmation_turn = any(kw in user_message.lower() for kw in explicit_confirmation_keywords)
+    user_confirmed = bool(conversation_context.get("campaign_creation_confirmed", False) or is_explicit_confirmation_turn)
+    if is_explicit_confirmation_turn:
+        conversation_context["campaign_creation_confirmed"] = True
+
+    # 3. Check (b): are budget, objective, audience known from conversation or brand facts?
+    all_text = " ".join([
+        user_message,
+        user_context or "",
+        " ".join(str(h.get("content") or "") for h in history),
+    ]).lower()
+
+    has_budget = bool(
+        business_budget
+        or any(w in all_text for w in ["جنيه", "egp", "le", "$", "usd", "budget", "ميزانية", "ميزانيه", "الف"])
+    )
+    has_objective = any(w in all_text for w in [
+        "objective", "goal", "sales", "awareness", "leads", "conversions", "هدف", "مبيعات", "وعي", "رسائل", "زيارات"
+    ])
+    has_audience = any(w in all_text for w in [
+        "audience", "target", "men", "women", "مستهدف", "جمهور", "شباب", "فئة", "عرسان", "موظفين"
+    ])
+    all_fields_known = has_budget and has_objective and has_audience
+
+    for block in blocks:
+        b_type = block.get("type")
+        if b_type == "action_card":
+            action_type = str(block.get("action_type") or "").lower()
+            task = str(block.get("task") or "").lower()
+            label = str(block.get("label") or "").lower()
+            
+            is_create_campaign = (
+                action_type in ("create_campaign", "create-campaign")
+                or task in ("create_campaign", "campaign_strategy")
+                or "create campaign" in label
+                or "انشاء حملة" in label
+                or "إطلاق حملة" in label
+            )
+
+            if is_create_campaign:
+                if not has_campaign_intent:
+                    _logger.warning(
+                        "create_campaign_card_stripped",
+                        extra={"reason": "missing_campaign_intent", "user_message": user_message[:80]}
+                    )
+                    continue
+
+                if not user_confirmed:
+                    _logger.warning(
+                        "create_campaign_card_stripped",
+                        extra={"reason": "unconfirmed_by_user", "user_message": user_message[:80]}
+                    )
+                    continue
+
+                if not all_fields_known:
+                    missing = []
+                    if not has_budget:
+                        missing.append("budget")
+                    if not has_objective:
+                        missing.append("objective")
+                    if not has_audience:
+                        missing.append("audience")
+                    _logger.warning(
+                        "create_campaign_card_replaced_with_question",
+                        extra={"reason": f"missing_fields: {','.join(missing)}"}
+                    )
+                    gated_blocks.append({
+                        "type": "question_with_options",
+                        "question": "To proceed with creating the campaign, please clarify the following missing details: " + ", ".join(missing),
+                        "options": [
+                            {"id": "opt_details", "label": "Provide missing campaign details", "payload": {"missing": missing}}
+                        ],
+                        "missing_info": missing,
+                        "allow_free_text": True,
+                    })
+                    continue
+
+        gated_blocks.append(block)
+
+    return gated_blocks
 
 
 # ------------------------------------------------------------- conversations --
@@ -199,9 +319,25 @@ async def handle_message(
     ``business`` is the already-resolved workspace row from
     ``WorkspaceDep``; this layer never picks a tenant for itself.
     """
-    conversation = await get_or_create_conversation(
-        db, request.conversation_id, business.id
-    )
+    # Server-side debounce to prevent duplicate conversation creation from rapid client double-submits
+    if not request.conversation_id:
+        b_key = business.id
+        now_ts = _now().timestamp()
+        cached = _IN_FLIGHT_NEW_CONVERSATIONS.get(b_key)
+        if cached and cached[0] == request.message and (now_ts - cached[2] < 2.5):
+            _logger.info(
+                "duplicate_new_conversation_deduplicated",
+                extra={"business_id": business.id, "reused_conversation_id": cached[1]},
+            )
+            conversation = await get_or_create_conversation(db, cached[1], business.id)
+        else:
+            conversation = await get_or_create_conversation(db, None, business.id)
+            _IN_FLIGHT_NEW_CONVERSATIONS[b_key] = (request.message, conversation.id, now_ts)
+    else:
+        conversation = await get_or_create_conversation(
+            db, request.conversation_id, business.id
+        )
+
     if event_queue is not None:
         await event_queue.put(
             {"type": "conversation_started", "conversationId": conversation.id}
@@ -250,11 +386,22 @@ async def handle_message(
     if not conversation.title:
         conversation.title = request.message[:80]
 
-    # Load Long-Term Memory (Profile.user_context_summary)
+    # Load Long-Term Memory (Profile.user_context_summary - FACTS ONLY)
     profile_row = await db.scalar(
         select(Profile).where(Profile.business_id == business.id).limit(1)
     )
     user_context = profile_row.user_context_summary if profile_row else None
+
+    # Load Active Plans separately from BrandMemoryItem (PLANS ONLY)
+    plan_item = await db.scalar(
+        select(BrandMemoryItem.text)
+        .where(
+            BrandMemoryItem.business_id == business.id,
+            BrandMemoryItem.kind == "strategy_blueprint",
+        )
+        .limit(1)
+    )
+    active_plans = plan_item if plan_item else None
 
     # LANGGRAPH UI BLOCKS OVERRIDE
     from app.ai.agents.orchestrator.brain import orchestrate
@@ -263,12 +410,23 @@ async def handle_message(
         history, 
         event_queue, 
         user_context=user_context,
-        conversation_summary=conv_summary
+        conversation_summary=conv_summary,
+        active_plans=active_plans,
     )
     blocks_raw = final_gui.model_dump(mode="json", by_alias=True)["blocks"] if final_gui else []
     final = {"blocks": blocks_raw}
     # END OVERRIDE
-    blocks = validate_blocks(list(final.get("blocks") or []))
+    raw_blocks = validate_blocks(list(final.get("blocks") or []))
+    
+    # Server-side gate on CREATE_CAMPAIGN action cards (Task 3)
+    blocks = _gate_campaign_action_cards(
+        raw_blocks,
+        user_message=request.message,
+        conversation_context=context,
+        user_context=user_context,
+        business_budget=business.monthly_budget,
+        history=history,
+    )
     agent_result = final.get("agent_result") or {}
 
     content_parts = []

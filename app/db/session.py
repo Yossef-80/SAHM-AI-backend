@@ -7,11 +7,13 @@ Postgres; ``create_all`` is used for dev/test on SQLite.
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import urlsplit
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -20,7 +22,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.config import get_settings
-from app.core.logging import get_logger
+from app.core.logging import get_logger, redact
 
 _logger = get_logger(__name__)
 
@@ -91,8 +93,61 @@ def _engine_kwargs(url: str, echo: bool) -> dict[str, Any]:
     return kwargs
 
 
+def _setup_db_tracing(engine: AsyncEngine) -> None:
+    """Attach SQLAlchemy event listeners to trace all database queries and execution times."""
+    sync_engine = engine.sync_engine
+    if getattr(sync_engine, "_tracing_attached", False):
+        return
+    sync_engine._tracing_attached = True
+
+    db_logger = get_logger("app.db.trace")
+
+    @event.listens_for(sync_engine, "before_cursor_execute")
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        conn.info.setdefault("query_start_time", []).append(time.monotonic())
+        stmt_clean = statement.strip()
+        op = stmt_clean.split()[0].upper() if stmt_clean else "SQL"
+        db_logger.info(
+            f"[DATABASE - {op}] Executing query",
+            extra={
+                "operation": op,
+                "statement": stmt_clean,
+                "parameters": redact(dict(parameters) if isinstance(parameters, dict) else parameters),
+                "executemany": executemany,
+            },
+        )
+
+    @event.listens_for(sync_engine, "after_cursor_execute")
+    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        start_times = conn.info.get("query_start_time", [])
+        duration_ms = int((time.monotonic() - start_times.pop()) * 1000) if start_times else 0
+        stmt_clean = statement.strip()
+        op = stmt_clean.split()[0].upper() if stmt_clean else "SQL"
+        rowcount = getattr(cursor, "rowcount", -1)
+        db_logger.info(
+            f"[DATABASE - {op} RESULT] Completed in {duration_ms}ms (rows: {rowcount})",
+            extra={
+                "operation": op,
+                "duration_ms": duration_ms,
+                "rowcount": rowcount,
+            },
+        )
+
+    @event.listens_for(sync_engine, "handle_error")
+    def handle_error(context):
+        db_logger.error(
+            f"[DATABASE - ERROR] SQL execution failed: {context.original_exception}",
+            extra={
+                "statement": getattr(context, "statement", None),
+                "error": str(context.original_exception),
+            },
+        )
+
+
 def _make_engine(url: str, echo: bool) -> AsyncEngine:
-    return create_async_engine(url, **_engine_kwargs(url, echo))
+    engine = create_async_engine(url, **_engine_kwargs(url, echo))
+    _setup_db_tracing(engine)
+    return engine
 
 
 def get_engine() -> AsyncEngine:

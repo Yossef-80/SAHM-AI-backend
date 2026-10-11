@@ -1,0 +1,17 @@
+{
+  "texts_analysed": 0,
+  "with_product_mention": 0,
+  "with_aspect_mention": 0,
+  "discovered_products": [],
+  "happiest_product": null,
+  "unhappiest_product": null,
+  "best_aspect": null,
+  "worst_aspect": null,
+  "products": [],
+  "aspects": [],
+  "top_complaints": {},
+  "top_praises": {},
+  "complaint_examples": {},
+  "frequent_negative_words": [],
+  "note": "Products are discovered automatically (web search + terms in reviews/posts), not from a fixed category dictionary. Aspects use a general keyword list."
+}

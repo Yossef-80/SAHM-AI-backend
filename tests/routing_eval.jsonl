@@ -1,0 +1,48 @@
+{"prompt": "make a search about haj arafa and what is him strengths and weaknesses", "expected_agent": "nour", "note": "historical failure case: explicit request to search external competitor"}
+{"prompt": "ازاي عايز تبدا خطه تسوق انا لسا عايزك تدور علي ناس منافسه", "expected_agent": "nour", "note": "historical failure case: explicit instruction to search competitors now"}
+{"prompt": "دورلي في السوق المصري على اسعار البدل الكلاسيك الحالية", "expected_agent": "nour", "note": "explicit search for live current market prices"}
+{"prompt": "ابحث عن منافسين جدد لمنتجات القهوة في القاهرة", "expected_agent": "nour", "note": "explicit live search request"}
+{"prompt": "search the web for top trending competitor offers in Egypt this month", "expected_agent": "nour", "note": "explicit web search request"}
+{"prompt": "look up current prices and promotions for Concrete suits", "expected_agent": "nour", "note": "explicit live lookup request"}
+{"prompt": "حلل آراء العملاء على جوجل مابس للمطاعم المنافسة الآن", "expected_agent": "nour", "note": "live external review lookup"}
+{"prompt": "find out what competitors are offering in Black Friday deals online", "expected_agent": "nour", "note": "live search query for competitor offers"}
+{"prompt": "Who are our competitors and what are their offers?", "expected_agent": "karim", "note": "historical failure case: memory recall of already researched competitors"}
+{"prompt": "مين المنافسين بتوعنا اللي كنا طلعناهم في البحث اللي فات؟", "expected_agent": "karim", "note": "memory recall of previously executed research"}
+{"prompt": "what were the key findings from our previous competitor analysis?", "expected_agent": "karim", "note": "recall of past research findings"}
+{"prompt": "إيه نقاط الضعف اللي سجلناها عن المنافس الرئيسي في البحث المخزن؟", "expected_agent": "karim", "note": "stored audit and recall"}
+{"prompt": "show me the audit report of last week's ad metrics", "expected_agent": "karim", "note": "historical metric audit"}
+{"prompt": "كم كان الـ ROAS للحملات اللي سجلناها في التقرير القديم؟", "expected_agent": "karim", "note": "past performance metrics recall"}
+{"prompt": "review our past performance data and historical metrics", "expected_agent": "karim", "note": "historical performance intelligence"}
+{"prompt": "طلعلي معلومات المنافسين اللي حفظناها قبل كده في الذاكرة", "expected_agent": "karim", "note": "stored memory recall"}
+{"prompt": "عايز اعمل حملة اعلانية", "expected_agent": "omar", "note": "historical failure case: strategy/campaign creation request"}
+{"prompt": "عايز خطة تسويقية متكاملة للربع القادم", "expected_agent": "omar", "note": "marketing strategy and roadmap"}
+{"prompt": "develop a go-to-market positioning strategy against mid-tier brands", "expected_agent": "omar", "note": "positioning strategy"}
+{"prompt": "كيف نحدد تموضع البراند في السوق المصري لزيادة الحصة السوقية؟", "expected_agent": "omar", "note": "brand positioning strategy"}
+{"prompt": "I want to create an ad campaign for our suits brand", "expected_agent": "omar", "note": "campaign creation owned by omar"}
+{"prompt": "حطلي خطة استراتيجية وتوزيع قنوات التسويق لموسم الأعياد", "expected_agent": "omar", "note": "strategic planning and channels"}
+{"prompt": "what is our strategic positioning roadmap for next year?", "expected_agent": "omar", "note": "strategic roadmap"}
+{"prompt": "اعملي استراتيجية كاملة لاقتحام سوق ملابس الشباب", "expected_agent": "omar", "note": "comprehensive market entry strategy"}
+{"prompt": "اكتبلي اسكريبت إعلان 15 ثانية", "expected_agent": "layla", "note": "historical failure case: commercial video script"}
+{"prompt": "write 3 high-converting Facebook ad headlines for our suits", "expected_agent": "layla", "note": "ad copy creation"}
+{"prompt": "عايز كابشن إنستجرام جذاب لعرض الخصم الأسبوعي", "expected_agent": "layla", "note": "social copy creation"}
+{"prompt": "draft a visual brief and storyboard for a TikTok reel", "expected_agent": "layla", "note": "creative visual brief"}
+{"prompt": "اكتبيلي نص إعلاني ممول موجه للشباب المقبلين على الزواج", "expected_agent": "layla", "note": "ad copy writing"}
+{"prompt": "generate creative visual ideas and ad copy for Instagram stories", "expected_agent": "layla", "note": "creative visual ideas and copy"}
+{"prompt": "اسكريبت فيديو 30 ثانية للمنتج الجديد", "expected_agent": "layla", "note": "video script generation"}
+{"prompt": "write primary text and descriptions for Meta conversion ads", "expected_agent": "layla", "note": "ad copy and descriptions"}
+{"prompt": "ظبط توزيع الميزانية على الحملات الشغالة", "expected_agent": "salma", "note": "historical failure case: live campaign budget reallocation"}
+{"prompt": "optimize our running Meta campaign to reduce cost per lead", "expected_agent": "salma", "note": "live campaign optimization"}
+{"prompt": "الحملة الإعلانية الشغالة الـ ROAS بتاعها نزل، تصرفي واعملي تعديل", "expected_agent": "salma", "note": "live running campaign troubleshooting"}
+{"prompt": "reallocate budget across our active ad sets on Facebook", "expected_agent": "salma", "note": "active ad spend rebalancing"}
+{"prompt": "أوقف الإعلانات اللي أدائها ضعيف في الحملة المباشرة", "expected_agent": "salma", "note": "live campaign adjustments"}
+{"prompt": "adjust bidding strategy and live ad spend on our current campaign", "expected_agent": "salma", "note": "live campaign ops"}
+{"prompt": "شوفي الحملات الحية الشغالة وظبطي الميزانيات اليومية", "expected_agent": "salma", "note": "live budget tuning"}
+{"prompt": "optimize active Google search campaign CPC and bids", "expected_agent": "salma", "note": "active campaign bid optimization"}
+{"prompt": "ايه الي تعرفه عني", "expected_agent": "chat", "note": "historical failure case: stored profile inquiry"}
+{"prompt": "what is my brand scope", "expected_agent": "chat", "note": "historical failure case: brand scope inquiry"}
+{"prompt": "صباح الخير، إزيك يا سهم؟", "expected_agent": "chat", "note": "conversational greeting"}
+{"prompt": "thank you so much for the clarification", "expected_agent": "chat", "note": "conversational pleasantry"}
+{"prompt": "وضحلي قصدك بإيه في النقطة التانية دي", "expected_agent": "chat", "note": "conversational follow-up clarification"}
+{"prompt": "what is our registered brand voice in your profile memory?", "expected_agent": "chat", "note": "stored brand fact question"}
+{"prompt": "مين انت وايه وظيفتك بالتحديد؟", "expected_agent": "chat", "note": "assistant identity query"}
+{"prompt": "تمام فهمت، خليك معايا هسألك كمان شوية", "expected_agent": "chat", "note": "conversational hold"}

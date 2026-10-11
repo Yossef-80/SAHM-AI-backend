@@ -1,17 +1,282 @@
 from __future__ import annotations
 
 import asyncio
+import re
+import uuid
+from datetime import datetime, timezone
 from typing import Any, List, Optional
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Profile, Conversation, Message
+from app.db.models import Profile, Conversation, Message, BrandMemoryItem
 from app.db.session import session_scope
 from app.ai.providers.llm import get_llm
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def count_tokens(text: str) -> int:
+    """Measure real tokens using tiktoken (cl100k_base).
+    
+    If tiktoken is unavailable, uses a language-aware approximation:
+    - Arabic characters (\u0600-\u06FF): ~1.8 characters per token.
+    - Other/Latin characters: ~3.5 characters per token.
+    Never uses a flat chars/3.5 across Arabic text.
+    """
+    if not text:
+        return 0
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(text))
+    except Exception:
+        pass
+    
+    # Language-aware fallback
+    arabic_chars = sum(1 for c in text if "\u0600" <= c <= "\u06ff")
+    other_chars = len(text) - arabic_chars
+    est_tokens = int((arabic_chars / 1.8) + (other_chars / 3.5))
+    return max(1, est_tokens)
+
+
+def _truncate_to_boundary(text: str, max_tokens: int) -> str:
+    """Truncate text at a bullet or sentence boundary without breaking mid-sentence."""
+    if not text:
+        return ""
+    lines = text.split("\n")
+    kept_lines: list[str] = []
+    
+    for line in lines:
+        candidate = "\n".join(kept_lines + [line]) if kept_lines else line
+        if count_tokens(candidate) > max_tokens:
+            if not kept_lines:
+                # If even the first line is over, split by sentences (. , ؟ , !)
+                sentences = re.split(r"(?<=[.!?؟])\s+", line)
+                kept_sents: list[str] = []
+                for s in sentences:
+                    cand_s = " ".join(kept_sents + [s]) if kept_sents else s
+                    if count_tokens(cand_s) <= max_tokens:
+                        kept_sents.append(s)
+                    else:
+                        break
+                if kept_sents:
+                    return " ".join(kept_sents)
+                # Word-level fallback if a single sentence exceeds cap
+                words = line.split()
+                kept_words: list[str] = []
+                for w in words:
+                    cand_w = " ".join(kept_words + [w]) if kept_words else w
+                    if count_tokens(cand_w) <= max_tokens:
+                        kept_words.append(w)
+                    else:
+                        break
+                return " ".join(kept_words)
+            break
+        kept_lines.append(line)
+        
+    return "\n".join(kept_lines)
+
+
+async def enforce_token_cap(
+    text: str,
+    max_tokens: int,
+    *,
+    context_label: str = "text",
+    retry_prompt_func: Any | None = None,
+) -> str:
+    """Enforce hard token cap on summarized or distilled text.
+    
+    1. Measures token count with real tokenizer.
+    2. If over cap, logs a WARNING.
+    3. Retries once with a stricter instruction containing the measured size (if retry_prompt_func supplied).
+    4. If still over cap, hard-truncates at sentence/bullet boundary.
+    """
+    if not text:
+        return ""
+    measured = count_tokens(text)
+    if measured <= max_tokens:
+        return text
+
+    logger.warning(
+        "token_cap_overflow_detected",
+        extra={
+            "context": context_label,
+            "measured_tokens": measured,
+            "max_tokens": max_tokens,
+            "overage": measured - max_tokens,
+        },
+    )
+
+    # 1. Retry once if retry callback is provided
+    if retry_prompt_func is not None:
+        try:
+            retried_text = await retry_prompt_func(measured, max_tokens, text)
+            if retried_text:
+                retried_tokens = count_tokens(retried_text)
+                if retried_tokens <= max_tokens:
+                    return retried_text
+                measured = retried_tokens
+                text = retried_text
+        except Exception as exc:
+            logger.warning(
+                "token_cap_retry_failed",
+                extra={"context": context_label, "error": str(exc)},
+            )
+
+    # 2. Hard truncate at bullet or sentence boundary
+    truncated = _truncate_to_boundary(text, max_tokens)
+    final_tokens = count_tokens(truncated)
+    logger.warning(
+        "token_cap_hard_truncated",
+        extra={
+            "context": context_label,
+            "initial_measured": measured,
+            "final_tokens": final_tokens,
+            "max_tokens": max_tokens,
+        },
+    )
+    return truncated
+
+
+def resplit_summary_text(summary_text: str) -> tuple[str, str]:
+    """Split an existing combined summary into BRAND FACTS vs ACTIVE PLANS without LLM.
+    
+    Parses bullet points and headers to partition descriptive facts away from
+    marketing goals, campaign pitches, and budgets.
+    """
+    if not summary_text:
+        return "", ""
+
+    plan_keywords = [
+        "goal", "goals", "budget", "budgets", "active marketing", "marketing goal",
+        "ad angle", "ad angles", "campaign", "campaigns", "channel strateg",
+        "خطة", "أهداف", "حملة", "حملات", "ميزانية", "زوايا إعلانية", "استراتيجية الحملة"
+    ]
+
+    facts_lines: list[str] = []
+    plans_lines: list[str] = []
+
+    lines = summary_text.split("\n")
+    current_target = facts_lines
+
+    for line in lines:
+        lower = line.lower()
+        # Header or bullet classification
+        if any(kw in lower for kw in plan_keywords) and any(marker in line for marker in ["**", "##", "###", ":", "-"]):
+            current_target = plans_lines
+        elif any(kw in lower for kw in ["brand name", "industry", "sector", "audience", "competitor", "اسم البراند", "المجال", "الجمهور", "المنافسين"]):
+            current_target = facts_lines
+
+        current_target.append(line)
+
+    facts = "\n".join(facts_lines).strip()
+    plans = "\n".join(plans_lines).strip()
+    return facts, plans
+
+
+async def resplit_existing_profile(
+    business_id: str,
+    db: AsyncSession,
+    llm: Any | None = None,
+) -> tuple[str, str]:
+    """Migration helper: re-splits an existing over-long user_context_summary into FACTS and PLANS.
+    
+    Stores FACTS in Profile.user_context_summary (capped <= 300 tokens).
+    Stores PLANS in BrandMemoryItem of kind="strategy_blueprint".
+    """
+    from app.ai.settings import get_ai_settings
+    ai_settings = get_ai_settings()
+    max_profile_tokens = ai_settings.memory_global_profile_max_tokens
+
+    stmt = select(Profile).where(Profile.business_id == business_id).limit(1)
+    profile = await db.scalar(stmt)
+    if not profile or not profile.user_context_summary:
+        return "", ""
+
+    raw_summary = profile.user_context_summary.strip()
+    
+    # Check if LLM re-split is possible
+    if llm:
+        sys_msg = SystemMessage(content=(
+            "You are a database repair and memory separation assistant for SAHM Marketing OS.\n"
+            "Separate the provided long-term memory into TWO DISTINCT ARTIFACTS:\n\n"
+            "=== BRAND FACTS ===\n"
+            "- Extract ONLY permanent descriptive facts: Brand Name, Industry/Sector, Geography, Target Audience, Pricing Policy, Known Competitors.\n"
+            f"- STRICT CONSTRAINT: MAXIMUM {max_profile_tokens} TOKENS. Descriptive only.\n\n"
+            "=== ACTIVE PLANS ===\n"
+            "- Extract marketing goals, budgets, ad angles, channel strategies, and campaign learnings.\n"
+        ))
+        usr_msg = HumanMessage(content=f"Original Profile Memory:\n{raw_summary}\n\nSplit into === BRAND FACTS === and === ACTIVE PLANS ===")
+        try:
+            resp = await llm.ainvoke([sys_msg, usr_msg])
+            content = resp.content if isinstance(resp.content, str) else "\n".join(str(p) for p in resp.content)
+            facts_part = ""
+            plans_part = ""
+            if "=== BRAND FACTS ===" in content:
+                parts = content.split("=== ACTIVE PLANS ===")
+                facts_part = parts[0].replace("=== BRAND FACTS ===", "").strip()
+                if len(parts) > 1:
+                    plans_part = parts[1].strip()
+            else:
+                facts_part, plans_part = resplit_summary_text(raw_summary)
+        except Exception:
+            facts_part, plans_part = resplit_summary_text(raw_summary)
+    else:
+        facts_part, plans_part = resplit_summary_text(raw_summary)
+
+    # Enforce hard token cap on FACTS
+    facts_part = await enforce_token_cap(
+        facts_part, max_profile_tokens, context_label=f"resplit_profile_facts_{business_id}"
+    )
+
+    profile.user_context_summary = facts_part
+
+    # Persist plans in BrandMemoryItem(kind="strategy_blueprint")
+    if plans_part:
+        item_stmt = (
+            select(BrandMemoryItem)
+            .where(
+                BrandMemoryItem.business_id == business_id,
+                BrandMemoryItem.kind == "strategy_blueprint",
+            )
+            .limit(1)
+        )
+        plan_item = await db.scalar(item_stmt)
+        now = datetime.now(timezone.utc)
+        if plan_item:
+            plan_item.text = plans_part
+            plan_item.metadata_ = {
+                **(plan_item.metadata_ or {}),
+                "active_plans": plans_part,
+                "updated_at": now.isoformat(),
+            }
+        else:
+            new_item = BrandMemoryItem(
+                id=f"mem_plan_{uuid.uuid4().hex[:12]}",
+                business_id=business_id,
+                kind="strategy_blueprint",
+                text=plans_part,
+                metadata_={
+                    "active_plans": plans_part,
+                    "source": "ltm_resplit_migration",
+                    "created_at": now.isoformat(),
+                },
+                created_at=now,
+            )
+            db.add(new_item)
+
+    await db.commit()
+    logger.info(
+        "profile_resplit_completed",
+        extra={
+            "business_id": business_id,
+            "facts_tokens": count_tokens(facts_part),
+            "plans_tokens": count_tokens(plans_part),
+        },
+    )
+    return facts_part, plans_part
 
 
 def compress_history_messages(history: list[dict[str, Any]], max_chars: int = 900) -> list[dict[str, Any]]:
@@ -49,18 +314,38 @@ class IntelligentMemoryCompressor:
     def __init__(self):
         # Default fast LLM for background compression
         self.fast_llm = get_llm().chat
+        # Watermark cache to prevent redundant consolidation calls: {business_id: max_message_created_at}
+        self._watermarks: dict[str, datetime] = {}
 
-    async def update_global_profile(self, business_id: str) -> str | None:
+    async def update_global_profile(self, business_id: str, force: bool = False) -> str | None:
         """
-        Updates the global 500-token long-term memory for the user profile.
-        Triggered after 3 minutes of inactivity.
+        Updates long-term memory for the user profile, separating BRAND FACTS from ACTIVE PLANS.
+        Enforces a hard token cap on FACTS (<= 300 tokens).
+        Stores PLANS separately in BrandMemoryItem(kind="strategy_blueprint").
+        Skips consolidation if no new messages arrived since last consolidation (dirty check).
         """
         async with session_scope() as db:
-            # 1. Fetch Profile for this business
+            # 1. Dirty check: has any new message arrived since the last consolidation?
+            watermark_stmt = (
+                select(func.max(Message.created_at))
+                .join(Conversation, Message.conversation_id == Conversation.id)
+                .where(Conversation.business_id == business_id)
+            )
+            latest_msg_time = await db.scalar(watermark_stmt)
+            if not force and latest_msg_time is not None:
+                last_time = self._watermarks.get(business_id)
+                if last_time is not None and latest_msg_time <= last_time:
+                    logger.info(
+                        "ltm_consolidation_skipped_no_new_messages",
+                        extra={"business_id": business_id, "watermark": str(latest_msg_time)},
+                    )
+                    stmt = select(Profile.user_context_summary).where(Profile.business_id == business_id).limit(1)
+                    return await db.scalar(stmt)
+
+            # 2. Fetch Profile for this business
             stmt = select(Profile).where(Profile.business_id == business_id).limit(1)
             profile = await db.scalar(stmt)
             if not profile:
-                import uuid
                 profile = Profile(
                     id=uuid.uuid4(),
                     supabase_user_id=uuid.uuid4(),
@@ -71,9 +356,14 @@ class IntelligentMemoryCompressor:
                 db.add(profile)
                 await db.flush()
 
-            old_summary = profile.user_context_summary or "No previous summary recorded."
+            old_summary = profile.user_context_summary or ""
 
-            # 2. Fetch recent messages for this business across conversations
+            # Check if existing summary needs migration/resplit (has plans in old summary)
+            if old_summary and any(kw in old_summary.lower() for kw in ["active marketing", "goals", "budget", "winning ad angles"]):
+                logger.info("ltm_auto_resplit_triggering", extra={"business_id": business_id})
+                old_summary, _ = await resplit_existing_profile(business_id, db, llm=self.fast_llm)
+
+            # 3. Fetch recent messages for this business across conversations
             conv_stmt = (
                 select(Conversation.id)
                 .where(Conversation.business_id == business_id)
@@ -82,7 +372,7 @@ class IntelligentMemoryCompressor:
             )
             conv_ids = (await db.execute(conv_stmt)).scalars().all()
             if not conv_ids:
-                return None
+                return profile.user_context_summary
 
             msg_stmt = (
                 select(Message)
@@ -92,7 +382,7 @@ class IntelligentMemoryCompressor:
             )
             recent_rows = (await db.execute(msg_stmt)).scalars().all()
             if not recent_rows:
-                return None
+                return profile.user_context_summary
 
             recent_chat_lines = [
                 f"{r.role.upper()}: {r.content[:400]}"
@@ -101,47 +391,126 @@ class IntelligentMemoryCompressor:
             ]
             recent_text = "\n".join(recent_chat_lines)
 
-            # 3. Prompt fast model for configurable token distillation
+            # 4. Prompt fast model for dual-layer distillation (FACTS vs PLANS)
             from app.ai.settings import get_ai_settings
             ai_settings = get_ai_settings()
             max_profile_tokens = ai_settings.memory_global_profile_max_tokens
-            max_words = int(max_profile_tokens * 0.75)
 
             sys_msg = SystemMessage(content=(
                 "You are an expert AI memory distillation assistant for the SAHM Marketing OS.\n"
-                "Your job is to update the user's permanent profile background.\n"
-                "CRITICAL INSTRUCTIONS:\n"
-                "- Extract ONLY permanent facts: Brand Name, Industry/Niche, Target Audience, Brand Voice/Tone, "
-                "Known Competitors, Active Marketing Goals, and Budget Preferences.\n"
-                "- DISCARD casual pleasantries, transient questions, and repetitive chit-chat.\n"
-                "- MERGE the new conversation facts into the existing summary seamlessly.\n"
-                f"- STRICT CONSTRAINT: MAXIMUM {max_profile_tokens} TOKENS (under {max_words} words). Format as high-density bullet points."
+                "Your job is to update the user's permanent memory by producing TWO SEPARATE ARTIFACTS:\n\n"
+                "ARTIFACT 1: === BRAND FACTS ===\n"
+                "- Extract ONLY permanent descriptive facts: Brand Name, Industry/Sector, Geography/Country, Target Audience, Pricing Policy, Known Competitors.\n"
+                "- STRICTLY FORBIDDEN: Do NOT include active marketing goals, ad campaigns, ad angles, budgets, or channel roadmaps here.\n"
+                f"- STRICT CONSTRAINT: MAXIMUM {max_profile_tokens} TOKENS. Descriptive only.\n\n"
+                "ARTIFACT 2: === ACTIVE PLANS ===\n"
+                "- Extract active marketing goals, budget allocations, ad angles, channel strategies, and campaign learnings.\n"
+                "- Format as concise bullet points."
             ))
 
             usr_msg = HumanMessage(content=(
-                f"=== CURRENT USER PROFILE SUMMARY ===\n{old_summary}\n\n"
+                f"=== CURRENT BRAND FACTS ===\n{old_summary or 'No previous facts recorded.'}\n\n"
                 f"=== RECENT CONVERSATION LOGS ===\n{recent_text}\n\n"
-                "Provide the updated, unified Long-Term Memory summary:"
+                "Produce the updated artifacts using the headers '=== BRAND FACTS ===' and '=== ACTIVE PLANS ===':"
             ))
 
             try:
                 response = await self.fast_llm.ainvoke([sys_msg, usr_msg])
-                if isinstance(response.content, list):
-                    new_summary = "\n".join([
-                        str(p.get("text", p) if isinstance(p, dict) else p)
-                        for p in response.content
-                    ]).strip()
-                else:
-                    new_summary = str(response.content).strip()
+                raw_response = (
+                    "\n".join([str(p.get("text", p) if isinstance(p, dict) else p) for p in response.content]).strip()
+                    if isinstance(response.content, list)
+                    else str(response.content).strip()
+                )
 
-                # 4. Save to DB
-                profile.user_context_summary = new_summary
+                # Parse two artifacts
+                new_facts = ""
+                new_plans = ""
+                if "=== BRAND FACTS ===" in raw_response:
+                    parts = raw_response.split("=== ACTIVE PLANS ===")
+                    new_facts = parts[0].replace("=== BRAND FACTS ===", "").strip()
+                    if len(parts) > 1:
+                        new_plans = parts[1].strip()
+                else:
+                    new_facts, new_plans = resplit_summary_text(raw_response)
+
+                # 5. Enforce hard token cap on FACTS (Task 5)
+                async def _retry_facts(cur_tok: int, cap: int, text: str) -> str:
+                    retry_sys = SystemMessage(content=(
+                        f"Your previous BRAND FACTS output was {cur_tok} tokens, which EXCEEDS the hard limit of {cap} tokens.\n"
+                        f"Compress it strictly under {cap} tokens while keeping Brand Name, Industry, Audience, and Competitors."
+                    ))
+                    r_res = await self.fast_llm.ainvoke([retry_sys, HumanMessage(content=text)])
+                    return str(r_res.content).strip()
+
+                new_facts = await enforce_token_cap(
+                    new_facts,
+                    max_profile_tokens,
+                    context_label=f"ltm_profile_{business_id}",
+                    retry_prompt_func=_retry_facts,
+                )
+
+                # 6. Check if facts changed (no-op check)
+                if old_summary and new_facts.strip() == old_summary.strip():
+                    logger.info("ltm_profile_unchanged_noop", extra={"business_id": business_id})
+                    if latest_msg_time is not None:
+                        self._watermarks[business_id] = latest_msg_time
+                    return profile.user_context_summary
+
+                # 7. Save BRAND FACTS to Profile.user_context_summary
+                profile.user_context_summary = new_facts
+
+                # 8. Save ACTIVE PLANS to BrandMemoryItem(kind="strategy_blueprint")
+                if new_plans:
+                    plan_stmt = (
+                        select(BrandMemoryItem)
+                        .where(
+                            BrandMemoryItem.business_id == business_id,
+                            BrandMemoryItem.kind == "strategy_blueprint",
+                        )
+                        .limit(1)
+                    )
+                    existing_plan = await db.scalar(plan_stmt)
+                    now = datetime.now(timezone.utc)
+                    if existing_plan:
+                        existing_plan.text = new_plans
+                        existing_plan.metadata_ = {
+                            **(existing_plan.metadata_ or {}),
+                            "active_plans": new_plans,
+                            "updated_at": now.isoformat(),
+                        }
+                    else:
+                        new_plan_item = BrandMemoryItem(
+                            id=f"mem_plan_{uuid.uuid4().hex[:12]}",
+                            business_id=business_id,
+                            kind="strategy_blueprint",
+                            text=new_plans,
+                            metadata_={
+                                "active_plans": new_plans,
+                                "source": "ltm_compressor",
+                                "created_at": now.isoformat(),
+                            },
+                            created_at=now,
+                        )
+                        db.add(new_plan_item)
+
                 await db.commit()
-                logger.info("ltm_profile_updated", extra={"business_id": business_id, "summary_len": len(new_summary)})
-                return new_summary
+
+                # Update watermark
+                if latest_msg_time is not None:
+                    self._watermarks[business_id] = latest_msg_time
+
+                logger.info(
+                    "ltm_profile_updated",
+                    extra={
+                        "business_id": business_id,
+                        "facts_tokens": count_tokens(new_facts),
+                        "plans_tokens": count_tokens(new_plans),
+                    },
+                )
+                return new_facts
             except Exception as e:
                 logger.error("ltm_update_failed", extra={"business_id": business_id, "error": str(e)})
-                return None
+                return profile.user_context_summary
 
 
 class MemoryDebouncer:
@@ -220,12 +589,11 @@ async def manage_session_memory_with_token_cap(
 
     valid_msgs = [m for m in messages if m.role in ("user", "assistant") and m.content]
     
-    # Calculate approximate tokens (~3.5 chars per token across English/Arabic)
-    total_chars = sum(len(m.content or "") for m in valid_msgs)
-    approx_tokens = int(total_chars / 3.5)
+    # Calculate measured tokens using real tokenizer
+    total_tokens = sum(count_tokens(m.content or "") for m in valid_msgs)
 
     # 1. Normal mode: below max_tokens
-    if approx_tokens < max_tokens:
+    if total_tokens < max_tokens:
         history = [
             {
                 "role": m.role,
@@ -240,7 +608,7 @@ async def manage_session_memory_with_token_cap(
     # 2. Threshold exceeded: summarize older turns and keep only the latest turns
     logger.info(
         "session_memory_token_cap_exceeded", 
-        extra={"conversation_id": conversation.id, "tokens": approx_tokens, "max_tokens": max_tokens}
+        extra={"conversation_id": conversation.id, "tokens": total_tokens, "max_tokens": max_tokens}
     )
 
     # Retain the configured number of recent messages for immediate conversational context
@@ -258,7 +626,7 @@ async def manage_session_memory_with_token_cap(
     sys_prompt = SystemMessage(content=(
         "You are an expert conversation memory assistant.\n"
         "Summarize the past conversation history between the user and the AI assistant into a compact, "
-        "high-density summary (under 250 words).\n"
+        "high-density summary.\n"
         "CRITICAL RULES:\n"
         "- Retain all essential user questions, stated goals, brand facts, numbers, competitor names, and key AI recommendations.\n"
         "- Drop chit-chat, greetings, and temporary clarification loops.\n"
@@ -280,10 +648,20 @@ async def manage_session_memory_with_token_cap(
         else:
             new_summary = str(response.content).strip()
 
+        # Enforce token cap on session summary
+        new_summary = await enforce_token_cap(
+            new_summary,
+            max_tokens // 2,
+            context_label=f"session_summary_{conversation.id}",
+        )
+
         # Update the database
         conversation.summary = new_summary
         await db.flush()
-        logger.info("conversation_summary_updated", extra={"conversation_id": conversation.id, "len": len(new_summary)})
+        logger.info(
+            "conversation_summary_updated",
+            extra={"conversation_id": conversation.id, "tokens": count_tokens(new_summary)},
+        )
     except Exception as e:
         logger.error("conversation_summary_failed", extra={"conversation_id": conversation.id, "error": str(e)})
         new_summary = conversation.summary
@@ -299,4 +677,3 @@ async def manage_session_memory_with_token_cap(
         for m in recent_msgs
     ]
     return compact_history, new_summary
-

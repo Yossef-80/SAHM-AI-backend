@@ -1,0 +1,19 @@
+{
+  "status": "error",
+  "source": "google_maps",
+  "url": "https://www.google.com/maps/place/Qedra+Smart+Village/@30.0830914,30.9012018,43935m/data=!3m1!1e3!4m6!3m5!1s0x14585bbb0fc5c845:0x78a4ee0f662f2f0a!8m2!3d30.0795663!4d31.0136127!16s%2Fg%2F11rzsxdglx?entry=ttu&g_ep=EgoyMDI2MTAwNy4wIKXMDSoASAFQAw%3D%3D",
+  "place_name": "Qedra Smart Village",
+  "reviews_fetched": 0,
+  "reviews": [],
+  "error": {
+    "code": "NO_REVIEWS_FOUND",
+    "message": "Reviews did not load directly from target URL."
+  },
+  "fetched_at": "2026-10-11T13:19:26.697929+00:00",
+  "debug": {
+    "final_url": "https://www.google.com/maps/place/Qedra+Smart+Village/@30.0830914,30.9012018,59460m/data=!3m1!1e3!4m6!3m5!1s0x14585bbb0fc5c845:0x78a4ee0f662f2f0a!8m2!3d30.0795663!4d31.0136127!16s%2Fg%2F11rzsxdglx?hl=en&entry=ttu&g_ep=EgoyMDI2MTAwNy4wIKXMDSoASAFQAw%3D%3D",
+    "title": "Qedra Smart Village - Google Maps",
+    "screenshot": "debug.png",
+    "body_preview": "    Saved  Recents  Get app  See photos Qedra Smart Village مطعم قدرة 4.7 Fast food restaurant  Directions  Save  Nearby  Send to phone  Share  Kerdasa, Giza Governorate 3630110   Closed · Opens 7 AM Mon   facebook.com    012 22356777    32H7+RC Kerdasa    Suggest an"
+  }
+}

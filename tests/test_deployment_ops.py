@@ -285,6 +285,11 @@ EXPECTED_SECRET_COLUMNS: set[tuple[str, str]] = {
     ("tool_settings", "dataforseo_password_enc"),
     ("tool_settings", "image_api_key_enc"),
     ("tool_settings", "search_api_key_enc"),
+    # llm_provider_settings: encrypted provider secrets
+    ("llm_provider_settings", "fast_api_key_enc"),
+    ("llm_provider_settings", "fast_extra_headers_enc"),
+    ("llm_provider_settings", "strong_api_key_enc"),
+    ("llm_provider_settings", "strong_extra_headers_enc"),
 }
 
 #: Naming rule that decides whether a column is secret-bearing.
