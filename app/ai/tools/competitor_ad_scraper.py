@@ -91,13 +91,15 @@ async def _scrape(page_url: str) -> list[dict]:
     token = get_ai_settings().apify_api_token
     if not token:
         raise RuntimeError("APIFY_API_TOKEN is not configured.")
+    
     client = ApifyClientAsync(token)
     run = await client.actor(ACTOR_ID).call(
         run_input={"startUrls": [{"url": page_url}], "resultsLimit": MAX_ADS},
-        timeout_secs=300,
     )
+    
     if not run:
         return []
+    
     dataset_id = run["defaultDatasetId"] if isinstance(run, dict) else run.default_dataset_id
     return [item async for item in client.dataset(dataset_id).iterate_items(limit=MAX_ADS)]
 
