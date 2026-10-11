@@ -87,9 +87,9 @@ def build_summary(name: str, n_ads: int, keywords: list[tuple[str, int]], images
 
 
 async def _scrape(page_url: str) -> list[dict]:
-    if not settings.APIFY_API_TOKEN:
+    if not settings.apify_api_token:
         raise RuntimeError("APIFY_API_TOKEN is not configured.")
-    client = ApifyClientAsync(settings.APIFY_API_TOKEN)
+    client = ApifyClientAsync(settings.apify_api_token)
     run = await client.actor(ACTOR_ID).call(
         run_input={"startUrls": [{"url": page_url}], "resultsLimit": MAX_ADS},
         timeout_secs=300,
