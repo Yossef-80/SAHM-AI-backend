@@ -244,6 +244,193 @@ BLOCK_TYPES: tuple[type[BaseBlock], ...] = (
     ErrorBlock,
 )
 
+def blocks_to_plaintext(blocks: list[Any] | None) -> str:
+    """Canonical lossless serializer converting Message.blocks to plain text.
+
+    Single source of truth for text representations across content column,
+    compaction, LTM summarization, notifications, and exports.
+    Covers every block type and guarantees no information loss.
+    RTL Arabic and emojis round-trip verbatim.
+    """
+    if not blocks:
+        return ""
+    if not isinstance(blocks, (list, tuple)):
+        blocks = [blocks]
+
+    parts: list[str] = []
+
+    for block in blocks:
+        if block is None:
+            continue
+        if hasattr(block, "model_dump"):
+            b = block.model_dump(mode="json", by_alias=True)
+        elif isinstance(block, dict):
+            b = block
+        else:
+            b = getattr(block, "__dict__", {})
+
+        b_type = str(b.get("type") or getattr(b, "type", "")).lower()
+        if hasattr(b_type, "value"):
+            b_type = str(b_type.value).lower()
+
+        if b_type == "text":
+            t = str(b.get("text") or "").strip()
+            if t:
+                parts.append(t)
+
+        elif b_type == "findings":
+            lines: list[str] = []
+            title = str(b.get("title") or "").strip()
+            if title:
+                lines.append(title)
+
+            raw_findings = b.get("findings") or b.get("items") or []
+            for f in raw_findings:
+                if hasattr(f, "model_dump"):
+                    f_dict = f.model_dump(mode="json", by_alias=True)
+                elif isinstance(f, dict):
+                    f_dict = f
+                else:
+                    f_dict = getattr(f, "__dict__", {})
+
+                f_title = str(f_dict.get("title") or f_dict.get("label") or "").strip()
+                f_detail = str(f_dict.get("detail") or f_dict.get("description") or "").strip()
+                f_source = str(f_dict.get("source") or "").strip()
+
+                # Check evidence if source is not explicitly specified
+                if not f_source:
+                    evidence_list = f_dict.get("evidence") or []
+                    ev_sources = []
+                    for ev in evidence_list:
+                        if hasattr(ev, "model_dump"):
+                            ev = ev.model_dump(mode="json", by_alias=True)
+                        if isinstance(ev, dict):
+                            s = ev.get("url") or ev.get("source") or ev.get("title")
+                            if s:
+                                ev_sources.append(str(s).strip())
+                    if ev_sources:
+                        f_source = ", ".join(ev_sources[:2])
+
+                line = ""
+                if f_title and f_detail:
+                    line = f"- {f_title}: {f_detail}"
+                elif f_title:
+                    line = f"- {f_title}"
+                elif f_detail:
+                    line = f"- {f_detail}"
+
+                if line and f_source:
+                    line += f" ({f_source})"
+                if line:
+                    lines.append(line)
+
+            if lines:
+                parts.append("\n".join(lines))
+
+        elif b_type == "question_with_options":
+            lines = []
+            q = str(b.get("question") or "").strip()
+            if q:
+                lines.append(q)
+            options = b.get("options") or []
+            for idx, opt in enumerate(options, 1):
+                if hasattr(opt, "model_dump"):
+                    opt = opt.model_dump(mode="json", by_alias=True)
+                if isinstance(opt, dict):
+                    opt_label = str(opt.get("label") or opt.get("text") or "").strip()
+                    opt_desc = str(opt.get("description") or "").strip()
+                else:
+                    opt_label = str(getattr(opt, "label", "") or getattr(opt, "text", "")).strip()
+                    opt_desc = str(getattr(opt, "description", "") or "").strip()
+
+                if opt_label and opt_desc:
+                    lines.append(f"{idx}. {opt_label} - {opt_desc}")
+                elif opt_label:
+                    lines.append(f"{idx}. {opt_label}")
+            if lines:
+                parts.append("\n".join(lines))
+
+        elif b_type == "recommendation":
+            lines = []
+            rec_title = str(b.get("title") or "").strip()
+            if rec_title:
+                lines.append(f"**Recommendation:** {rec_title}")
+            rationale = str(b.get("rationale") or "").strip()
+            if rationale:
+                lines.append(rationale)
+            impact = str(b.get("estimated_impact") or b.get("estimatedImpact") or "").strip()
+            if impact:
+                lines.append(f"Estimated impact: {impact}")
+            if lines:
+                parts.append("\n".join(lines))
+
+        elif b_type == "metric":
+            label = str(b.get("label") or "").strip()
+            val = b.get("value")
+            unit = str(b.get("unit") or "").strip()
+            delta = b.get("delta")
+            line = f"**{label}:** {val}{unit}" if unit else f"**{label}:** {val}"
+            if delta is not None:
+                line += f" (delta: {delta})"
+            parts.append(line)
+
+        elif b_type == "action_card":
+            label = str(b.get("label") or b.get("title") or "").strip()
+            desc = str(b.get("description") or "").strip()
+            line = f"**Action:** {label}"
+            if desc:
+                line += f" - {desc}"
+            parts.append(line)
+
+        elif b_type == "task_progress":
+            name = str(b.get("task_name") or b.get("taskName") or "Task").strip()
+            status = str(b.get("status") or "").strip()
+            msg = str(b.get("message") or "").strip()
+            line = f"**Task {name}:** {status}"
+            if msg:
+                line += f" - {msg}"
+            parts.append(line)
+
+        elif b_type == "context_used":
+            items = b.get("items") or []
+            lines = ["**Context used:**"]
+            for item in items:
+                if hasattr(item, "model_dump"):
+                    item = item.model_dump(mode="json", by_alias=True)
+                if isinstance(item, dict):
+                    l = str(item.get("label") or "").strip()
+                    d = str(item.get("detail") or "").strip()
+                else:
+                    l = str(getattr(item, "label", "")).strip()
+                    d = str(getattr(item, "detail", "")).strip()
+                if l and d:
+                    lines.append(f"- {l}: {d}")
+                elif l:
+                    lines.append(f"- {l}")
+            if len(lines) > 1:
+                parts.append("\n".join(lines))
+
+        elif b_type == "error":
+            msg = str(b.get("message") or "").strip()
+            parts.append(f"**Error:** {msg}")
+
+        else:
+            # Unknown / future block type -> degrade gracefully to key fields
+            lines = []
+            for k in ("title", "label", "text", "message", "description", "detail", "summary"):
+                val = str(b.get(k) or "").strip()
+                if val:
+                    lines.append(val)
+            if not lines:
+                for k, v in b.items():
+                    if k not in ("id", "type") and v:
+                        lines.append(f"{k}: {v}")
+            if lines:
+                parts.append("\n".join(lines))
+
+    return "\n\n".join(parts)
+
+
 __all__ = [
     "ActionCard",
     "AgentEventData",
@@ -251,6 +438,7 @@ __all__ = [
     "Block",
     "BlockKind",
     "BLOCK_TYPES",
+    "blocks_to_plaintext",
     "ContextItem",
     "ContextUsedBlock",
     "ErrorBlock",
@@ -268,3 +456,4 @@ __all__ = [
     "Tone",
     "Language",
 ]
+

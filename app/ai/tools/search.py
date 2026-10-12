@@ -9,6 +9,9 @@ from app.ai.enums import SearchProvider, LLMProvider
 from app.ai.settings import get_ai_settings
 
 
+from app.schemas.common import canonicalize_url
+
+
 @tool
 def web_search_tool(query: str, config: RunnableConfig) -> str:
     """
@@ -32,7 +35,10 @@ def web_search_tool(query: str, config: RunnableConfig) -> str:
         if not results:
             return "No results found for the query."
         
-        raw_text = "\n\n".join([f"Title: {res.title}\nContent: {res.snippet}" for res in results])
+        raw_text = "\n\n".join([
+            f"Title: {res.title}\nURL: {canonicalize_url(res.url)}\nContent: {res.snippet}"
+            for res in results
+        ])
         
         # Use the configured fast LLM to summarize the findings intelligently
         fast_llm = get_llm().chat
@@ -45,7 +51,12 @@ def web_search_tool(query: str, config: RunnableConfig) -> str:
         usr_msg = HumanMessage(content=f"Query: {query}\n\nSearch Results:\n{raw_text}")
         
         summary_response = fast_llm.invoke([sys_msg, usr_msg])
-        return f"Search Summary for '{query}':\n{summary_response.content}"
+        sources = [
+            f"- [{res.title}]({canonicalize_url(res.url)})" if res.url else f"- {res.title}"
+            for res in results
+        ]
+        sources_text = "\n".join(sources)
+        return f"Search Summary for '{query}':\n{summary_response.content}\n\nSources:\n{sources_text}"
         
     except Exception as e:
         return f"Error performing web search: {str(e)}"

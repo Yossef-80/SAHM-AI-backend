@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import BaseModel, Field
 
 class CompetitorSummary(BaseModel):
@@ -5,6 +6,8 @@ class CompetitorSummary(BaseModel):
     positioning: str = Field(description="How they position themselves in the market")
     strengths: list[str] = Field(description="Key strengths and advantages")
     weaknesses_or_gaps: list[str] = Field(description="Weaknesses or gaps in their offering")
+    source: str | None = Field(default=None, description="Primary website URL or source for this competitor")
+    evidence: list[dict[str, Any]] = Field(default_factory=list, description="Evidence items supporting this competitor")
 
 class MarketResearchReport(BaseModel):
     """Call this tool to submit your final, highly structured competitive market research report."""
@@ -17,3 +20,5 @@ class MarketResearchReport(BaseModel):
     social_insights: list[str] = Field(description="Social media presence and strategy insights")
     opportunities_for_target_brand: list[str] = Field(description="Strategic opportunities for our brand")
     risks: list[str] = Field(description="Potential risks and threats in the market")
+    sources: list[str] = Field(default_factory=list, description="Primary source or competitor URLs consulted during research")
+    evidence: list[dict[str, Any]] = Field(default_factory=list, description="Supporting evidence items {title, url, snippet}")

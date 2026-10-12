@@ -17,6 +17,8 @@ class MessageContext(ApiModel):
     creative_id: str | None = None
     insight_id: str | None = None
     business_id: str | None = None
+    competitor_id: str | None = None
+    competitor_name: str | None = None
 
 
 class AssistantMessageRequest(ApiModel):

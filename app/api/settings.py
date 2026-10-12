@@ -358,7 +358,7 @@ async def update_llm_settings(
             headers = sent["extra_headers"] or {}
             if len(headers) > 20 or any(len(k) > 100 or len(v) > 1000 for k, v in headers.items()):
                 raise ValidationFailed("custom header values exceed the supported size")
-            encrypted = cipher.encrypt(json.dumps(headers)) if headers else None
+            encrypted = cipher.encrypt(json.dumps(headers, ensure_ascii=False)) if headers else None
             setattr(row, f"{tier}_extra_headers_enc", encrypted)
     row.updated_by = principal.user_id if principal is not None else None
     await db.commit()

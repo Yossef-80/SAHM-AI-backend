@@ -53,7 +53,7 @@ from app.core.tools.base import Tool, ToolContext, log_tool_call
 from app.core.tools.registry import get_tools_for
 from app.core.usage import RunUsageTracker, check_budget, record_usage
 from app.schemas.agent import AgentEvent, AgentResult, ToolCallRecord
-from app.schemas.common import Autonomy, ToolStatus
+from app.schemas.common import Autonomy, ToolStatus, canonicalize_url
 from app.schemas.tools import BrandContext, MemoryScope
 
 _logger = get_logger(__name__)
@@ -314,7 +314,7 @@ def _competitor_research_evidence(
                     {
                         "source": source,
                         "detail": f"{title}: {snippet}"[:700],
-                        "url": result.get("url") or None,
+                        "url": canonicalize_url(result.get("url")) if result.get("url") else None,
                     }
                 )
         elif record.tool == "analyze_website":
@@ -336,7 +336,7 @@ def _competitor_research_evidence(
                     {
                         "source": source,
                         "detail": detail[:900],
-                        "url": payload.get("url") or None,
+                        "url": canonicalize_url(payload.get("url")) if payload.get("url") else None,
                     }
                 )
     return evidence
@@ -743,6 +743,11 @@ async def _execute(
                 )
                 if final.parsed is not None:
                     output_model_data = final.parsed.model_dump(mode="json")
+                    if task_name == "competitor_research" and _has_research_data(tool_calls, tool_outputs):
+                        if not output_model_data.get("evidence"):
+                            collected = _competitor_research_evidence(tool_calls, tool_outputs)
+                            if collected:
+                                output_model_data["evidence"] = collected
                 else:
                     incomplete = True
                     incomplete_reason = "model produced no parseable structured output"

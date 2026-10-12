@@ -30,7 +30,10 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+#: Native JSONB on PostgreSQL / Supabase, falling back to JSON on SQLite.
+JSON_TYPE = JSON().with_variant(JSONB, "postgresql")
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
@@ -200,9 +203,9 @@ class BrandProfile(Base, TimestampMixin):
     brand_voice: Mapped[str | None] = mapped_column(Text)
     visual_style: Mapped[str | None] = mapped_column(Text)
     target_audience: Mapped[str | None] = mapped_column(Text)
-    key_offers: Mapped[list[str]] = mapped_column(JSON, default=list)
-    goals: Mapped[list[str]] = mapped_column(JSON, default=list)
-    competitors: Mapped[list[str]] = mapped_column(JSON, default=list)
+    key_offers: Mapped[list[str]] = mapped_column(JSON_TYPE, default=list)
+    goals: Mapped[list[str]] = mapped_column(JSON_TYPE, default=list)
+    competitors: Mapped[list[str]] = mapped_column(JSON_TYPE, default=list)
 
     business: Mapped[Business] = relationship(back_populates="profile")
 
@@ -242,7 +245,7 @@ class Conversation(Base, TimestampMixin):
     )
     title: Mapped[str] = mapped_column(String(300), default="")
     # Sticky context: campaign_id / creative_id / insight_id.
-    context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    context: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict)
     summary: Mapped[str | None] = mapped_column(Text)
 
     messages: Mapped[list["Message"]] = relationship(
@@ -262,7 +265,7 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, default="")
-    blocks: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    blocks: Mapped[list[dict[str, Any]]] = mapped_column(JSON_TYPE, default=list)
     task_id: Mapped[str | None] = mapped_column(String(64), index=True)
     persona_id: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
@@ -339,7 +342,7 @@ class Insight(Base):
     title: Mapped[str] = mapped_column(String(400))
     detail: Mapped[str] = mapped_column(Text, default="")
     severity: Mapped[str] = mapped_column(String(20), default="info", index=True)
-    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict)
     payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     persona_id: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
@@ -374,8 +377,8 @@ class Recommendation(Base, TimestampMixin):
     action_type: Mapped[str] = mapped_column(String(60), index=True)
     title: Mapped[str] = mapped_column(String(400))
     rationale: Mapped[str] = mapped_column(Text, default="")
-    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict)
+    evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSON_TYPE, default=list)
     status: Mapped[str] = mapped_column(
         String(20), default=RecommendationStatus.PENDING.value, index=True
     )
@@ -439,17 +442,17 @@ class AgentTask(Base, TimestampMixin):
     task_name: Mapped[str] = mapped_column(String(60), index=True)
     persona_id: Mapped[str] = mapped_column(String(64), index=True)
     status: Mapped[str] = mapped_column(String(32), default=TaskStatus.QUEUED.value, index=True)
-    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSON_TYPE, default=list)
     progress: Mapped[float] = mapped_column(Float, default=0.0)
     incomplete: Mapped[bool] = mapped_column(Boolean, default=False)
     error: Mapped[str | None] = mapped_column(Text)
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
-    blocks: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    blocks: Mapped[list[dict[str, Any]]] = mapped_column(JSON_TYPE, default=list)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
     model: Mapped[str | None] = mapped_column(String(80))
     request_id: Mapped[str | None] = mapped_column(String(64), index=True)
-    inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    inputs: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -465,7 +468,7 @@ class AgentToolCall(Base):
     conversation_id: Mapped[str | None] = mapped_column(String(64), index=True)
     persona_id: Mapped[str | None] = mapped_column(String(64), index=True)
     tool: Mapped[str] = mapped_column(String(80), index=True)
-    input: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    input: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict)
     output_summary: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="ok")
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
@@ -488,7 +491,7 @@ class Integration(Base, TimestampMixin):
     refresh_token_enc: Mapped[str | None] = mapped_column(Text)
     account_id: Mapped[str | None] = mapped_column(String(120))
     account_name: Mapped[str | None] = mapped_column(String(200))
-    scopes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    scopes: Mapped[list[str]] = mapped_column(JSON_TYPE, default=list)
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(20), default="connected")

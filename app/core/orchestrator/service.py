@@ -375,6 +375,8 @@ async def handle_message(
     # Routing only that short phrase sent it to normal chat, where the model
     # could claim it was starting research without actually invoking a task.
     routed_message = _resolve_retry_message(request.message, history)
+    if context.get("competitor_name") and str(context["competitor_name"]).lower() not in routed_message.lower():
+        routed_message = f"[Target Competitor: {context['competitor_name']}] {routed_message}"
 
     await _persist_message(
         db,
@@ -429,18 +431,9 @@ async def handle_message(
     )
     agent_result = final.get("agent_result") or {}
 
-    content_parts = []
-    for block in blocks:
-        if block.get("type") == "text":
-            content_parts.append(str(block.get("text") or ""))
-        elif block.get("type") == "findings":
-            content_parts.append(str(block.get("title") or ""))
-            for finding in block.get("findings", []):
-                content_parts.append("- " + str(finding.get("title") or "") + ": " + str(finding.get("description") or ""))
-    content = "\n".join(content_parts)
-    if not content:
-        import json
-        content = json.dumps(blocks)
+    from app.schemas.blocks import blocks_to_plaintext
+
+    content = blocks_to_plaintext(blocks)
     if not content or content == "[]":
         content = str(final.get("error") or "")
 

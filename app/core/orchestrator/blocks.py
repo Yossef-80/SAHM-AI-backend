@@ -30,6 +30,7 @@ from app.schemas.blocks import (
     RecommendationBlock,
     TaskProgressBlock,
     TextBlock,
+    blocks_to_plaintext,
 )
 from app.schemas.common import (
     BlockKind,
@@ -330,7 +331,8 @@ def _research_blocks(task_name: str, output: dict[str, Any]) -> list[dict[str, A
                 Finding(
                     title=str(comp.get("name") or "Competitor"),
                     detail="\n".join(detail_parts),
-                    source=str(comp.get("source") or "competitor_research"),
+                    source=str(comp.get("source") or (evidence[0].url if evidence and evidence[0].url else (evidence[0].source if evidence else "competitor_research"))),
+                    confidence=float(comp.get("confidence") or 0.9),
                     evidence=evidence,
                 )
             )
@@ -342,7 +344,9 @@ def _research_blocks(task_name: str, output: dict[str, Any]) -> list[dict[str, A
                 Finding(
                     title=str(gap.get("title") or "Gap"),
                     detail=str(gap.get("detail") or ""),
-                    source=str(gap.get("evidence_source") or "market_gaps"),
+                    source=str(gap.get("evidence_source") or (evidence[0].url if evidence and evidence[0].url else (evidence[0].source if evidence else "market_gaps"))),
+                    confidence=float(gap.get("confidence") or 0.9),
+                    evidence=evidence,
                 )
             )
     else:
@@ -353,9 +357,15 @@ def _research_blocks(task_name: str, output: dict[str, Any]) -> list[dict[str, A
                 Finding(
                     title=str(segment.get("name") or "Segment"),
                     detail=str(segment.get("description") or ""),
-                    source="market_analysis",
+                    source=str(segment.get("source") or (evidence[0].url if evidence and evidence[0].url else (evidence[0].source if evidence else "market_analysis"))),
+                    confidence=float(segment.get("confidence") or 0.9),
+                    evidence=evidence,
                 )
             )
+
+    for finding in findings:
+        if not finding.evidence:
+            _logger.warning("research_finding_missing_evidence", extra={"title": finding.title, "task_name": task_name})
 
     blocks: list[dict[str, Any]] = []
     if findings:
@@ -572,6 +582,7 @@ def _optimization_blocks(
 
 __all__ = [
     "action_card",
+    "blocks_to_plaintext",
     "compose_blocks",
     "context_used_block",
     "error_block",

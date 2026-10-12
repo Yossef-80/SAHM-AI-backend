@@ -52,7 +52,7 @@ def _check_metadata(value: dict[str, Any] | None) -> dict[str, Any] | None:
             )
     import json
 
-    if len(json.dumps(value, default=str)) > MAX_METADATA_JSON:
+    if len(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8")) > MAX_METADATA_JSON:
         raise ValueError(f"metadata serialises to more than {MAX_METADATA_JSON} bytes")
     return value
 

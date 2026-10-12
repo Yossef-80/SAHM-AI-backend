@@ -1,11 +1,16 @@
 from typing import Literal, Any
 import asyncio
+import re
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 
+from app.core.logging import get_logger
 from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
+from app.schemas.common import Evidence, canonicalize_url
+from app.schemas.blocks import MessageWithBlocks, FindingsBlock, Finding, TextBlock
+from app.ai.memory.compressor import compress_history_messages
 
 from app.ai.agents.nour.graph import nour_graph
 from app.ai.agents.omar.graph import omar_graph
@@ -17,14 +22,13 @@ class RoutingDecision(BaseModel):
     agent: Literal["nour", "omar", "layla", "karim", "salma", "chat", "unknown"] = Field(description="The agent best suited to handle this prompt.")
     reason: str = Field(description="Why this agent was chosen.")
 
-from app.schemas.blocks import MessageWithBlocks
-from app.ai.memory.compressor import compress_history_messages
+logger = get_logger(__name__)
 
 ROUTER_SYSTEM_PROMPT = """You are the Orchestrator Hub. You route user prompts to the correct marketing agent based EXCLUSIVELY on the user's explicit intent in their newest message.
 
 Agents and Scopes:
-- nour  → LIVE RESEARCH only: The user explicitly asks to search, find, crawl, or analyze information NOW (search, look up, find prices, check reviews, analyze competitors from live web: "ابحث", "دور", "حلل", "search", "find competitors").
-- karim → MEMORY RECALL only: Questions about what was ALREADY researched or stored in memory, past audit, past reports, past performance metrics, past history ("مين المنافسين المسجلين عندنا", "إيه المتخزن في الذاكرة", "what do we know about competitors from previous research").
+- nour  → LIVE RESEARCH & COMPETITOR TOOLS: The user explicitly asks to search, find, crawl, or analyze information NOW, or mentions a competitor or tool with @ (e.g. @AbuAuf, @web_analyzer, @reviews, @gap_analysis, @researcher, "حلل موقع", "افحص المنافس", "ريفيوهات", "تقييمات", "فجوات السوق", "search", "find competitors").
+- karim → MEMORY RECALL only: Questions about what was ALREADY researched or stored in memory without asking to run new live tools ("مين المنافسين المسجلين عندنا", "إيه المتخزن في الذاكرة", "what do we know about competitors from previous research").
 - omar  → STRATEGY only: When THIS message explicitly asks for a high-level marketing strategy, strategic roadmap, market positioning, or ad campaign creation / plan ("عايز اعمل حملة اعلانية", "حطلي خطة تسويق", "positioning strategy").
 - layla → CONTENT creation only: Creative assets explicitly requested NOW (writing ad copy, headlines, visual briefs, 15s commercial scripts, reels scripts).
 - salma → LIVE CAMPAIGN OPS only: Real-time budget reallocation, ROAS adjustments, or performance optimization on currently RUNNING/active ad campaigns.
@@ -32,16 +36,22 @@ Agents and Scopes:
 
 HARD ROUTING RULES:
 1. Route strictly by the user's EXPLICIT intent in THIS NEWEST MESSAGE. Never route based on what earlier turns or the brand profile discuss (the presence of budgets or goals in the profile is NOT an intent).
-2. Competitor mentions WITHOUT an explicit request to search the web NOW → karim (or chat if about stored profile), NOT nour.
-3. Live campaign ops (salma) vs campaign strategy/creation (omar): 'salma' handles live/running campaign tweaks only; 'omar' handles strategy, roadmaps, and creating new campaigns.
-4. When unsure or if the request is ambiguous or a clarification/greeting → tie-break toward 'chat'.
+2. If the user mentions `@` with a competitor name or tool (e.g. `@Tie House`, `@web_analyzer`, `@reviews`, `@gap_analysis`) requesting live analysis, reviews, web audit, or market gaps → ALWAYS route to 'nour'.
+3. Competitor mentions WITHOUT an explicit request to search the web NOW or run live tools → karim (or chat if about stored profile), NOT nour.
+4. Live campaign ops (salma) vs campaign strategy/creation (omar): 'salma' handles live/running campaign tweaks only; 'omar' handles strategy, roadmaps, and creating new campaigns.
+5. When unsure or if the request is ambiguous or a clarification/greeting → tie-break toward 'chat'.
 """
 
 BLOCK_STRUCTURER_PROMPT = """Convert the following text into structured React UI Blocks. 
 CRITICAL RULE FOR THE 'type' FIELD: 
-- For paragraphs, use exactly 'text' (NOT 'TextBlock').
-- For lists/bullet points, use exactly 'findings' (NOT 'FindingsBlock').
+- For paragraphs and headings, use exactly 'text' (NOT 'TextBlock').
+- For lists, bullet points, competitor summaries, and research points, use exactly 'findings' (NOT 'FindingsBlock').
 Ensure the format and 'type' values are strictly adhered to.
+
+FINDINGS REQUIREMENTS:
+- Every finding MUST have a concise 'title' AND substantive 'detail' (the full explanation or content). NEVER emit an empty detail or just title followed by colon.
+- If sources, URLs, or citations are present in the text, wire them into 'source' (URL or provider name) and 'evidence' (list of {title, url, snippet}).
+- Set 'confidence' to 'high', 'medium', or 'low' (or float 0.0-1.0) when appropriate.
 
 CRITICAL CONSTRAINT:
 Only create 'action_card' or 'question_with_options' blocks that EXPLICITLY exist in the source text. Never invent follow-up CTAs. 'recommendation' blocks must come from the source text, not be generated by you."""
@@ -76,6 +86,8 @@ def format_tool_payload_to_markdown(tool_name: str, args: dict[str, Any]) -> str
                     weaknesses = comp.get("weaknesses_or_gaps") or comp.get("weaknesses") or []
                     if isinstance(weaknesses, list) and weaknesses:
                         lines.append(f"- **Weaknesses/Gaps:** {'; '.join(str(w) for w in weaknesses)}")
+                    if comp.get("source"):
+                        lines.append(f"- **Source:** {comp['source']}")
                 elif isinstance(comp, str):
                     lines.append(f"- {comp}")
             lines.append("")
@@ -96,6 +108,26 @@ def format_tool_payload_to_markdown(tool_name: str, args: dict[str, Any]) -> str
                 for item in items:
                     lines.append(f"- {item}")
                 lines.append("")
+
+        sources = args.get("sources") or []
+        if isinstance(sources, list) and sources:
+            lines.append("## Sources")
+            for s in sources:
+                lines.append(f"- {s}")
+            lines.append("")
+
+        evidence_items = args.get("evidence") or []
+        if isinstance(evidence_items, list) and evidence_items:
+            lines.append("## Evidence")
+            for ev in evidence_items:
+                if isinstance(ev, dict):
+                    ev_title = ev.get("title") or "Source"
+                    ev_url = ev.get("url")
+                    if ev_url:
+                        lines.append(f"- [{ev_title}]({canonicalize_url(ev_url)})")
+                    else:
+                        lines.append(f"- {ev_title}")
+            lines.append("")
     elif "summary" in args and "details" in args:
         if args.get("summary"):
             lines.append(str(args["summary"]))
@@ -196,6 +228,28 @@ async def orchestrate(
         messages = final_state["messages"]
         last_msg = messages[-1]
         
+        collected_evidence: list[dict[str, Any]] = []
+        for msg in messages:
+            if getattr(msg, "type", "") == "tool":
+                tool_content = str(getattr(msg, "content", ""))
+                for match in re.finditer(r"\[([^\]]+)\]\((https?://[^\)]+)\)", tool_content):
+                    c_url = canonicalize_url(match.group(2))
+                    if c_url and not any(e.get("url") == c_url for e in collected_evidence):
+                        collected_evidence.append({
+                            "title": match.group(1).strip(),
+                            "url": c_url,
+                            "source": getattr(msg, "name", "tool"),
+                        })
+                for raw_url in re.findall(r"https?://[^\s)\]]+", tool_content):
+                    c_url = canonicalize_url(raw_url)
+                    if c_url and not any(e.get("url") == c_url for e in collected_evidence):
+                        domain = c_url.split("/")[2] if "//" in c_url else "Web Source"
+                        collected_evidence.append({
+                            "title": domain,
+                            "url": c_url,
+                            "source": getattr(msg, "name", "tool"),
+                        })
+
         if last_msg.type == "tool":
             # Graph ended by calling a tool like 'submit_research_report'. Render structured args into Markdown.
             ai_msg = messages[-2]
@@ -204,12 +258,28 @@ async def orchestrate(
                 tool_args = ai_msg.tool_calls[0]["args"]
                 tool_name = tool_name or ai_msg.tool_calls[0].get("name", "")
                 final_msg = format_tool_payload_to_markdown(tool_name, tool_args)
+                for s in tool_args.get("sources") or []:
+                    if isinstance(s, str):
+                        c_url = canonicalize_url(s)
+                        if c_url and not any(e.get("url") == c_url for e in collected_evidence):
+                            collected_evidence.append({"title": "Source", "url": c_url, "source": tool_name})
+                for ev in tool_args.get("evidence") or []:
+                    if isinstance(ev, dict) and ev.get("url"):
+                        c_url = canonicalize_url(ev["url"])
+                        if c_url and not any(e.get("url") == c_url for e in collected_evidence):
+                            collected_evidence.append({
+                                "title": ev.get("title") or "Source",
+                                "url": c_url,
+                                "source": ev.get("source") or tool_name,
+                                "snippet": ev.get("snippet"),
+                            })
             else:
                 final_msg = str(last_msg.content)
         else:
             final_msg = str(last_msg.content)
     else:
         # Fast Conversational Agent for follow-ups, profile queries, and general chat
+        collected_evidence = []
         if event_queue:
             detail = "Answering follow-up question..." if decision.agent == "chat" else "Answering general question..."
             await event_queue.put({"type": "step_started", "step": "chat", "detail": detail})
@@ -224,11 +294,28 @@ async def orchestrate(
 
     block_llm = get_llm(provider=ai_settings.llm_provider).chat.with_structured_output(MessageWithBlocks)
     try:
-        return await block_llm.ainvoke([
+        structured = await block_llm.ainvoke([
             SystemMessage(content=BLOCK_STRUCTURER_PROMPT),
             HumanMessage(content=final_msg)
         ])
     except Exception as e:
         print(f"[ORCHESTRATOR] UI Block structuring failed, falling back to plain text. Error: {e}")
         from app.schemas.blocks import TextBlock
-        return MessageWithBlocks(blocks=[TextBlock(text=final_msg)])
+        structured = MessageWithBlocks(blocks=[TextBlock(text=final_msg)])
+
+    # Post-process findings to attach evidence and validate receipt
+    is_research_turn = decision.agent in ("nour", "research") or bool(collected_evidence)
+    for block in structured.blocks:
+        if isinstance(block, FindingsBlock):
+            for finding in block.findings:
+                if not finding.evidence and collected_evidence:
+                    finding.evidence = [Evidence.model_validate(e) for e in collected_evidence]
+                    if not finding.source and collected_evidence[0].get("url"):
+                        finding.source = collected_evidence[0]["url"]
+                if is_research_turn and not finding.evidence:
+                    logger.warning(
+                        "research_finding_missing_evidence",
+                        extra={"title": finding.title, "agent": decision.agent},
+                    )
+
+    return structured

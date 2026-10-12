@@ -13,8 +13,20 @@ from app.db.models import Profile, Conversation, Message, BrandMemoryItem
 from app.db.session import session_scope
 from app.ai.providers.llm import get_llm
 from app.core.logging import get_logger
+from app.schemas.blocks import blocks_to_plaintext
 
 logger = get_logger(__name__)
+
+
+def _message_to_text(msg: Any) -> str:
+    """Canonical text representation of a message row or history dict."""
+    if hasattr(msg, "blocks") and msg.blocks:
+        return blocks_to_plaintext(msg.blocks)
+    if isinstance(msg, dict) and msg.get("blocks"):
+        return blocks_to_plaintext(msg["blocks"])
+    content = getattr(msg, "content", None) if hasattr(msg, "content") else (msg.get("content") if isinstance(msg, dict) else None)
+    return str(content or "")
+
 
 
 def count_tokens(text: str) -> int:
@@ -288,7 +300,7 @@ def compress_history_messages(history: list[dict[str, Any]], max_chars: int = 90
     compact_history = []
     for item in history:
         role = item.get("role")
-        content = item.get("content") or ""
+        content = _message_to_text(item)
         
         # If assistant generated a massive response, distill it
         if role == "assistant" and len(content) > max_chars:
@@ -302,10 +314,13 @@ def compress_history_messages(history: list[dict[str, Any]], max_chars: int = 90
             
             compact_history.append({
                 **item,
-                "content": compressed
+                "content": compressed,
             })
         else:
-            compact_history.append(item)
+            compact_history.append({
+                **item,
+                "content": content,
+            })
             
     return compact_history
 
@@ -385,9 +400,9 @@ class IntelligentMemoryCompressor:
                 return profile.user_context_summary
 
             recent_chat_lines = [
-                f"{r.role.upper()}: {r.content[:400]}"
+                f"{r.role.upper()}: {_message_to_text(r)}"
                 for r in reversed(recent_rows)
-                if r.content
+                if _message_to_text(r).strip()
             ]
             recent_text = "\n".join(recent_chat_lines)
 
@@ -587,17 +602,17 @@ async def manage_session_memory_with_token_cap(
     except Exception:
         retain_count = 2
 
-    valid_msgs = [m for m in messages if m.role in ("user", "assistant") and m.content]
+    valid_msgs = [m for m in messages if m.role in ("user", "assistant") and _message_to_text(m).strip()]
     
     # Calculate measured tokens using real tokenizer
-    total_tokens = sum(count_tokens(m.content or "") for m in valid_msgs)
+    total_tokens = sum(count_tokens(_message_to_text(m)) for m in valid_msgs)
 
     # 1. Normal mode: below max_tokens
     if total_tokens < max_tokens:
         history = [
             {
                 "role": m.role,
-                "content": m.content or "",
+                "content": _message_to_text(m),
                 "persona_id": m.persona_id,
                 "blocks": m.blocks or [],
             }
@@ -619,7 +634,7 @@ async def manage_session_memory_with_token_cap(
         older_msgs = valid_msgs[:-1]
         recent_msgs = valid_msgs[-1:]
 
-    older_text = "\n".join([f"{m.role.upper()}: {m.content}" for m in older_msgs])
+    older_text = "\n".join([f"{m.role.upper()}: {_message_to_text(m)}" for m in older_msgs])
     current_summary = conversation.summary or "No previous summary."
 
     fast_llm = get_llm().chat

@@ -7,6 +7,7 @@ Postgres; ``create_all`` is used for dev/test on SQLite.
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -28,6 +29,27 @@ _logger = get_logger(__name__)
 
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
+
+
+def _clean_db_trace_param(val: Any) -> Any:
+    """Recursively parse JSON string parameters to native dict/list for readable trace logging."""
+    if isinstance(val, str):
+        val_trimmed = val.strip()
+        if (val_trimmed.startswith("{") and val_trimmed.endswith("}")) or (
+            val_trimmed.startswith("[") and val_trimmed.endswith("]")
+        ):
+            try:
+                parsed = json.loads(val_trimmed)
+                return _clean_db_trace_param(parsed)
+            except Exception:
+                pass
+    elif isinstance(val, dict):
+        return {k: _clean_db_trace_param(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_clean_db_trace_param(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(_clean_db_trace_param(v) for v in val)
+    return val
 
 
 #: Host fragments that identify a connection-pooler proxy (PgBouncer / Supavisor).
@@ -107,12 +129,14 @@ def _setup_db_tracing(engine: AsyncEngine) -> None:
         conn.info.setdefault("query_start_time", []).append(time.monotonic())
         stmt_clean = statement.strip()
         op = stmt_clean.split()[0].upper() if stmt_clean else "SQL"
+        raw_params = dict(parameters) if isinstance(parameters, dict) else parameters
+        cleaned_params = _clean_db_trace_param(raw_params)
         db_logger.info(
             f"[DATABASE - {op}] Executing query",
             extra={
                 "operation": op,
                 "statement": stmt_clean,
-                "parameters": redact(dict(parameters) if isinstance(parameters, dict) else parameters),
+                "parameters": redact(cleaned_params),
                 "executemany": executemany,
             },
         )
@@ -145,7 +169,11 @@ def _setup_db_tracing(engine: AsyncEngine) -> None:
 
 
 def _make_engine(url: str, echo: bool) -> AsyncEngine:
-    engine = create_async_engine(url, **_engine_kwargs(url, echo))
+    engine = create_async_engine(
+        url,
+        json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
+        **_engine_kwargs(url, echo),
+    )
     _setup_db_tracing(engine)
     return engine
 

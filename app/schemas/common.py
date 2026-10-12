@@ -10,9 +10,33 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Annotated
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
+
+
+def canonicalize_url(url: str | None) -> str:
+    """Canonicalize URLs by stripping tracking parameters (srsltid, utm_*, fbclid, gclid)."""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return url
+        query_params = parse_qsl(parsed.query, keep_blank_values=True)
+        filtered_params = [
+            (k, v)
+            for k, v in query_params
+            if not (k.startswith("utm_") or k.lower() in ("srsltid", "fbclid", "gclid"))
+        ]
+        new_query = urlencode(filtered_params)
+        return urlunparse(
+            (parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment)
+        )
+    except Exception:
+        return url
+
 
 
 class ApiModel(BaseModel):
@@ -123,10 +147,20 @@ class IntentKind(str, Enum):
 class Evidence(ApiModel):
     """A pointer to where a claim came from. Never invented."""
 
-    source: str = Field(description="e.g. 'web_search', 'get_campaign_insights', 'user_input'")
+    source: str = Field(default="web_search", description="e.g. 'web_search', 'get_campaign_insights', 'user_input'")
     detail: str = ""
+    title: str | None = None
+    snippet: str | None = None
     url: str | None = None
     retrieved_at: datetime | None = None
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def _canonicalize_url(cls, v: object) -> str | None:
+        if isinstance(v, str):
+            clean = canonicalize_url(v)
+            return clean or None
+        return v
 
 
 class Option(ApiModel):
