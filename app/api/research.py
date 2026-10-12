@@ -111,6 +111,7 @@ class RunResearchRequest(BaseModel):
         "generate_marketing_strategy",
     ]
     query: str = Field(default="", description="Target query, brand name, URL, or keyword")
+    language: str | None = Field(default=None, description="Output language preference ('ar' or 'en')")
 
 
 class ResearchItemOut(BaseModel):
@@ -255,6 +256,123 @@ TOOL_PROMPTS = {
         "## Key Metrics & Targets (CAC, ROAS, Target Order Volume)\n"
         "## Immediate Top 3 Action Items for This Week\n"
         "## 🌐 Sources & References"
+    ),
+}
+
+DENSE_REPORT_PREFIX_AR = (
+    "حد أقصى صارم للطول والإيجاز: من 300 إلى 380 كلمة كحد أقصى.\n"
+    "قدم نقاطًا مكثفة وغنية بالمعلومات بدون أي حشو أو كلام إنشائي.\n"
+    "كل سطر يجب أن يحتوي على حقائق محددة، أرقام، أو تحركات تكتيكية.\n"
+    "شرط اللغة الإلزامي: اكتب التقرير بالكامل باللغة العربية الفصحى.\n\n"
+)
+
+TOOL_PROMPTS_AR = {
+    "analyze_website": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت خبير في تحليل المواقع الإلكترونية وتحسين معدل التحويل (CRO) لمنصة سهم.\n"
+        "حلل محتوى الموقع المستخرج ونظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## نظرة عامة وتموضع العلامة التجارية\n"
+        "## العروض الأساسية والقيمة المقدمة\n"
+        "## إشارات الثقة والأدلة الاجتماعية (تقييمات، شهادات، ضمانات)\n"
+        "## نقاط ضعف واحتكاك التحويل\n"
+        "## توصيات عملية للنمو وزيادة المبيعات\n\n"
+        "قم بتضمين قسم '## 🌐 المصادر والمراجع' في النهاية يحتوي على روابط ماركداون للموقع الذي تم تحليله."
+    ),
+    "analyze_competitor": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت محلل استخبارات منافسين أول لمنصة سهم.\n"
+        "حلل من يعلن لهذا الجمهور وكيف، بناءً على مصادر الويب الموثقة. نظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## نظرة عامة على المنافس وحصته في السوق بمصر\n"
+        "## الجمهور المستهدف والخصائص الديموغرافية\n"
+        "## الزوايا والرسائل الإعلانية والحملات النشطة\n"
+        "## استراتيجية التسعير والباقات والعروض\n"
+        "## نقاط ضعف المنافس وكيف نتفوق عليه في السوق\n"
+        "## 🌐 المصادر والمراجع\n"
+        "(اذكر كل مصدر ويب تم الرجوع إليه كرابط ماركداون قابل للنقر: - [عنوان المصدر](URL))"
+    ),
+    "analyze_social_profile": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت استراتيجي محتوى وسائل التواصل الاجتماعي لمنصة سهم.\n"
+        "حلل بروفايل المنافس بناءً على الأدلة والبيانات الحقيقية ونظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## ركائز ومحاور المحتوى الأساسية\n"
+        "## ديناميكيات التفاعل وأفضل الأشكال أداءً (ريلز مقابل كاروسيل)\n"
+        "## نبرة صوت العلامة التجارية والأسلوب البصري\n"
+        "## انطباعات وتفاعل الجمهور ومشاعر التعليقات\n"
+        "## توصيات عملية: ما يجب التركيز عليه ونشره بكثرة\n"
+        "## 🌐 المصادر والمراجع\n"
+        "(اذكر كافة الحسابات والمراجع بروابط ماركداون قابلة للنقر)"
+    ),
+    "analyze_reviews": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت محلل تجربة العملاء والمشاعر والآراء لمنصة سهم.\n"
+        "حلل آراء وتقييمات العملاء من الويب ومصادر المراجعات. نظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## تقييم المشاعر العام واتجاهات الآراء\n"
+        "## أبرز ما يمتدحه العملاء (عوامل الرضا والجذب)\n"
+        "## أبرز شكاوى العملاء ونقاط الألم والاحتكاك (ما يضر المبيعات)\n"
+        "## اقتباسات ممثلة من تعليقات العملاء الواقعية\n"
+        "## حلول استراتيجية وفرص للتموضع في السوق\n"
+        "## 🌐 المصادر والمراجع\n"
+        "(اذكر روابط التقييمات وصفحات المتاجر المرجعية)"
+    ),
+    "analyze_market": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت محلل السوق الكلي والقطاعات التجارية لمنصة سهم.\n"
+        "حلل حجم السوق وشرائحه واتجاهاته لهذا المجال في مصر. نظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## حجم السوق ومسار النمو في مصر لعام 2026\n"
+        "## شرائح المستهلكين الرئيسية وسلوك الإنفاق\n"
+        "## الاتجاهات الصاعدة في هذا المجال وتغيرات المستهلك\n"
+        "## الواقع الاقتصادي (الأسعار، العملة، القوة الشرائية، الاستيراد)\n"
+        "## فجوات السوق وفرص النمو الواعدة ذات العائد المرتفع\n"
+        "## 🌐 المصادر والمراجع\n"
+        "(استشهد بتقارير السوق والأخبار ومصادر البيانات بروابط ماركداون)"
+    ),
+    "analyze_keywords": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت استراتيجي تحسين محركات البحث والنية الشرائية للبحث لمنصة سهم.\n"
+        "حلل تكتلات الطلب والبحث ونظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## تكتلات الكلمات ذات النية الشرائية العالية (مرحلة الشراء الفوري)\n"
+        "## تكتلات الكلمات المعلوماتية والتثقيفية (مرحلة البحث والمقارنة)\n"
+        "## حجم البحث التقديري وشدة المنافسة\n"
+        "## كلمات البحث الطويلة (Long-Tail) وتكتلات الأسئلة الشائعة\n"
+        "## هيكل المحتوى والصفحات المستهدفة الموصى بها\n"
+        "## 🌐 المصادر والمراجع\n"
+        "(قم بتضمين مراجع البحث وروابط النطاقات ذات الصلة)"
+    ),
+    "analyze_competitor_creatives": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت مدير إبداعي واستراتيجي إعلانات ممولة لمنصة سهم.\n"
+        "حلل إعلانات المنافسين وأشكالها والهوكات والزوايا الترويجية بناءً على أدلة السوق الحقيقية.\n"
+        "تعليمات صارمة: لا تكتب نبذة عامة عن تاريخ الشركة بل ركز 100% على الإبداع الإعلاني، كتابة النصوص، الهوكات البصرية، وثيمات الحملات.\n\n"
+        "نظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## 🎬 مفاهيم الإعلانات المستمرة والزوايا الإعلانية الأساسية\n"
+        "## 🪝 تحليل الهوك في أول 3 ثوانٍ (بصري وعنوان نصي)\n"
+        "## 📱 تفصيل الأشكال الإبداعية وأسلوب الإنتاج (ريلز، كاروسيل، صور ثابتة)\n"
+        "## 🏷️ العروض الترويجية والأسعار ودعوات اتخاذ الإجراء (CTA)\n"
+        "## 💡 كيف نتفوق عليهم إبداعيًا (3 أفكار إعلانية قابلة للتنفيذ لعلامتنا)\n"
+        "## 🌐 المصادر والمراجع\n"
+        "(استشهد بمكتبة إعلانات ميتا ومراجع الحملات بروابط ماركداون)"
+    ),
+    "detect_market_gaps": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت خبير اكتشاف الفرص وتوافق المنتج مع السوق لمنصة سهم.\n"
+        "اجمع كل الأبحاث السابقة ورتب الاحتياجات غير المخدومة. نظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## الملخص التنفيذي للفرص\n"
+        "## احتياجات وإحباطات العملاء غير المخدومة في السوق\n"
+        "## الفجوات في التسعير (خيارات مفقودة في الجودة أو الفئات المتوسطة والفاخرة)\n"
+        "## فجوات المنتجات والجودة والخدمة\n"
+        "## ترتيب الفرص حسب إمكانات الإيرادات والجدوى\n"
+        "## 🌐 المصادر والمراجع"
+    ),
+    "generate_marketing_strategy": (
+        DENSE_REPORT_PREFIX_AR +
+        "أنت الرئيس التنفيذي للتسويق (CMO) لمنصة سهم.\n"
+        "ابنِ خطة عمل تسويقية قابلة للتنفيذ لمدة 90 يومًا. نظم تقريرك في Markdown نظيف بالعناوين التالية:\n"
+        "## تموضع العلامة التجارية والميزة التنافسية الاستثنائية\n"
+        "## خارطة طريق التنفيذ لـ 90 يومًا (الشهر 1: التأسيس، الشهر 2: التوسع، الشهر 3: التحسين)\n"
+        "## توزيع القنوات والميزانية (ميتا، تيك توك، جوجل، المؤثرين)\n"
+        "## المؤشرات والأهداف الرئيسية (CAC، ROAS، حجم الطلبات المستهدف)\n"
+        "## أهم 3 إجراءات فورية للتنفيذ هذا الأسبوع\n"
+        "## 🌐 المصادر والمراجع"
     ),
 }
 
@@ -408,6 +526,9 @@ async def run_research(
     fast_llm = get_llm().chat
     search_provider = get_search_provider(ai_settings.search_provider)
 
+    req_lang = (payload.language or "").lower()
+    is_ar = req_lang == "ar" or bool(re.search(r"[\u0600-\u06FF]", query))
+
     # 1. Ground-Truth Verification & Typo Detection
     verification = await verify_and_resolve_entity(query, tool_type, fast_llm)
     v_status = verification["status"]
@@ -416,21 +537,36 @@ async def run_research(
 
     # CASE A: Entity Not Found in Ground Truth (Fake, nonsensical, or completely unknown)
     if v_status == "not_found":
-        not_found_report = (
-            f"## ⚠️ Brand Verification: Entity Not Found in Market\n\n"
-            f"We could not verify **\"{query}\"** as an active commercial brand, business, or competitor in the market.\n\n"
-            f"### Ground-Truth Verification Details:\n"
-            f"• **Finding:** {v_explanation}\n"
-            f"• **Search Footprint:** No verified commercial storefronts, official social pages, or recognizable business listings matched this query.\n\n"
-            f"### Recommended Next Steps:\n"
-            f"• Check the spelling or provide the official registered brand name.\n"
-            f"• If this is a new or private business, provide their direct website in **Website analyzer** or their official handle in **Social profile** to extract direct intelligence.\n"
-        )
+        if is_ar:
+            not_found_report = (
+                f"## ⚠️ التحقق من الكيان: لم يتم العثور على الكيان في السوق\n\n"
+                f"لم نتمكن من التحقق من **\"{query}\"** كعلامة تجارية أو نشاط تجاري نشط في السوق.\n\n"
+                f"### تفاصيل التحقق:\n"
+                f"• **النتيجة:** {v_explanation}\n"
+                f"• **الأثر البحثي:** لا توجد متاجر تجارية معتمدة أو صفحات رسمية موثقة تطابق هذا الاستعلام.\n\n"
+                f"### الخطوات الموصى بها:\n"
+                f"• تأكد من صحة كتابة الاسم التجاري الرسمي.\n"
+                f"• إذا كان نشاطًا جديدًا أو خاصًا، ضع الرابط مباشرة في **محلل المواقع** أو حسابه في **بروفايل السوشيال** لاستخراج البيانات مباشرة.\n"
+            )
+            failed_title = f"فشل التحقق: '{query}'"
+        else:
+            not_found_report = (
+                f"## ⚠️ Brand Verification: Entity Not Found in Market\n\n"
+                f"We could not verify **\"{query}\"** as an active commercial brand, business, or competitor in the market.\n\n"
+                f"### Ground-Truth Verification Details:\n"
+                f"• **Finding:** {v_explanation}\n"
+                f"• **Search Footprint:** No verified commercial storefronts, official social pages, or recognizable business listings matched this query.\n\n"
+                f"### Recommended Next Steps:\n"
+                f"• Check the spelling or provide the official registered brand name.\n"
+                f"• If this is a new or private business, provide their direct website in **Website analyzer** or their official handle in **Social profile** to extract direct intelligence.\n"
+            )
+            failed_title = f"Verification Failed: '{query}'"
+
         return ResearchItemOut(
             id=f"mem_unverified_{uuid.uuid4().hex[:10]}",
             tool=tool_type,
             query=query,
-            title=f"Verification Failed: '{query}'",
+            title=failed_title,
             summary=not_found_report,
             details={
                 "subject": query,
@@ -448,24 +584,43 @@ async def run_research(
     effective_query = target_subject
     typo_callout = ""
     if v_status == "typo_corrected" and target_subject.lower() != query.lower():
-        typo_callout = (
-            f"> 💡 **Auto-Corrected Query**: Detected and corrected typo from *\"{query}\"* to **\"{target_subject}\"** based on market ground truth.\n\n"
-        )
+        if is_ar:
+            typo_callout = (
+                f"> 💡 **تصحيح تلقائي**: تم تصحيح الخطأ الإملائي من *\"{query}\"* إلى **\"{target_subject}\"** بناءً على بيانات السوق الحقيقية.\n\n"
+            )
+        else:
+            typo_callout = (
+                f"> 💡 **Auto-Corrected Query**: Detected and corrected typo from *\"{query}\"* to **\"{target_subject}\"** based on market ground truth.\n\n"
+            )
 
-    title_map = {
-        "analyze_website": f"Website Analysis: {effective_query}",
-        "analyze_competitor": f"Competitor Research: {effective_query}",
-        "analyze_social_profile": f"Social Profile: {effective_query}",
-        "analyze_reviews": f"Reviews & Sentiment: {effective_query}",
-        "analyze_market": f"Market Analysis: {effective_query}",
-        "analyze_keywords": f"Keyword Clusters: {effective_query}",
-        "analyze_competitor_creatives": f"Competitor Creatives: {effective_query}",
-        "detect_market_gaps": "Market Gaps & Opportunity Ranking",
-        "generate_marketing_strategy": "90-Day Marketing Strategy Blueprint",
-    }
+    if is_ar:
+        title_map = {
+            "analyze_website": f"تحليل الموقع: {effective_query}",
+            "analyze_competitor": f"أبحاث المنافس: {effective_query}",
+            "analyze_social_profile": f"بروفايل السوشيال ميديا: {effective_query}",
+            "analyze_reviews": f"التقييمات والمشاعر: {effective_query}",
+            "analyze_market": f"تحليل السوق: {effective_query}",
+            "analyze_keywords": f"تكتلات الكلمات المفتاحية: {effective_query}",
+            "analyze_competitor_creatives": f"إعلانات المنافسين: {effective_query}",
+            "detect_market_gaps": "فجوات السوق وترتيب الفرص",
+            "generate_marketing_strategy": "خطة الاستراتيجية التسويقية لـ 90 يومًا",
+        }
+    else:
+        title_map = {
+            "analyze_website": f"Website Analysis: {effective_query}",
+            "analyze_competitor": f"Competitor Research: {effective_query}",
+            "analyze_social_profile": f"Social Profile: {effective_query}",
+            "analyze_reviews": f"Reviews & Sentiment: {effective_query}",
+            "analyze_market": f"Market Analysis: {effective_query}",
+            "analyze_keywords": f"Keyword Clusters: {effective_query}",
+            "analyze_competitor_creatives": f"Competitor Creatives: {effective_query}",
+            "detect_market_gaps": "Market Gaps & Opportunity Ranking",
+            "generate_marketing_strategy": "90-Day Marketing Strategy Blueprint",
+        }
     title = title_map.get(tool_type, f"{tool_type.replace('_', ' ').title()}: {effective_query}")
     if v_status == "typo_corrected" and target_subject.lower() != query.lower():
-        title = f"{title} (auto-corrected from '{query}')"
+        suffix = f" (تم التصحيح من '{query}')" if is_ar else f" (auto-corrected from '{query}')"
+        title = f"{title}{suffix}"
 
     # 2. Collect Live Web Evidence & Source Links
     sources: list[dict[str, str]] = []
@@ -522,18 +677,30 @@ async def run_research(
     raw_evidence = "\n\n".join(evidence_blocks)
 
     # 3. Synthesize Structured Report with Ground-Truth References
-    sys_instruction = TOOL_PROMPTS.get(tool_type, TOOL_PROMPTS["analyze_competitor"])
+    prompts_table = TOOL_PROMPTS_AR if is_ar else TOOL_PROMPTS
+    sys_instruction = prompts_table.get(tool_type, prompts_table["analyze_competitor"])
     sys_prompt = SystemMessage(content=sys_instruction)
     
     brand_context_block = f"Brand Context / Long-Term Memory:\n{user_context}\n" if user_context else ""
-    usr_prompt = HumanMessage(content=(
-        f"Target Subject: '{effective_query}'\n"
-        f"Research Type: '{tool_type}'\n\n"
-        f"{brand_context_block}"
-        f"Verified Web & Market Evidence (with URLs):\n{raw_evidence}\n\n"
-        "Generate a dense, concise structured intelligence report (strictly under 380 words) in clean Markdown.\n"
-        "Ground your findings in the provided evidence and list all sources in the '## 🌐 Sources & References' section as clickable markdown links."
-    ))
+    if is_ar:
+        usr_prompt = HumanMessage(content=(
+            f"الموضوع المستهدف: '{effective_query}'\n"
+            f"نوع البحث: '{tool_type}'\n\n"
+            f"{brand_context_block}"
+            f"أدلة الويب والسوق الموثقة (مع الروابط):\n{raw_evidence}\n\n"
+            "تعليمات لغوية صارمة: يجب أن يكون كامل التقرير باللغة العربية الفصحى الواضحة مع العناوين والنقاط باللغة العربية دون استخدام أي لغة أخرى.\n"
+            "قم بتوليد تقرير استخباراتي مكثف وموجز (أقل من 380 كلمة) بتنسيق Markdown نظيف.\n"
+            "استند في نتائجك إلى الأدلة المقدمة واذكر كافة المصادر في قسم '## 🌐 المصادر والمراجع' كروابط ماركداون قابلة للنقر."
+        ))
+    else:
+        usr_prompt = HumanMessage(content=(
+            f"Target Subject: '{effective_query}'\n"
+            f"Research Type: '{tool_type}'\n\n"
+            f"{brand_context_block}"
+            f"Verified Web & Market Evidence (with URLs):\n{raw_evidence}\n\n"
+            "Generate a dense, concise structured intelligence report (strictly under 380 words) in clean Markdown.\n"
+            "Ground your findings in the provided evidence and list all sources in the '## 🌐 Sources & References' section as clickable markdown links."
+        ))
 
     try:
         import asyncio
@@ -541,16 +708,18 @@ async def run_research(
         summary_text = extract_clean_text(res.content)
     except Exception as e:
         logger.error("research_synthesis_failed", extra={"error": str(e)})
-        summary_text = f"## Research Findings for {effective_query}\n\n{raw_evidence}"
+        fallback_hdr = f"نتائج أبحاث: {effective_query}" if is_ar else f"Research Findings for {effective_query}"
+        summary_text = f"## {fallback_hdr}\n\n{raw_evidence}"
 
     # Prepend typo correction banner if applicable
     if typo_callout:
         summary_text = typo_callout + summary_text
 
     # Ensure source references exist at the bottom if sources were found
-    if sources and "Sources & References" not in summary_text and "## Sources" not in summary_text:
+    sources_hdr = "المصادر والمراجع" if is_ar else "Sources & References"
+    if sources and sources_hdr not in summary_text and "## Sources" not in summary_text and "## المصادر" not in summary_text:
         source_links_md = "\n".join([f"- [{s['title']}]({s['url']})" for s in sources if s.get("url")])
-        summary_text += f"\n\n## 🌐 Sources & References\n{source_links_md}\n"
+        summary_text += f"\n\n## 🌐 {sources_hdr}\n{source_links_md}\n"
 
     summary_text = clean_raw_string(summary_text)
     memory_id = f"mem_res_{uuid.uuid4().hex[:12]}"
@@ -559,13 +728,22 @@ async def run_research(
     # Distill report into a compact memory note for agent context
     item_tokens_limit = ai_settings.memory_item_max_tokens
     item_words_limit = int(item_tokens_limit * 0.8)
-    distill_sys = SystemMessage(content=(
-        "You are an AI Memory Distiller for SAHM OS.\n"
-        "Distill this research report into an ultra-compact brand memory note for AI marketing agents.\n"
-        f"STRICT CONSTRAINT: Exactly {max(40, item_words_limit - 30)} to {item_words_limit} words maximum (under {item_tokens_limit} tokens).\n"
-        "Focus only on key factual intelligence: competitor strengths/weaknesses, audience desires, price points, and winning creative angles.\n"
-        "Format as 3-4 dense bullet points. Zero conversational filler."
-    ))
+    if is_ar:
+        distill_sys = SystemMessage(content=(
+            "أنت ملخص ذاكرة الذكاء الاصطناعي لمنصة سهم.\n"
+            "لخص تقرير البحث هذا في ملاحظة ذاكرة فائقة الإيجاز لوكلاء التسويق بالذكاء الاصطناعي باللغة العربية.\n"
+            f"شرط صارم: بالضبط من {max(40, item_words_limit - 30)} إلى {item_words_limit} كلمة كحد أقصى (أقل من {item_tokens_limit} توكن).\n"
+            "ركز فقط على الحقائق الاستخباراتية الرئيسية: نقاط قوة/ضعف المنافس، رغبات الجمهور، الأسعار، والزوايا الإعلانية الناجحة.\n"
+            "اكتب الملاحظة في 3-4 نقاط كثيفة باللغة العربية. ممنوع الحشو أو المقدمات."
+        ))
+    else:
+        distill_sys = SystemMessage(content=(
+            "You are an AI Memory Distiller for SAHM OS.\n"
+            "Distill this research report into an ultra-compact brand memory note for AI marketing agents.\n"
+            f"STRICT CONSTRAINT: Exactly {max(40, item_words_limit - 30)} to {item_words_limit} words maximum (under {item_tokens_limit} tokens).\n"
+            "Focus only on key factual intelligence: competitor strengths/weaknesses, audience desires, price points, and winning creative angles.\n"
+            "Format as 3-4 dense bullet points. Zero conversational filler."
+        ))
     distill_usr = HumanMessage(content=f"Research Title: {title}\nReport:\n{summary_text}")
     try:
         import asyncio
