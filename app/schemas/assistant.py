@@ -29,6 +29,8 @@ class AssistantMessageRequest(ApiModel):
     persona_id: str | None = None
     # Opt into streaming-ish long-task handling: returns a task_id immediately.
     async_mode: bool = False
+    # User's chosen application interface language (e.g. 'ar' or 'en')
+    language: str | None = None
 
 
 class AssistantMessageResponse(ApiModel):

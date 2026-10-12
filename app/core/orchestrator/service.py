@@ -453,6 +453,7 @@ async def handle_message(
         conversation_summary=conv_summary,
         active_plans=active_plans,
         business_id=business.id,
+        language=request.language,
     )
     blocks_raw = final_gui.model_dump(mode="json", by_alias=True)["blocks"] if final_gui else []
     final = {"blocks": blocks_raw}

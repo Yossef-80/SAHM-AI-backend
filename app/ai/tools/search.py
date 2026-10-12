@@ -1,3 +1,4 @@
+import re
 from typing import Dict, Any, Optional
 from langchain_core.tools import tool
 from langchain_core.runnables.config import RunnableConfig
@@ -43,9 +44,11 @@ def web_search_tool(query: str, config: RunnableConfig) -> str:
         # Use the configured fast LLM to summarize the findings intelligently
         fast_llm = get_llm().chat
         
+        is_ar_query = bool(re.search(r"[\u0600-\u06FF]", query))
+        lang_note = " IMPORTANT: Extract and summarize the facts strictly in Arabic." if is_ar_query else ""
         sys_msg = SystemMessage(content=(
             "You are an extraction assistant. Extract strictly the numbers, facts, and key details "
-            "from the following search results that directly answer the query. "
+            f"from the following search results that directly answer the query.{lang_note} "
             "Keep it under 150 words. Do not add conversational filler."
         ))
         usr_msg = HumanMessage(content=f"Query: {query}\n\nSearch Results:\n{raw_text}")

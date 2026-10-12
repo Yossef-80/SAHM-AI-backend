@@ -35,8 +35,9 @@ CRITICAL INSTRUCTIONS FOR RESEARCH & ANALYSIS:
 2. FACT-CHECKING: When analyzing competitors from web searches, carefully verify that the business is actually in the correct industry and market.
 3. ATTRIBUTION: Do not mix up facts between competitors.
 4. CONTEXT: Always check the brand context first using get_brand_context_tool to understand who you are researching for.
-5. SEARCH: Formulate highly specific queries using web_search_tool. YOU ARE STRICTLY LIMITED TO A MAXIMUM OF 2 SEARCH QUERIES.
-6. FINAL OUTPUT: You MUST submit your final findings by calling the `submit_research_report` tool. Do not generate an unstructured conversational response at the end. Just call the tool with the structured data.
+5. SEARCH: Formulate highly specific queries using web_search_tool. You may execute 1 to 2 targeted searches per competitor or entity (up to 4 searches total when comparing multiple competitors).
+6. LANGUAGE: If the user prompt or context is in Arabic, write all report fields (market_overview, competitor_summary positioning, strengths, weaknesses, opportunities, risks) in clear Arabic.
+7. FINAL OUTPUT: You MUST submit your final findings by calling the `submit_research_report` tool. Do not generate an unstructured conversational response at the end. Just call the tool with the structured data.
 
 OUTPUT CONTRACT: Deliver the research report only. Do not add strategy advice, campaign CTAs, or next-step offers. End after the sources section.
 """
