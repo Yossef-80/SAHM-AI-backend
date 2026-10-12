@@ -1,389 +1,370 @@
-# 🛠️ SAHM Marketing OS — Tools & Agents Improvement Guide
+# 🛠️ SAHM Marketing OS — Tools & Agents Engineering Guide
 
-> **Audience:** Developers, AI engineers, and contributors tasked with improving **Tools** and **Agents** in SAHM AI.  
-> **Purpose:** A complete, hands-on engineering playbook. You can hand this document directly to an AI (Claude, ChatGPT, Gemini) to collaborate on optimizing any tool or agent.
-
----
-
-## 1. Quick Orientation (Tools & Agents in SAHM)
-
-In SAHM AI:
-- **Tools** are the sensory organs and action levers of the system. They search the live web, scrape landing pages, analyze ad creatives, extract customer reviews, and distill market opportunities.
-- **Agents** are the specialized personas (Nour, Omar, Karim, Layla, Salma, Orchestrator) that interact with the user, synthesize tool data, make marketing decisions, and draft campaigns.
-
-### The Two Ways Tools Are Used:
-1. **Direct Execution (The Research Tab):** The user clicks "Run" on a tool card (e.g., Competitor research on *"Tie House"*). The tool runs directly through `app/api/research.py`, verifies the entity, searches live web data, creates a comprehensive report for the UI, and distills a ~100-token memory item into the brand database.
-2. **Autonomous Invocation (The Assistant Chat):** A user asks Nour or Salma: *"Who is advertising against our luxury coffee brand in Cairo?"* The agent selects the appropriate tool, calls it, receives the clean output, and weaves it into its conversational response.
+> **Audience:** Developers, AI engineers, and technical contributors tasked with building, debugging, and improving **Tools** and **Agents** in SAHM AI.  
+> **Purpose:** A complete, hands-on engineering manual and reference playbook. You can hand this document directly to an AI assistant (Claude, ChatGPT, Gemini) to collaborate on developing new tools, tuning prompts, or optimizing multi-agent execution.
 
 ---
 
-## 2. Developer Boundaries: What Files Can You Edit?
+## 1. Core Architecture: Tools & Agents in SAHM
 
-To protect database schemas, multi-tenant workspace isolation, and authentication, strictly adhere to these boundaries:
+In the SAHM Marketing Operating System:
+- **Tools** are the sensory organs and operational levers of the system. They scrape landing pages, search live web indexes, pull Google Analytics metrics, scrape Google Maps reviews, inspect competitor Facebook ads, generate day-by-day content schedules, and persist marketing assets into PostgreSQL.
+- **Agents** are specialized AI personas (Nour, Omar, Layla, Karim, Salma, Orchestrator) implemented as **LangGraph State Machines**. Each agent possesses a dedicated system prompt, persona guardrails, approved tool bindings, and typed Pydantic output schemas.
+
+```
++----------------------------------------------------------------------------------------------------+
+|                                    TWO MODES OF TOOL EXECUTION                                     |
++----------------------------------------------------------------------------------------------------+
+|                                                                                                    |
+|  [MODE 1: Direct Execution via Research Hub API]                                                   |
+|  • User triggers a specific tool card in /research (e.g., Competitor Analysis on "Tie House").     |
+|  • Hits POST /api/v1/research/run directly.                                                        |
+|  • Flow: Ground-Truth Entity Verification -> Live Data Fetch (SERP/Scrape) -> Structured Markdown  |
+|          -> Dual-Layer Storage (Compact text ~100 tokens + Full Report in metadata_).             |
+|                                                                                                    |
+|  [MODE 2: Autonomous Multi-Turn Invocation via Assistant Chat]                                    |
+|  • User prompts the assistant in /assistant: "Analyze the top specialty coffee competitors in Cairo"|
+|  • Orchestrator classifies intent and routes to Nour's LangGraph StateGraph.                       |
+|  • Flow: Nour calls get_brand_context_tool -> executes web_search_tool (max 2 queries) -> calls    |
+|          submit_research_report -> Orchestrator extracts tool arguments -> Formats UI Blocks.      |
+|                                                                                                    |
++----------------------------------------------------------------------------------------------------+
+```
+
+---
+
+## 2. Developer Safe Zones & Codebase Boundaries
+
+To maintain database integrity, multi-tenant workspace isolation, and security standards, strictly adhere to these boundaries:
 
 ```
 +---------------------------------------------------------------------------------------+
-|  🟢 SAFE TO EDIT (Your Daily Workspace)                                               |
+|  🟢 SAFE TO EDIT (Daily Engineering Workspace)                                         |
 |  -----------------------------------------------------------------------------------  |
-|  • SAHM-AI-backend/app/ai/tools/*.py          (Tool implementations & scrapers)       |
-|  • SAHM-AI-backend/app/ai/agents/*/*.py       (Agent prompts, personas & tool wiring) |
+|  • SAHM-AI-backend/app/ai/tools/*.py          (Tool logic, scrapers, GA4, Apify)      |
+|  • SAHM-AI-backend/app/ai/tools/strategy/*.py (Marketing, campaign & calendar tools)   |
+|  • SAHM-AI-backend/app/ai/agents/*/*.py       (Agent prompts, state, schema, graphs)  |
 |  • SAHM-AI-backend/app/api/research.py        (Research prompts, validation, storage) |
-|  • SAHM-AI-frontend/src/components/research/  (Tool inputs, cards, Markdown renderer) |
+|  • SAHM-AI-backend/app/api/content.py         (Content calendar endpoints)            |
+|  • SAHM-AI-frontend/src/components/research/  (Tool UI cards, MarkdownReport renderer)|
+|  • SAHM-AI-frontend/src/components/chat/      (Chat bubbles, Generative UI blocks)    |
 +---------------------------------------------------------------------------------------+
-|  🟡 EDIT WITH CAUTION (Coordinate with backend lead)                                  |
+|  🟡 EDIT WITH CAUTION (Coordinate with System Lead)                                   |
 |  -----------------------------------------------------------------------------------  |
-|  • SAHM-AI-backend/app/api/chat.py            (Chat routing & streaming logic)        |
-|  • SAHM-AI-backend/app/ai/providers/*.py      (Search & LLM model adapters)           |
+|  • app/ai/agents/orchestrator/brain.py        (Routing rules, UI Block structurer)    |
+|  • app/core/orchestrator/service.py           (Message handling, card gating)         |
+|  • app/ai/memory/compressor.py                (Token cap compressor & LTM debouncer)  |
+|  • app/core/llm/router.py                     (Provider clients & workspace caching)  |
 +---------------------------------------------------------------------------------------+
-|  🔴 DO NOT EDIT (System Core & Security)                                              |
+|  🔴 DO NOT EDIT WITHOUT FORMAL REVIEW (System Core & Security)                        |
 |  -----------------------------------------------------------------------------------  |
-|  • app/db/models.py                           (Requires DB migrations)                |
-|  • app/db/session.py                          (Postgres pooler & session manager)     |
+|  • app/db/models.py                           (Requires Alembic database migrations)  |
+|  • app/core/security.py                       (TokenCipher Fernet encryption at rest) |
+|  • app/core/approvals/                        (Two-phase human approval workflow)     |
+|  • app/core/tools/protected.py                (External Meta write tools)             |
 |  • app/api/deps.py                            (Multi-tenant X-Workspace-Id resolver)  |
-|  • app/config.py                              (Global environment schema)             |
 +---------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 3. What Files to Give to an AI for Context
+## 3. Catalog of the 9 Research Hub Tools (`app/api/research.py`)
 
-When asking an AI (Claude, GPT-4, etc.) to help you improve or build a feature, **do not dump the entire repository**. Give it only the relevant files:
-
-### Scenario A: Improving a Research Tool (e.g., Competitor Ads, Reviews, Keywords)
-Give the AI:
-1. This file: `TEAM_TOOLS_AND_AGENTS_GUIDE.md` (for rules and memory contracts)
-2. `SAHM-AI-backend/app/api/research.py` (the execution endpoint & prompt catalog)
-3. The specific tool file:
-   - For website scraping: `app/ai/tools/analyze_website.py`
-   - For search & scraping: `app/ai/tools/search.py`
-   - For reviews: `app/ai/tools/get_reviews.py`
-   - For brand context: `app/ai/tools/brand_context.py`
-
-### Scenario B: Improving an Agent (e.g., Nour, Omar, Salma)
-Give the AI:
-1. This file: `TEAM_TOOLS_AND_AGENTS_GUIDE.md`
-2. `SAHM-AI-backend/app/ai/agents/<agent_name>/agent.py`
-3. `SAHM-AI-backend/app/ai/agents/<agent_name>/prompts.py`
-4. `SAHM-AI-backend/app/api/chat.py`
-
----
-
-## 4. The 5-Stage Life Cycle of a SAHM Tool
-
-Every tool must adhere to this standardized architecture:
-
-```
-[User Input / Query]
-       │
-       ▼
-1. Validation & Ground-Truth Verification
-   (Checks if entity exists; fixes typos like "Tiee Hose" -> "Tie House"; rejects gibberish)
-       │
-       ▼
-2. Live Data Gathering (SERP / Scrape / API)
-   (Collects live web snippets, page content, or external ad library links with real URLs)
-       │
-       ▼
-3. Structured Synthesis (LLM)
-   (Generates clean Markdown: 300-380 words max, dense bullet points, clickable source links)
-       │
-       ▼
-4. Dual-Layer Storage (Preventing Token Bloat)
-   ├── A. BrandMemoryItem.text      ──> Distilled by fast_llm to 80-120 words (~100 tokens)
-   ├── B. BrandMemoryItem.metadata_ ──> Full 380-word report stored under "full_report"
-   └── C. Profile.user_context_summary ──> Long-term memory updated (<300 tokens total)
-       │
-       ▼
-5. Output Presentation (UI & Agent Response)
-   ├── UI: Full report rendered via MarkdownReport (h2, h3, h4, lists, source link cards)
-   └── Agent: Compact fact retrieved on future chats without token overflow
-```
-
----
-
-## 5. Detailed Catalog of All 9 Research Tools
+All 9 research tools adhere to the **Dense Report Standard**: strictly 300–380 words, dense bullet points, zero conversational filler, and clickable markdown source links (`- [Title](URL)`).
 
 ### Tool 1: Website Analyzer (`analyze_website`)
-- **Card Title in UI:** Website analyzer
-- **Input Needed:** `url` (e.g., `https://yourbrand.com` or competitor URL).
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/ai/tools/analyze_website.py`
-  - `SAHM-AI-backend/app/api/research.py` (prompt in `TOOL_PROMPTS["analyze_website"]`)
+- **Card in UI:** Website analyzer
+- **Input:** `url` (e.g., `https://yourbrand.com` or competitor URL).
 - **Execution Mechanism:**
-  - Fetches the webpage HTML using `httpx`.
-  - Cleans HTML via BeautifulSoup, extracting title, meta description, H1/H2 tags, pricing cues, and body text.
-  - LLM evaluates brand positioning, value propositions, trust signals, and CRO friction points.
-- **Output Structure:**
+  1. Validates URL scheme (`http://` or `https://`).
+  2. Fetches HTML using `httpx` and extracts body content via `BeautifulSoup` and `Trafilatura`.
+  3. Strips JavaScript, styling, and navigation boilerplate.
+  4. LLM analyzes brand positioning, core offers, trust badges, conversion friction points, and growth recommendations.
+- **Output Markdown Structure:**
   - `## Overview & Brand Positioning`
   - `## Core Offers & Value Propositions`
   - `## Trust Signals & Social Proof`
   - `## Conversion Friction & Gaps`
   - `## Actionable Recommendations for Growth`
-  - `## 🌐 Sources & References`
-- **User Experience Impact:** Users paste their own URL or a competitor's URL and immediately discover why visitors bounce and how to fix their landing page copy.
-- **Marketing Result Impact:** Direct lift in Conversion Rate (CVR) and clearer Unique Value Proposition (UVP).
-- **Improvement Ideas to Discuss with AI:**
-  - Add extraction of OpenGraph tags and schema.org microdata (e.g., Product pricing, ratings).
-  - Add page speed / mobile viewport responsiveness heuristics.
-
----
+  - `## 🌐 Sources & References` (Clickable link to analyzed domain)
+- **Marketing Impact:** Pinpoints landing page drop-off causes and lifts website Conversion Rate (CVR).
 
 ### Tool 2: Competitor Research (`analyze_competitor`)
-- **Card Title in UI:** Competitor research
-- **Input Needed:** `competitor` name or category (e.g., `"Tie House"` or `"specialty coffee cairo"`). Optional; falls back to category context.
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["analyze_competitor"]`)
-  - `SAHM-AI-backend/app/ai/providers/search.py`
+- **Card in UI:** Competitor research
+- **Input:** `query` (Competitor name or category, e.g. `"Tie House"`).
 - **Execution Mechanism:**
-  - Passes through `verify_and_resolve_entity` to ensure the brand is real and correct misspellings.
-  - Queries search engine: `"{brand} egypt brand store products positioning reviews"`.
-  - Analyzes market share, target demographic, promotional bundles, and vulnerabilities.
-- **Output Structure:**
+  1. Runs `verify_and_resolve_entity` to verify the brand and auto-correct typos.
+  2. Queries live search provider (Tavily/DDG) with regional targeting: `"{brand} egypt brand store products positioning reviews"`.
+  3. Analyzes market share, target customer demographic, advertising angles, pricing bundles, and competitive vulnerabilities.
+- **Output Markdown Structure:**
   - `## Competitor Overview & Market Share in Egypt`
   - `## Target Audience & Customer Demographics`
   - `## Advertising Angles, Hooks & Campaigns`
   - `## Pricing Strategy & Promotional Bundles`
   - `## Competitor Vulnerabilities & How We Outcompete Them`
-  - `## 🌐 Sources & References` (Clickable links)
-- **User Experience Impact:** Replaces hours of manual competitor browsing with an actionable counter-positioning brief.
-- **Marketing Result Impact:** Enables competitive ad campaigns that exploit competitor price weaknesses and service gaps.
+  - `## 🌐 Sources & References` (Clickable web sources)
+- **Marketing Impact:** Equips brands with counter-positioning angles to exploit competitor service gaps and price weaknesses.
 
----
-
-### Tool 3: Social Profile Analyzer (`analyze_social_profile`)
-- **Card Title in UI:** Social profile
-- **Input Needed:** `handle` (e.g., `@yourbrand` or `@competitorbrand`).
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["analyze_social_profile"]`)
-  - `SAHM-AI-backend/app/core/tools/connectors.py`
+### Tool 3: Social Profile Audit (`analyze_social_profile`)
+- **Card in UI:** Social profile
+- **Input:** `query` (Social handle or profile URL, e.g. `@el_araby_group`).
 - **Execution Mechanism:**
-  - Searches for recent public social posts, bio text, Reels engagement patterns, and comment sentiment.
-- **Output Structure:**
+  1. Performs indexed web discovery across Instagram, TikTok, and Facebook public footprints.
+  2. Identifies content pillars, top-performing media formats (Reels vs Carousels), brand voice, and audience comment sentiment.
+- **Output Markdown Structure:**
   - `## Core Content Pillars & Themes`
-  - `## Engagement Dynamics & Top-Performing Formats (Reels vs Carousels)`
+  - `## Engagement Dynamics & Top-Performing Formats`
   - `## Brand Tone of Voice & Visual Aesthetic`
   - `## Audience Reception & Comment Sentiment`
   - `## 'What to Post More Of' Strategic Action Items`
   - `## 🌐 Sources & References`
-- **User Experience Impact:** Gives founders and content creators a clear roadmap of high-engagement content topics.
-- **Marketing Result Impact:** Higher organic reach, reduced cost per follower, and improved social engagement rates.
+- **Marketing Impact:** Guides organic social media teams on what formats actually generate engagement in their niche.
 
----
-
-### Tool 4: Reviews & Sentiment (`analyze_reviews`)
-- **Card Title in UI:** Reviews
-- **Input Needed:** `url` or brand name (e.g., Google Maps link, Trustpilot URL, or store link). Optional.
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/ai/tools/get_reviews.py`
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["analyze_reviews"]`)
+### Tool 4: Customer Reviews & Sentiment (`analyze_reviews`)
+- **Card in UI:** Reviews & sentiment
+- **Input:** `query` (Brand name or Google Maps / e-commerce listing).
 - **Execution Mechanism:**
-  - Searches Google reviews, Facebook page reviews, and consumer forum discussions.
-  - Synthesizes recurring emotional themes and complaints.
-- **Output Structure:**
+  1. Gathers customer feedback from Google Maps (via Playwright or web search), Trustpilot, and social discussions.
+  2. Analyzes net sentiment, top praises, top customer complaints, and representative verbatim quotes.
+- **Output Markdown Structure:**
   - `## Overall Sentiment Score & Review Trends`
   - `## Top Customer Praises (What customers love)`
-  - `## Top Customer Complaints & Friction Points (What hurts sales)`
+  - `## Top Customer Complaints & Friction Points`
   - `## Representative Customer Quotes`
   - `## Strategic Fixes & Positioning Opportunities`
   - `## 🌐 Sources & References`
-- **User Experience Impact:** Highlights the exact vocabulary and emotional pain points customers express in their own words.
-- **Marketing Result Impact:** Copywriters use actual customer quotes in ad hooks, drastically improving Click-Through Rate (CTR).
+- **Marketing Impact:** Directly identifies product and delivery flaws (e.g. slow shipping to New Cairo) to turn into marketing trust guarantees.
 
----
-
-### Tool 5: Market Analysis (`analyze_market`)
-- **Card Title in UI:** Market analysis
-- **Input Needed:** Category or question (e.g., `"ready-to-drink coffee egypt"`). Optional.
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["analyze_market"]`)
+### Tool 5: Market Dynamics & Sizing (`analyze_market`)
+- **Card in UI:** Market dynamics
+- **Input:** `query` (Industry or category, e.g. `"Egyptian specialty coffee"`).
 - **Execution Mechanism:**
-  - Searches recent market reports, Egyptian economic news, and consumer spending data.
-- **Output Structure:**
+  1. Searches macro industry reports, economic news, and consumer spending data in Egypt.
+  2. Evaluates market size, 2026 growth trajectories, consumer shifts, and economic realities (currency inflation, import restrictions).
+- **Output Markdown Structure:**
   - `## Market Size & 2026 Growth Trajectory in Egypt`
   - `## Key Consumer Segments & Spending Behavior`
   - `## Emerging Category Trends & Consumer Shifts`
   - `## Economic Realities (Currency, imports, price elasticity)`
   - `## High-Growth Whitespaces & Category Opportunities`
   - `## 🌐 Sources & References`
-- **User Experience Impact:** Provides macro-level clarity on market sizing, consumer price sensitivity, and category trends.
-- **Marketing Result Impact:** Prevents businesses from launching products in shrinking categories; identifies emerging high-growth niches.
+- **Marketing Impact:** Protects business owners from launching unprofitable product lines in saturated market tiers.
 
----
-
-### Tool 6: Keyword Clusters (`analyze_keywords`)
-- **Card Title in UI:** Keywords
-- **Input Needed:** `seed` keyword (e.g., `"cold brew cairo"`).
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["analyze_keywords"]`)
+### Tool 6: SEO Keyword Demand (`analyze_keywords`)
+- **Card in UI:** Search keywords
+- **Input:** `query` (Seed keyword or topic, e.g. `"بدل رجالي كلاسيك"`).
 - **Execution Mechanism:**
-  - Analyzes search intent, clustering keywords into Transactional, Informational, and Long-Tail groups.
-- **Output Structure:**
-  - `## High-Intent Transactional Keyword Clusters (High buying intent)`
-  - `## Informational & Education Keyword Clusters (Research stage)`
+  1. Extracts transactional and informational search queries from search engine results and suggested questions.
+  2. Clusters keywords into high-buying-intent transactional terms, educational terms, and long-tail query silos.
+- **Output Markdown Structure:**
+  - `## High-Intent Transactional Keyword Clusters`
+  - `## Informational & Educational Keyword Clusters`
   - `## Estimated Search Demand & Competition Intensity`
   - `## Long-Tail Search Queries & Question Clusters`
   - `## Recommended Content Silos & Target Pages`
   - `## 🌐 Sources & References`
-- **User Experience Impact:** Organizes search terms by intent so the user knows what to target in Google Ads vs. SEO blog posts.
-- **Marketing Result Impact:** Lowers Google Search Ad Cost Per Click (CPC) and builds organic search traffic.
+- **Marketing Impact:** Informs organic search content strategy and Google Search ad copy.
 
----
-
-### Tool 7: Competitor Creatives & Ads (`analyze_competitor_creatives`)
-- **Card Title in UI:** Competitor ads
-- **Input Needed:** `competitor` name (e.g., `"Town Team"` or `"Tie House"`). Optional.
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["analyze_competitor_creatives"]`)
+### Tool 7: Competitor Creative Audit (`analyze_competitor_creatives`)
+- **Card in UI:** Competitor ad creatives
+- **Input:** `query` (Competitor brand name, e.g. `"Concrete Egypt"`).
 - **Execution Mechanism:**
-  - Generates live deep-link to Meta Ad Library Egypt for the brand.
-  - Analyzes competitor visual patterns, 3-second opening video hooks, promotional offers, and copywriting psychology.
-  - **Crucial Rule:** Does *not* write generic corporate histories; focuses 100% on ad creatives and psychology.
-- **Output Structure:**
+  1. Verifies the brand name and searches the Meta Ad Library and campaign footprints in Egypt.
+  2. Analyzes long-running evergreen ad angles, 3-second visual and audio hooks, creative formats (UGC vs Studio), promotional offers, and drafts 3 counter-concepts.
+- **Output Markdown Structure:**
   - `## 🎬 Long-Running Creative Concepts & Core Ad Angles`
   - `## 🪝 3-Second Hook Analysis (Visual & Headline Hooks)`
-  - `## 📱 Creative Formats & Production Styles Breakdown (UGC vs Studio)`
+  - `## 📱 Creative Formats & Production Styles Breakdown`
   - `## 🏷️ Promotional Offers, Hooks & Call-to-Actions (CTAs)`
-  - `## 💡 How to Out-Create Them (3 Actionable Ad Concepts for Our Brand)`
-  - `## 🌐 Sources & References` (Includes Meta Ad Library link)
-- **User Experience Impact:** Users immediately see the exact ad styles and opening hooks their competitors are spending budget on.
-- **Marketing Result Impact:** Direct increase in Thumb-Stop Ratio (3-second video views) and ROAS.
+  - `## 💡 How to Out-Create Them (3 Actionable Ad Concepts)`
+  - `## 🌐 Sources & References` (Clickable links to ad campaigns and Meta Ad Library)
+- **Marketing Impact:** Prevents creative fatigue and inspires high-CTR video hooks based on proven market spend.
 
----
-
-### Tool 8: Market Gaps (`detect_market_gaps`)
-- **Card Title in UI:** Market gaps
-- **Input Needed:** Optional (synthesizes all research stored so far in Brand Memory).
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["detect_market_gaps"]`)
+### Tool 8: Market Whitespace Detection (`detect_market_gaps`)
+- **Card in UI:** Market gaps & opportunities
+- **Input:** `query` (Optional; analyzes accumulated brand memory across all past research runs).
 - **Execution Mechanism:**
-  - Queries recent `BrandMemoryItem` rows (competitor analyses, review sentiment, website audits) and identifies unserved customer frustrations and pricing gaps.
-- **Output Structure:**
+  1. Pulls all previously saved `BrandMemoryItem` records for the business.
+  2. Synthesizes unserved customer needs, missing pricing tiers, and product whitespaces into a ranked matrix.
+- **Output Markdown Structure:**
   - `## Executive Opportunity Summary`
   - `## Unserved Customer Needs & Frustrations in the Category`
   - `## Pricing Gaps (Missing luxury or quality mid-tier options)`
   - `## Product, Quality & Service Whitespaces`
   - `## Ranked Opportunities by Revenue Potential & Feasibility`
   - `## 🌐 Sources & References`
-- **User Experience Impact:** Identifies high-margin product or service opportunities that competitors ignore.
-- **Marketing Result Impact:** Unlocks new revenue streams and defensible product-market fit.
+- **Marketing Impact:** Identifies blue-ocean product opportunities where competitors are absent.
 
----
-
-### Tool 9: Marketing Strategy (`generate_marketing_strategy`)
-- **Card Title in UI:** Marketing strategy
-- **Input Needed:** Notes / focus areas (optional).
-- **Files to Edit:**
-  - `SAHM-AI-backend/app/api/research.py` (`TOOL_PROMPTS["generate_marketing_strategy"]`)
+### Tool 9: 90-Day Strategic Blueprint (`generate_marketing_strategy`)
+- **Card in UI:** Strategic roadmap
+- **Input:** `query` (Optional; defaults to comprehensive 90-day growth plan).
 - **Execution Mechanism:**
-  - Acts as a Fractional CMO, pulling brand context and market research to construct a 90-day execution blueprint.
-- **Output Structure:**
+  1. Synthesizes brand goals, monthly budget, and competitor insights into a 3-month tactical execution plan.
+  2. Allocates budget across Meta, TikTok, Google, and Influencers with target ROAS and CAC metrics.
+- **Output Markdown Structure:**
   - `## Core Brand Positioning & The Unfair Advantage Hook`
   - `## 90-Day Execution Roadmap (Month 1: Foundation, Month 2: Scale, Month 3: Optimize)`
-  - `## Channel Allocation & Budget Strategy (Meta, TikTok, Google, WhatsApp)`
+  - `## Channel Allocation & Budget Strategy`
   - `## Key Metrics & Targets (CAC, ROAS, Target Order Volume)`
   - `## Immediate Top 3 Action Items for This Week`
   - `## 🌐 Sources & References`
-- **User Experience Impact:** Transforms fragmented marketing tactics into a cohesive, prioritized 90-day plan.
-- **Marketing Result Impact:** Eliminates wasted ad spend and aligns budget with profitable channels.
+- **Marketing Impact:** Provides executive direction with immediate, prioritized weekly action items.
 
 ---
 
-## 6. The Memory Distillation Contract (Preventing Token Bloat)
+## 4. Catalog of Live Agent Tools (`app/ai/tools/`)
 
-Whenever you add or modify a tool in `app/api/research.py`, **you must preserve this distillation pattern**:
+These tools are bound directly to LangGraph agents for autonomous decision-making and data collection:
 
+| Tool Function | File Path | Bound Agent(s) | Purpose & Capabilities |
+| :--- | :--- | :--- | :--- |
+| `web_search_tool` | `app/ai/tools/search.py` | Nour, Omar | Queries Tavily / DuckDuckGo; uses fast LLM summarizer to return facts under 150 words. Strict limit of 2 calls per run. |
+| `get_brand_context_tool`| `app/ai/tools/brand_context.py` | All Agents | Retrieves active brand profile (voice, audience, currency, goals) from database. |
+| `analyze_website_tool` | `app/ai/tools/analyze_website.py` | Nour | Fetches and extracts clean body text from any HTTP/HTTPS URL via Trafilatura. |
+| `get_reviews_tool` | `app/ai/tools/get_reviews.py` | Nour | Extracts customer ratings and reviews using Google Places API or Playwright scraper. |
+| `get_reviews_playwright`| `app/ai/tools/get_reviews_playwright.py` | CLI / Nour | Headless Chromium scraper extracting review counts, star ratings, and review cards directly from Google Maps URLs. |
+| `fetch_competitor_ads` | `app/ai/tools/fetch_competitor_ads.py` | Nour | Apify actor client that extracts active Facebook Ad Library copy, media assets, and keywords. |
+| `fetch_ga4_performance`| `app/ai/tools/fetch_ga4_performance.py`| Karim | Google Analytics Data API client extracting sessions, page views, bounce rate, and conversions over date ranges. |
+| `generate_marketing_strategy` | `app/ai/tools/strategy/generate_marketing_strategy.py` | Omar | Structured Pydantic tool generating positioning, target personas, and 90-day roadmap. |
+| `generate_campaign_strategy` | `app/ai/tools/strategy/generate_campaign_strategy.py` | Omar | Generates campaign big idea and channel budget shares that strictly sum to 100%. |
+| `generate_content_calendar` | `app/ai/tools/strategy/generate_content_calendar.py` | Omar | Generates multi-day post schedule and auto-persists records into `ContentItem` database table. |
+| `submit_research_report`| `app/ai/agents/nour/graph.py` | Nour | Final submission tool carrying typed `MarketResearchReport` payload. |
+| `submit_strategy_report`| `app/ai/agents/omar/graph.py` | Omar | Final submission tool carrying typed `StrategyReport` payload. |
+| `submit_creative_brief` | `app/ai/agents/layla/graph.py` | Layla | Final submission tool carrying typed `CreativeBrief` payload. |
+| `submit_performance_report`| `app/ai/agents/karim/graph.py`| Karim | Final submission tool carrying typed `PerformanceReport` payload. |
+| `submit_optimization_plan`| `app/ai/agents/salma/graph.py` | Salma | Final submission tool carrying typed `OptimizationPlan` payload. |
+
+---
+
+## 5. Protected Write Tools & Human-in-the-Loop Safety
+
+SAHM enforces a strict security policy: **No AI agent can write directly to external advertising platforms.**
+
+```
+Agent Detects Inefficiency (e.g. Campaign ad set CPA is 40% above target)
+                    │
+                    ▼
+     create_recommendation Tool
+     (Saves recommendation record in PostgreSQL with status="pending")
+                    │
+                    ▼
+           Human Review Dialog (UI)
+     User inspects estimated impact and before/after diff:
+     - Before: Daily Budget 500 EGP
+     - After:  Daily Budget 300 EGP
+                    │
+          +---------+---------+
+          │                   │
+       Approved            Rejected
+          │                   │
+          ▼                   ▼
+     POST /recommendations/   status="rejected"
+     {id}/approve (confirm=true)
+          │
+          ▼
+     Protected Tool (apply_change)
+     Executes change on Meta Graph API
+     Logs immutable entry in audit_logs table
+```
+
+### The Two Protected Write Tools (`app/core/tools/protected.py`):
+1. **`apply_change`**: Updates campaign budgets, status (pause/activate), or targeting parameters on Meta Graph API. Requires a valid `recommendation_id` confirmed by a user with `member` or `owner` role.
+2. **`publish_campaign`**: Publishes a drafted campaign from `Campaign` table to Meta Ads Manager.
+
+*Neither tool is registered in `registry.py` or available to LLM tool bindings. They can only be executed by `app/core/approvals/service.py` after human confirmation.*
+
+---
+
+## 6. How LangGraph Agents Work (The Execution Loop)
+
+Every agent in `app/ai/agents/` follows a standardized LangGraph state loop:
+
+```mermaid
+flowchart TD
+    START --> agent["Agent Node (LLM with Bound Tools)"]
+    agent --> should_continue{"Has Tool Calls?"}
+    should_continue -- Yes --> tools["Tools Node (ToolNode Execution)"]
+    should_continue -- No --> END
+    tools --> post_tools_routing{"Was Submitter Tool Called?"}
+    post_tools_routing -- Yes (submit_* called) --> END
+    post_tools_routing -- No --> agent
+```
+
+### Key LangGraph Rules:
+1. **Submitter Tool Termination:** When an agent finishes its work, it calls its dedicated submitter tool (e.g. `submit_research_report`). `post_tools_routing` detects this tool name and immediately routes to `END`.
+2. **Deep Argument Extraction:** In `app/ai/agents/orchestrator/brain.py`, the orchestrator inspects the second-to-last message (`messages[-2]`) to extract the full arguments dictionary from the tool call rather than returning the literal return string (`"REPORT_SUBMITTED_SUCCESSFULLY"`).
+3. **Format Tool Payload to Markdown:** The function `format_tool_payload_to_markdown` in `brain.py` converts the structured arguments dictionary into clean, styled Markdown with section headers and bullet points before UI block conversion.
+
+---
+
+## 7. How to Build a New Tool in 5 Steps
+
+Follow this exact recipe whenever you build a new tool for SAHM AI:
+
+### Step 1: Define the Pydantic Input Schema
+Create your input schema in `app/ai/tools/your_tool.py`:
 ```python
-# 1. Distill the 380-word report to an 80-120 word memory note
-distill_sys = SystemMessage(content=(
-    "You are an AI Memory Distiller for SAHM OS.\n"
-    "Distill this research report into an ultra-compact brand memory note for AI marketing agents.\n"
-    "STRICT CONSTRAINT: Exactly 80 to 120 words maximum.\n"
-    "Focus only on key factual intelligence: competitor strengths/weaknesses, audience desires, price points, and winning creative angles.\n"
-    "Format as 3-4 dense bullet points. Zero conversational filler."
-))
-distill_usr = HumanMessage(content=f"Research Title: {title}\nReport:\n{summary_text}")
-distill_res = await asyncio.to_thread(fast_llm.invoke, [distill_sys, distill_usr])
-compact_memory_text = extract_clean_text(distill_res.content)
+from pydantic import BaseModel, Field
 
-# 2. Store compact text in DB column, full report in metadata
-mem_item = BrandMemoryItem(
-    id=memory_id,
-    business_id=ws.business_id,
-    kind=kind,
-    text=compact_memory_text,             # <-- ONLY ~100 tokens loaded by AI agents!
-    metadata_={
-        "tool": tool_type,
-        "query": query,
-        "title": title,
-        "full_report": summary_text,       # <-- Full report preserved for UI display!
-        "details": {...},
-    },
-)
-db.add(mem_item)
+class AnalyzeTiktokHashtagInput(BaseModel):
+    hashtag: str = Field(description="Target TikTok hashtag without the # symbol, e.g. 'cairofashion'.")
+    region: str = Field(default="EG", description="Two-letter country code.")
 ```
 
----
+### Step 2: Implement the Tool Function
+Decorate your async or sync function with `@tool(args_schema=...)`:
+```python
+from langchain_core.tools import tool
 
-## 7. How to Talk to AI: Ready-to-Use Prompt Templates
-
-Copy and paste these prompts into your AI coding assistant (ChatGPT, Claude, Gemini) when working on tools or agents:
-
-### Prompt Template 1: Improving an Existing Tool
-```text
-I am working on the SAHM Marketing OS project. Please read TEAM_TOOLS_AND_AGENTS_GUIDE.md for our architectural rules.
-I want to improve the tool: [insert tool name, e.g., analyze_competitor_creatives].
-Relevant file: SAHM-AI-backend/app/api/research.py.
-
-Goals:
-1. Ensure the prompt produces strictly under 380 words of high-density bullet points in clean Markdown.
-2. Ground findings in live evidence and include clickable markdown source citations.
-3. Preserve the dual-layer memory pattern (compact ~100 tokens in BrandMemoryItem.text, full report in metadata).
-4. Eliminate any Python dictionary leaks or raw JSON formatting in the output.
-
-Please review the existing implementation and provide the updated code with rationale.
+@tool(args_schema=AnalyzeTiktokHashtagInput)
+async def analyze_tiktok_hashtag(hashtag: str, region: str = "EG") -> dict:
+    """Analyzes view counts and trending creator hooks for a given TikTok hashtag in Egypt."""
+    # 1. Fetch live data via HTTP client or scraper
+    # 2. Return clean dictionary with facts
+    return {
+        "hashtag": hashtag,
+        "views_estimate": "45.2M",
+        "top_hooks": ["Top 3 wedding dress shops in Cairo", "Budget styling challenge"],
+        "competition": "medium"
+    }
 ```
 
-### Prompt Template 2: Adding a Brand New Tool
-```text
-I am adding a new tool to SAHM Marketing OS: [tool name, e.g., analyze_whatsapp_funnel].
-Please follow the guidelines in TEAM_TOOLS_AND_AGENTS_GUIDE.md:
-1. Define the Pydantic request schema and tool type.
-2. Define the prompt in TOOL_PROMPTS with DENSE_REPORT_PREFIX and structured Markdown headings.
-3. Define the live data gathering step (web search / scraping).
-4. Implement entity verification & typo handling if applicable.
-5. Save the distilled result to BrandMemoryItem with the dual-layer storage pattern.
-6. Provide the frontend ToolConfig entry for SAHM-AI-frontend/src/components/research/research-view.tsx.
+### Step 3: Handle Database Persistence (If Saving an Asset)
+If your tool produces a persistent entity (like a `ContentItem`, `Creative`, or `BrandMemoryItem`), inject the database session or use `session_scope()`:
+```python
+from app.db.models import BrandMemoryItem
+from app.db.session import session_scope
+
+async def save_hashtag_memory(business_id: str, data: dict):
+    async with session_scope() as session:
+        item = BrandMemoryItem(
+            id=f"mem_tt_{uuid.uuid4().hex[:12]}",
+            business_id=business_id,
+            kind="market_research",
+            text=f"TikTok hashtag #{data['hashtag']} in {data['region']} has {data['views_estimate']} views.",
+            metadata_={"full_report": data}
+        )
+        session.add(item)
 ```
 
-### Prompt Template 3: Tuning an Agent Persona (e.g., Nour, Omar, Salma)
-```text
-I want to enhance the agent [e.g., Omar the copywriter] in SAHM Marketing OS.
-Files: SAHM-AI-backend/app/ai/agents/omar/prompts.py and agent.py.
+### Step 4: Bind the Tool to the Desired Agent
+Add the tool to the agent's tool list in `app/ai/agents/<agent_name>/graph.py`:
+```python
+from app.ai.tools.your_tool import analyze_tiktok_hashtag
 
-Requirements:
-1. Infuse culturally native Egyptian marketing psychology (e.g., EGP currency considerations, urgency hooks, colloquial Arabic & English).
-2. Ensure the agent uses retrieved BrandMemoryItems effectively without repeating old conversations.
-3. Ensure the agent provides structured deliverables (Hook, Body, CTA, Visual Concept) rather than generic marketing advice.
+# Add to agent tools
+NOUR_TOOLS = [..., analyze_tiktok_hashtag]
 ```
+Update the agent's prompt in the same file to describe when and how to call the tool.
 
----
+### Step 5: Test the Tool
+Write a targeted unit or integration test in `tests/test_your_tool.py`:
+```python
+import pytest
+from app.ai.tools.your_tool import analyze_tiktok_hashtag
 
-## 8. Verification & Testing Checklist Before Pushing
-
-Before committing any tool or agent changes, run this 4-step checklist:
-
-1. **Verify No Raw Hash `#` Leaks in UI:**
-   Ensure headings render as styled HTML (`<h2>`, `<h3>`), not plain text `# Title`.
-2. **Verify Memory Item Token Count:**
-   Query `BrandMemoryItem.text` in the database and verify it is under 120 words (~100 tokens).
-3. **Verify Full Report in Metadata:**
-   Check that `BrandMemoryItem.metadata_["full_report"]` contains the complete report and that `GET /api/v1/research/items` returns it to the UI.
-4. **Run TypeScript Check:**
-   In `SAHM-AI-frontend`, run:
-   ```bash
-   npx tsc --noEmit
-   ```
-   Must complete with **0 errors**.
-5. **Git Synchronization:**
-   Commit to `tools-development`, merge/push to `ahmed` and `main` branches.
+@pytest.mark.asyncio
+async def test_analyze_tiktok_hashtag():
+    result = await analyze_tiktok_hashtag.ainvoke({"hashtag": "cairofashion", "region": "EG"})
+    assert "top_hooks" in result
+```

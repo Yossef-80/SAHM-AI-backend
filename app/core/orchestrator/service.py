@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
@@ -274,6 +274,18 @@ async def get_conversation(
     conversation = await db.scalar(stmt)
     if conversation is None:
         raise NotFoundError(f"conversation '{conversation_id}' not found")
+    def _msg_sort_key(m: Message) -> tuple[float, int]:
+        t = m.created_at
+        if t is None:
+            return (0.0, 0 if m.role == "user" else 1)
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        return (t.timestamp(), 0 if m.role == "user" else 1)
+
+    sorted_messages = sorted(
+        conversation.messages,
+        key=_msg_sort_key,
+    )
     messages = [
         MessageSchema(
             id=m.id,
@@ -284,7 +296,7 @@ async def get_conversation(
             task_id=m.task_id,
             persona_id=m.persona_id,
         )
-        for m in conversation.messages
+        for m in sorted_messages
     ]
     ctx = conversation.context or {}
     return ConversationDetail(
@@ -307,6 +319,7 @@ async def _persist_message(
     blocks: list[dict[str, Any]],
     task_id: str | None = None,
     persona_id: str | None = None,
+    created_at: datetime | None = None,
 ) -> Message:
     message = Message(
         id=_new_id("msg"),
@@ -316,6 +329,7 @@ async def _persist_message(
         blocks=blocks,
         task_id=task_id,
         persona_id=persona_id,
+        created_at=created_at or _now(),
     )
     db.add(message)
     await db.flush()
@@ -378,7 +392,7 @@ async def handle_message(
         await db.execute(
             select(Message)
             .where(Message.conversation_id == conversation.id)
-            .order_by(Message.created_at.asc())
+            .order_by(Message.created_at.asc(), desc(Message.role))
         )
     ).scalars().all()
 
@@ -400,12 +414,14 @@ async def handle_message(
     if context.get("competitor_name") and str(context["competitor_name"]).lower() not in routed_message.lower():
         routed_message = f"[Target Competitor: {context['competitor_name']}] {routed_message}"
 
+    user_now = _now()
     await _persist_message(
         db,
         conversation_id=conversation.id,
         role="user",
         content=request.message,
         blocks=[{"type": "text", "text": request.message}],
+        created_at=user_now,
     )
     if not conversation.title:
         conversation.title = request.message[:80]
@@ -460,7 +476,12 @@ async def handle_message(
     if not content or content == "[]":
         content = str(final.get("error") or "")
 
-    await _persist_message(
+    from datetime import timedelta
+    asst_now = _now()
+    if asst_now <= user_now:
+        asst_now = user_now + timedelta(milliseconds=100)
+
+    asst_row = await _persist_message(
         db,
         conversation_id=conversation.id,
         role="assistant",
@@ -468,6 +489,7 @@ async def handle_message(
         blocks=blocks,
         task_id=final.get("task_id"),
         persona_id=str(agent_result.get("persona_id") or ""),
+        created_at=asst_now,
     )
     await db.commit()
 
@@ -480,11 +502,11 @@ async def handle_message(
             _logger.warning("ltm_debouncer_schedule_failed", extra={"error": str(exc)})
 
     message = MessageSchema(
-        id=_new_id("msg"),
+        id=asst_row.id,
         role="assistant",
         content=content,
         blocks=blocks,
-        created_at=_now(),
+        created_at=asst_now,
         task_id=final.get("task_id"),
         persona_id=str(agent_result.get("persona_id") or ""),
     )

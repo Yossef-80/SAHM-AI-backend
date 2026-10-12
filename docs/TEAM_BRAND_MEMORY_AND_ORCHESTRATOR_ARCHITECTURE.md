@@ -1,85 +1,86 @@
 # 🧠 SAHM Brand Memory & Orchestrator Architecture Guide
 
-> **Target Audience:** Engineering team, AI engineers, and developers working on SAHM Marketing OS.  
-> **Purpose:** A complete, deep-dive explanation of how memory works, what is stored in Brand Memory, how items are prioritized and ordered, how summarization is triggered, how context is passed into the Orchestrator, and how to control everything via environment variables.
+> **Target Audience:** Engineering team, AI engineers, and system architects working on SAHM Marketing OS.  
+> **Purpose:** A complete, deep-dive architectural manual explaining how memory is structured, how token bloat is eliminated, how facts and plans are separated, how the Orchestrator routes user prompts, how UI Blocks are generated, and how background memory debouncers operate.
 
 ---
 
-## 1. Executive Overview
+## 1. Executive Overview & The Problem with Naive AI Memory
 
-In SAHM AI, **Memory** is the cognitive bridge connecting market research, customer interactions, and multi-agent execution. Without memory, each agent interaction starts from zero, wasting tokens and forcing users to repeatedly explain their brand, competitors, and products.
+In a multi-agent marketing operating system, **Memory** is the cognitive bridge between market research, past campaign outcomes, brand identity, and multi-agent execution. Without memory, every agent interaction starts from zero, forcing users to repeatedly explain their brand, target audience, competitors, and budgets.
 
-### The Problem With Naive Memory:
-If you save full 1,500-word research reports or 30 turns of raw chat into an AI agent's prompt, you encounter **Context Window Bloat**:
-1. **High Token Costs:** Passing 15,000 tokens on every message exhausts daily budgets rapidly.
-2. **Slow Response Times:** Huge context windows degrade LLM inference speeds.
-3. **Lost in the Middle:** Large Language Models lose focus when bombarded with repetitive conversational chit-chat.
+### The Pitfalls of Naive AI Memory:
+1. **Context Window Overflow:** Appending 30 turns of raw conversational chit-chat or saving full 1,500-word market research reports into an agent's prompt causes prompts to exceed 10,000–20,000 tokens per message.
+2. **Exponential Token Costs:** Ingesting 20,000 tokens on every routine user query exhausts API budgets within days.
+3. **Severe Latency:** High prompt token counts significantly increase Time-to-First-Token (TTFT) and inference latency.
+4. **"Lost in the Middle" Degradation:** Large language models suffer degraded instruction-following when relevant brand facts are buried inside thousands of words of conversational noise.
+5. **Plan Contamination:** When an agent's prompt mixes general brand facts with an unconfirmed, drafted marketing plan, the router mistakenly believes the user wants to execute the plan instead of answering a simple question.
 
-### The SAHM Solution: A 4-Tier Memory Hierarchy
-SAHM solves this with a **4-tier memory hierarchy** powered by dynamic token threshold compression, background inactivity debouncing, and dual-layer database storage:
+### The SAHM Solution: A 4-Tier Memory Hierarchy + Orchestrator Brain
+SAHM solves these challenges through a **4-tier memory hierarchy**, language-aware token estimation, background debouncing, and strict plan/fact context separation:
 
 ```
-+---------------------------------------------------------------------------------------+
-|                                4-TIER MEMORY HIERARCHY                                |
-+---------------------------------------------------------------------------------------+
-|                                                                                       |
-|  [TIER 1: Working Turn History]                                                       |
-|  • Active chat messages in current session buffer.                                    |
-|  • Passes raw user/assistant turns while total tokens < MEMORY_SESSION_MAX_TOKENS.    |
-|                                                                                       |
-|  [TIER 2: Dynamic Session Summary (conversation.summary)]                             |
-|  • Triggered automatically when chat session exceeds MEMORY_SESSION_MAX_TOKENS.      |
-|  • Older turns are condensed by fast_llm into a unified summary (<250 words).         |
-|  • Keeps only the last MEMORY_RETAIN_RECENT_TURNS raw turns alongside the summary.     |
-|                                                                                       |
-|  [TIER 3: Brand Memory Items (BrandMemoryItem Table)]                                 |
-|  • Persistent marketing intelligence from the Research Hub & tool runs.               |
-|  • DUAL-LAYER STORAGE:                                                                |
-|      - text column: Strictly compact (80-120 words / ~100 tokens) for AI recall.      |
-|      - metadata_["full_report"]: Complete 380-word structured report for UI display.  |
-|                                                                                       |
-|  [TIER 4: Global Brand Brain / LTM (Profile.user_context_summary)]                    |
-|  • Single permanent profile anchor across all conversations (strictly < 300 tokens).   |
-|  • Maintained in background by MemoryDebouncer after MEMORY_LTM_DEBOUNCE_SECONDS.     |
-|                                                                                       |
-+---------------------------------------------------------------------------------------+
++----------------------------------------------------------------------------------------------------+
+|                                    4-TIER MEMORY HIERARCHY                                         |
++----------------------------------------------------------------------------------------------------+
+|                                                                                                    |
+|  [TIER 1: Working Turn History]                                                                    |
+|  • Active chat messages in the current conversation buffer (messages table).                       |
+|  • Passes raw user/assistant turns while total estimated tokens < MEMORY_SESSION_MAX_TOKENS (1500).|
+|                                                                                                    |
+|  [TIER 2: Dynamic Session Summary (conversation.summary)]                                          |
+|  • Triggered automatically when active session tokens exceed MEMORY_SESSION_MAX_TOKENS.            |
+|  • Older turns are condensed by fast_llm into a concise session summary (<250 words).              |
+|  • Retains only the last MEMORY_RETAIN_RECENT_TURNS (default: 2) raw turns alongside the summary.  |
+|                                                                                                    |
+|  [TIER 3: Brand Memory Items (BrandMemoryItem Table)]                                              |
+|  • Persistent marketing intelligence from research runs, website audits, and competitor notes.     |
+|  • DUAL-LAYER STORAGE:                                                                             |
+|      - text column: Strictly compact (80-120 words / ~100 tokens) for AI prompt injection.         |
+|      - metadata_["full_report"]: Complete 380-word structured report for UI display.               |
+|                                                                                                    |
+|  [TIER 4: Global Brand Brain / LTM (Profile.user_context_summary)]                                 |
+|  • Single permanent brand anchor across all conversations (strictly < 300 tokens).                 |
+|  • Maintained in background by MemoryDebouncer after 3 minutes of user inactivity.                 |
+|                                                                                                    |
++----------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
 ## 2. What Is Stored in Brand Memory (`BrandMemoryItem`)?
 
-The `BrandMemoryItem` table (in `app/db/models.py`) stores verified commercial intelligence generated by research tools and autonomous agents.
-
-### Database Schema
+The `BrandMemoryItem` table in PostgreSQL (`app/db/models.py`) stores commercial intelligence generated by research tools and agents:
 
 ```sql
 CREATE TABLE brand_memory_items (
     id VARCHAR(64) PRIMARY KEY,                -- e.g. "mem_res_510a4c514cf0"
-    business_id VARCHAR(64) NOT NULL,          -- Multi-tenant isolation (foreign key to businesses.id)
-    kind VARCHAR(32) NOT NULL,                 -- Category of the intelligence artifact
-    text TEXT NOT NULL,                        -- COMPACT distilled facts (~80-120 words for AI prompt injection)
-    metadata_ JSONB DEFAULT '{}',              -- Full report, sources, query, and analysis timestamps
-    created_at TIMESTAMP WITH TIME ZONE        -- Creation timestamp for temporal sorting
+    business_id VARCHAR(64) NOT NULL,          -- Multi-tenant isolation (FK to businesses.id)
+    kind VARCHAR(40) NOT NULL,                 -- Category enum
+    text TEXT NOT NULL,                        -- COMPACT distilled facts (~80-120 words for AI injection)
+    embedding VECTOR(1536),                    -- pgvector cosine similarity vector
+    metadata JSONB DEFAULT '{}',               -- Full report, citations, and analysis payloads
+    campaign_id VARCHAR(64),                   -- Optional link to campaign
+    created_at TIMESTAMP WITH TIME ZONE        -- Temporal ordering
 );
 ```
 
 ### The 6 Core Memory `kind` Categories
 
-| `kind` Enum | Originating Tool | What Is Stored Inside | Example Facts Preserved |
+| `kind` Enum | Originating Tool | Contents & Focus | Example Preserved Fact |
 | :--- | :--- | :--- | :--- |
-| `competitor_note` | `analyze_competitor`, `analyze_competitor_creatives` | Competitor market share, price anchors, ad hooks, weaknesses, and counter-positioning angles. | *"Tie House: Egyptian apparel brand since 1995. Offers 3 shirts for 999 EGP. Vulnerable in video lifestyle storytelling."* |
+| `competitor_note` | `analyze_competitor`, `analyze_competitor_creatives` | Competitor market share, price anchors, ad hooks, weaknesses, and counter-positioning. | *"Tie House: Egyptian apparel brand since 1995. Offers 3 shirts for 999 EGP. Vulnerable in video lifestyle storytelling."* |
 | `website_analysis` | `analyze_website` | Conversion rate friction, trust badges, UVPs, and landing page audit notes. | *"Brand UVP: Cold brew on subscription. Friction: Checkout requires 4 steps, lacks ApplePay/ValU."* |
 | `market_research` | `analyze_market`, `analyze_reviews`, `analyze_keywords` | Consumer sentiment scores, recurring customer complaints, keyword demand clusters, and macro trends. | *"High search demand for 'cold brew cairo'. 68% of reviews complain about slow delivery to New Cairo."* |
 | `market_gaps` | `detect_market_gaps` | Synthesized category whitespaces, unserved pricing tiers, and ranked growth opportunities. | *"Whitespace: No premium canned sugar-free iced coffee in Egypt priced between 50-70 EGP."* |
-| `strategy_blueprint` | `generate_marketing_strategy` | 90-day execution milestones, budget allocation across Meta/TikTok/Google, target CAC/ROAS. | *"Month 1: UGC Reels hook testing. Budget: 60% Meta, 30% TikTok, 10% Google. Target ROAS: 3.5x."* |
+| `strategy_blueprint` | `generate_marketing_strategy` | 90-day execution milestones, channel budget allocations, target CAC/ROAS. | *"Month 1: UGC Reels hook testing. Budget: 60% Meta, 30% TikTok, 10% Google. Target ROAS: 3.5x."* |
 | `brand_voice_rules` | Agent learning / User settings | Brand tone, forbidden claims, required terminology, and primary customer demographic. | *"Tone: Authoritative yet witty. Forbidden words: 'Cheap', 'Discount'. Currency: EGP only."* |
 
 ---
 
 ## 3. The Dual-Layer Storage Pattern (Anti-Token-Bloat)
 
-One of the most important architectural patterns in SAHM OS is the **Dual-Layer Storage Pattern**:
+The **Dual-Layer Storage Pattern** is the foundational mechanism that allows human users to inspect deep, multi-paragraph reports while ensuring AI agents never exceed their token budget:
 
 ```
 Research Tool Execution (e.g., analyze_competitor on "Tie House")
@@ -102,152 +103,170 @@ Research Tool Execution (e.g., analyze_competitor on "Tie House")
    Panel for human eyes
 ```
 
-### Why This Matters:
-- **For the User:** The user sees a beautiful, multi-section 380-word report with clickable source links, competitor hook breakdowns, and recommendations.
-- **For the AI Agents:** When Omar, Nour, or Karim read the brand memory, they ingest only ~100 tokens per memory item instead of 1,500 tokens. Ten competitor analyses cost **1,000 tokens** instead of **15,000 tokens**!
+### The Math:
+- **Without Dual-Layer Storage:** 10 research items × 1,500 tokens = **15,000 tokens** injected into every agent prompt.
+- **With Dual-Layer Storage:** 10 research items × 100 tokens = **1,000 tokens** injected into agent prompts.
+- **Net Result:** 93.3% token reduction with zero loss of human-readable detail.
 
 ---
 
-## 4. Ordering, Priorities & Retrieval Logic
+## 4. Language-Aware Token Estimation & Boundary Truncation
 
-When agents query memory, what gets prioritized and in what order?
+Naive token estimation formulas (like `characters / 4`) fail catastrophically on Arabic text. Arabic script uses multi-byte UTF-8 representations and compact morphemes where a single Arabic word can represent an entire sentence.
 
-### 1. Strict Tenant Isolation (Priority 0)
-All queries enforce `BrandMemoryItem.business_id == ws.business_id`. A business can **never** see or retrieve another business's memory items.
+In `app/ai/memory/compressor.py`, token counting is handled by `count_tokens()`:
+1. **Primary Counter:** Uses `tiktoken` with the `cl100k_base` BPE tokenizer.
+2. **Calibrated Fallback:** If `tiktoken` is unavailable, applies language-aware character weighting:
+   $$\text{Arabic Characters } (\text{\textbackslash u0600–\textbackslash u06FF}): \sim 1.8 \text{ characters per token}$$
+   $$\text{Latin / Standard Characters}: \sim 3.5 \text{ characters per token}$$
 
-### 2. Temporal Recency (Priority 1)
-All memory queries order by `created_at DESC`:
+### Boundary-Aware Truncation (`_truncate_to_boundary`)
+When text must be capped, naive substring slicing cuts words in half or leaves dangling sentences. SAHM implements boundary truncation:
+1. Slices at paragraph breaks (`\n\n`) first.
+2. If still over cap, slices at bullet points (`\n- `).
+3. If still over cap, slices at sentence boundaries (`.` , `!` , `?` , `؟`).
+4. Never emits broken words or unfinished thoughts.
+
+---
+
+## 5. Strict Separation of Brand Facts vs. Active Plans
+
+One of the most critical architectural breakthroughs in SAHM OS is the separation of **Brand Facts** from **Active Plans**:
+
+```
+                       USER REQUEST ENTERING SYSTEM
+                                    │
+               +--------------------+--------------------+
+               │                                         │
+               ▼                                         ▼
+   [Brand Facts / Global LTM]                [Active Marketing Plans]
+   Source: Profile.user_context_summary      Source: BrandMemoryItem.text
+   Content: Brand name, industry, UVP,       (kind == 'strategy_blueprint')
+   target audience, currency, tone.          Content: 90-day roadmaps, budget splits,
+   Size: Strictly < 300 tokens               campaign big ideas.
+               │                                         │
+               ▼                                         ▼
+   Injected into ALL Router Calls            Injected ONLY into Strategy Agents
+   (The Orchestrator uses this to know       (Omar & Salma receive this ONLY when
+   who the brand is WITHOUT assuming         their intent is explicitly chosen.
+   the user wants to execute a plan)         Never injected into Router!)
+```
+
+### Why This Separation Is Essential:
+If an active marketing plan (e.g. *"Launch a 50,000 EGP Black Friday campaign on Meta"*) is passed into the Orchestrator router prompt, the router misinterprets casual questions like *"How are you?"* or *"Who are my competitors?"* as an instruction to execute the campaign plan. By isolating plans to Omar and Salma, the router remains objective and deterministic.
+
+---
+
+## 6. The Orchestrator Brain & Deterministic Routing
+
+The Orchestrator (`app/ai/agents/orchestrator/brain.py`) acts as the Chief of Staff.
+
+### Routing Configuration:
+- **Model:** Fast LLM with `temperature=0.0` for 100% deterministic intent classification.
+- **Output Schema:** Pydantic `RoutingDecision` (`agent`: Literal["nour", "omar", "layla", "karim", "salma", "chat", "unknown"], `reason`: str).
+
+### Routing Rules Matrix:
+
+| User Intent in Newest Turn | Routed Agent | Key Trigger Keywords / Mentions |
+| :--- | :--- | :--- |
+| Live web crawl, competitor teardown, reviews, market gaps | **`nour`** | `@Tie House`, `@web_analyzer`, `@reviews`, `@gap_analysis`, "حلل موقع", "افحص المنافس", "ريفيوهات", "search", "crawl" |
+| What was already researched or stored in memory | **`karim`** | "مين المنافسين المسجلين عندنا", "إيه المتخزن في الذاكرة", "what do we already know" |
+| Marketing strategy, 90-day roadmap, or content calendar | **`omar`** | "عايز اعمل حملة", "خطة تسويق", "جدول محتوى", "خليهم في الكالندر", "schedule posts", "content calendar" |
+| Ad copy, visual hooks, commercial scripts, reels | **`layla`** | "اكتب اعلان", "hook", "script", "creative brief", "صياغة اعلان" |
+| Live running campaign tweaks, budget reallocation, ROAS tuning | **`salma`** | "عدل الميزانية", "حسن الحملة الشغالة", "optimize running campaign", "reallocate budget" |
+| Pleasantries, brand profile recall, general questions | **`chat`** | "ايه اللي تعرفه عني", "hello", "who are you", "what is my budget" |
+
+### Server-Side Gating on Campaign Action Cards:
+In `app/core/orchestrator/service.py`, `_gate_campaign_action_cards` prevents agents from prematurely generating `CREATE_CAMPAIGN` action cards unless three conditions are met simultaneously:
+1. Intent in this turn was explicitly strategy/campaign creation.
+2. Required fields are known: budget, objective, and target audience.
+3. The user has explicitly confirmed campaign creation in the conversation thread.
+
+---
+
+## 7. The Generative UI Block Structurer
+
+When LangGraph agents complete their tasks, they output rich Markdown or structured tool arguments. The frontend React application requires a typed JSON schema of **UI Blocks**:
+
+```json
+{
+  "blocks": [
+    {
+      "type": "text",
+      "text": "Based on our live analysis of Tie House..."
+    },
+    {
+      "type": "findings",
+      "findings": [
+        {
+          "title": "Pricing Anchor & Bundles",
+          "detail": "Tie House anchors their promotion on 3-shirt bundles for 999 EGP.",
+          "confidence": "high",
+          "source": "https://tiehouse.com/offers",
+          "evidence": [
+            {
+              "title": "Tie House Offers",
+              "url": "https://tiehouse.com/offers",
+              "snippet": "Buy 3 classic cotton shirts for 999 EGP with free shipping."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### The UI Structuring Flow:
+1. `format_tool_payload_to_markdown` renders tool argument dictionaries into human-readable Markdown with `##` headers and bullet points.
+2. `canonicalize_url` extracts and validates real URLs from tool evidence.
+3. Fast LLM applies `BLOCK_STRUCTURER_PROMPT` using `with_structured_output(MessageWithBlocks)` to emit typed blocks.
+4. If the structuring LLM call fails or hits a rate limit, the system gracefully falls back to `TextBlock(text=final_msg)`.
+
+---
+
+## 8. Memory Debouncer & Background Worker
+
+To prevent long-term memory updates from adding latency to the user's chat turn, SAHM uses an asynchronous background debouncer:
+
 ```python
-select(BrandMemoryItem)
-.where(BrandMemoryItem.business_id == ws.business_id)
-.order_by(desc(BrandMemoryItem.created_at))
-.limit(20)
-```
-**Rationale:** In marketing, market data ages quickly. An ad creative hook analyzed yesterday takes precedence over an ad analysis from six months ago.
+class MemoryDebouncer:
+    def __init__(self, debounce_seconds: float = 180.0):
+        self.debounce_seconds = debounce_seconds
+        self._tasks: dict[str, asyncio.Task] = {}
 
-### 3. Context Hierarchy (Priority 2)
-When building context for an agent, memory is layered in this order of precedence:
-1. **Global Profile LTM (`Profile.user_context_summary`):** The foundational anchor (Brand identity, core product, primary budget).
-2. **Domain-Specific Memory Items:**
-   - If an agent is writing ad copy → `competitor_note` (hooks) and `brand_voice_rules` take precedence.
-   - If an agent is planning a roadmap → `strategy_blueprint` and `market_gaps` take precedence.
-3. **Conversation Summary (`conversation.summary`):** High-level summary of earlier turns in this exact chat thread.
-4. **Recent Chat Turns:** The immediate 2 turns for conversational continuity.
+    def schedule_ltm_update(self, business_id: str):
+        # Cancels previous pending timer for this business
+        # Starts new 180-second (3-minute) timer
+        # When timer expires without new messages, updates Profile.user_context_summary
+```
+
+### Debouncing Process:
+1. User chats with the assistant.
+2. The HTTP turn finishes and immediately streams the answer to the user.
+3. Fast background task calls `memory_debouncer.schedule_ltm_update(business_id)`.
+4. If the user continues chatting within 3 minutes, the timer resets.
+5. Once the conversation is idle for 3 minutes, the worker condenses key facts into `Profile.user_context_summary` (<300 tokens) in a single background query.
 
 ---
 
-## 5. How Summarization Works (The Three Engines)
+## 9. Environment Variables & Memory Configuration
 
-SAHM utilizes three distinct summarization engines to keep memory fresh and compact:
-
-### Engine 1: Dynamic Session Threshold Compressor
-- **Implementation File:** `app/ai/memory/compressor.py` (`manage_session_memory_with_token_cap`)
-- **Trigger:** When active chat history tokens exceed `MEMORY_SESSION_MAX_TOKENS` (default: `1500`).
-- **Token Estimation Formula:**
-  $$\text{approx\_tokens} = \frac{\sum \text{characters}}{3.5}$$
-  *(Calibrated for bilingual Arabic/English text).*
-- **Action:**
-  1. Older turns are extracted, leaving the last `MEMORY_RETAIN_RECENT_TURNS` (default: `2`) intact.
-  2. `fast_llm` merges the older turns into `conversation.summary` in the database.
-  3. The agent receives only `[SystemMessage(conv_summary)] + recent_turns`.
-
-### Engine 2: Background Inactivity Debouncer (LTM)
-- **Implementation File:** `app/ai/memory/compressor.py` (`MemoryDebouncer`)
-- **Trigger:** Inactivity countdown of `MEMORY_LTM_DEBOUNCE_SECONDS` (default: `180` seconds / 3 minutes).
-- **Action:**
-  1. Every incoming user message resets the 3-minute timer.
-  2. When the user stops chatting and 3 minutes elapse, the background worker fires `update_global_profile(business_id)`.
-  3. `fast_llm` extracts permanent facts from recent conversations (goals, budget, audience, competitors) and updates `Profile.user_context_summary` (strictly under `MEMORY_GLOBAL_PROFILE_MAX_TOKENS`, default: `300` tokens).
-
-### Engine 3: Tool Execution Memory Distiller
-- **Implementation File:** `app/api/research.py` (`run_research`)
-- **Trigger:** Immediate on completion of any research tool run.
-- **Action:**
-  1. The tool finishes its web research and generates the full report.
-  2. `fast_llm` distills the report into 3–4 bullet points (under `MEMORY_ITEM_MAX_TOKENS`, default: `120` tokens).
-  3. Saves the compact text to `BrandMemoryItem.text` and the full markdown to `metadata_["full_report"]`.
-
----
-
-## 6. How Memory Is Passed to the Orchestrator & Agents
-
-Here is the exact code trace of how memory travels from the database into the agent's prompt:
-
-```
-                          [User Sends Message in Chat]
-                                       │
-                                       ▼
-1. Orchestrator Service (app/core/orchestrator/service.py)
-   • Loads Message rows from DB for this conversation.
-   • Calls: history, conv_summary = await manage_session_memory_with_token_cap(db, conversation, msg_rows)
-   • Loads Profile: profile_row = await db.scalar(select(Profile).where(Profile.business_id == business.id))
-   • Extracts: user_context = profile_row.user_context_summary
-                                       │
-                                       ▼
-2. Brain Orchestrator (app/ai/agents/orchestrator/brain.py)
-   • Calls: orchestrate(prompt, history, user_context=user_context, conversation_summary=conv_summary)
-   • Builds chat_history prompt array:
-       - SystemMessage("USER BRAND & BUSINESS PROFILE (Long-Term Memory):\n" + user_context)
-       - SystemMessage("PREVIOUS CONVERSATION SUMMARY (Earlier topics in this chat):\n" + conv_summary)
-       - HumanMessage / AIMessage turns (after compress_history_messages)
-                                       │
-                                       ▼
-3. Routing & Specialist Graph Execution
-   • LLM evaluates routing intent (Nour, Omar, Karim, Layla, Salma, or Chat).
-   • Passes the complete enriched chat_history into the specialist graph:
-       await graphs[agent].ainvoke({"messages": chat_history + [HumanMessage(prompt)]}, config)
-                                       │
-                                       ▼
-4. Specialist Agent Execution (e.g., Omar the Copywriter)
-   • Omar sees the brand profile, competitor notes, and chat summary right in his system context.
-   • He writes ad copy aligned with the verified brand facts without asking repetitive questions!
-```
-
----
-
-## 7. Environment Variables Control Guide
-
-You can fine-tune every aspect of the memory engine without touching code by editing `SAHM-AI-backend/.env`:
+All memory thresholds and timeouts can be configured in `SAHM-AI-backend/.env`:
 
 ```env
-# ==============================================================================
-# 🧠 MEMORY ENGINE & TOKEN OPTIMIZATION CONTROLS
-# ==============================================================================
+# Memory Configuration
+MEMORY_SESSION_MAX_TOKENS=1500          # Trigger session summary compaction
+MEMORY_RETAIN_RECENT_TURNS=2             # Turns kept intact after summary
+MEMORY_LTM_DEBOUNCE_SECONDS=180          # Inactivity period before LTM update (3 mins)
+MEMORY_LTM_MAX_TOKENS=300                # Strict token cap on Profile.user_context_summary
 
-# 1. Max tokens in chat session before older turns are summarized into DB
-# Default: 1500 (lower = earlier summarization, less tokens; higher = longer raw chat memory)
-MEMORY_SESSION_MAX_TOKENS=1500
+# Embedding Configuration
+EMBEDDING_DIM=1536                       # Dimension for pgvector cosine vectors
+EMBEDDING_PROVIDER=openai                # or mock
 
-# 2. Inactivity delay in seconds before updating global profile LTM in background
-# Default: 180 (180s = 3 minutes of user idle time)
-MEMORY_LTM_DEBOUNCE_SECONDS=180
-
-# 3. Max tokens cap for distilled BrandMemoryItem (strictly factual bullet points for AI agents)
-# Default: 120 (approx. 80-100 words)
-MEMORY_ITEM_MAX_TOKENS=120
-
-# 4. Max tokens cap for global Profile Long-Term Memory (Profile.user_context_summary)
-# Default: 300 (approx. 200-240 words)
-MEMORY_GLOBAL_PROFILE_MAX_TOKENS=300
-
-# 5. Number of recent turns to retain raw when session threshold is exceeded
-# Default: 2 (1 user message + 1 assistant message for immediate conversational flow)
-MEMORY_RETAIN_RECENT_TURNS=2
+# Timeouts & Guardrails
+AI_LLM_TIMEOUT_SECONDS=180               # Timeout for heavy agent tasks
+OLLAMA_TIMEOUT_SECONDS=1000              # Timeout for local Colab/Ollama tunnels
+DAILY_TOKEN_BUDGET=100000                # Per-workspace daily token spend ceiling
 ```
-
-### Tuning Guide for Different Scenarios:
-
-| Goal / Environment | Recommended Settings | Why |
-| :--- | :--- | :--- |
-| **Strict Cost Reduction** (Free LLM tier / Low Token Budgets) | `MEMORY_SESSION_MAX_TOKENS=1000`<br>`MEMORY_ITEM_MAX_TOKENS=80`<br>`MEMORY_GLOBAL_PROFILE_MAX_TOKENS=200` | Minimizes token usage per turn. Keeps agent context ultra-lean. |
-| **Production Balanced** (Recommended Default) | `MEMORY_SESSION_MAX_TOKENS=1500`<br>`MEMORY_ITEM_MAX_TOKENS=120`<br>`MEMORY_GLOBAL_PROFILE_MAX_TOKENS=300` | Optimal balance of rich context, fast inference, and low token costs. |
-| **High Context / Complex B2B Strategy** | `MEMORY_SESSION_MAX_TOKENS=3000`<br>`MEMORY_ITEM_MAX_TOKENS=200`<br>`MEMORY_GLOBAL_PROFILE_MAX_TOKENS=500` | Allows deep conversational threads with extensive factual recall. |
-
----
-
-## 8. Summary & Optimization Checklist for Engineers
-
-When building new tools or updating agent behaviors, verify these three rules:
-1. **Never bypass distillation:** Always distill research text into ~100 tokens before saving to `BrandMemoryItem.text`.
-2. **Never save raw JSON or Python dict strings:** Always pass content through `extract_clean_text()` and `clean_raw_string()`.
-3. **Always let the debouncer handle LTM:** Do not trigger heavy global profile re-writes on every keystroke; let `MemoryDebouncer` handle it asynchronously in the background.

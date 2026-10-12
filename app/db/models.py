@@ -282,7 +282,7 @@ class Conversation(Base, TimestampMixin):
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",
         cascade="all, delete-orphan",
-        order_by="Message.created_at",
+        order_by="Message.created_at, desc(Message.role)",
         lazy="selectin",
     )
 

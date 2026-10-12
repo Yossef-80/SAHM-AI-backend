@@ -1,246 +1,258 @@
 # 🚀 SAHM Marketing OS — Project Scope, Architecture & State Assessment
 
-> **Target Audience:** Engineering team members joining the project who need a complete, ground-up understanding of SAHM AI, its business goals, current implementation status, and multi-agent system.  
-> **How to Use:** You can read this document directly or upload/paste it into an AI assistant (Claude, ChatGPT, Gemini) to collaborate on features, architectural improvements, and strategic roadmaps.
+> **Target Audience:** Engineering team members, technical leads, product managers, and presentation speakers who need a complete, ground-up understanding of SAHM AI, its commercial value proposition, actual implementation status, and multi-agent system.  
+> **How to Use:** Read this document to understand the full system scope, copy sections into presentation slide decks, or feed it to AI assistants (Claude, ChatGPT, Gemini) to collaborate on new features and architectural optimizations.
 
 ---
 
-## 1. Executive Summary & Vision
+## 1. Executive Summary & Product Vision
 
 ### What is SAHM AI?
-**SAHM AI (سهم)** is an autonomous **Multi-Agent Marketing Operating System** designed primarily for small-to-medium businesses (SMBs), e-commerce brands, and agency operators in Egypt and the MENA region.
+**SAHM AI (سهم)** is an autonomous **Multi-Agent Marketing Operating System** engineered specifically for small-to-medium businesses (SMBs), e-commerce brands, and digital agency operators in Egypt and the MENA region. 
 
-### The Problem It Solves
-Traditional marketing platforms (Meta Ads Manager, Google Ads, TikTok Ads) are fragmented, complex, and require expensive specialized teams:
-1. **High Headcount Cost:** Businesses need media buyers, copywriters, creative designers, SEO analysts, and CRO consultants.
-2. **Context Fragmentation:** Ad tools do not understand the brand's unique history, customer reviews, competitor moves, or market dynamics.
-3. **Regional Gap (Egypt/MENA):** Most AI marketing tools fail at Arabic/Egyptian dialect nuance, local economic realities (e.g., EGP currency fluctuations, local payment habits, WhatsApp-first conversion funnels).
-
-### The Solution: An Autonomous Marketing Department in a Box
-SAHM AI replaces disjointed marketing workflows with a **specialized squad of AI marketing specialists** coordinated by an Orchestrator. These agents research competitors, monitor live web data, write culturally resonant Arabic/English copy, draft visual ad concepts, optimize budget allocations, and remember everything across customer touchpoints.
+SAHM transforms fragmented, high-friction marketing workflows into an integrated, autonomous **"Marketing Department in a Box"**. Through a unified, bilingual interface (Arabic & English), business owners and marketing teams collaborate with specialized AI agents who execute market research, competitive audits, direct-response copywriting, creative design briefs, multi-channel campaign planning, automated content calendar scheduling, and performance analytics.
 
 ```
-+-----------------------------------------------------------------------------------+
-|                                SAHM CLIENT (Next.js)                              |
-|   +-----------------------+   +----------------------+   +--------------------+   |
-|   |   🧠 Research Hub     |   |   💬 Assistant Chat  |   |   🎨 Creatives &   |   |
-|   | (Live Market Intel)   |   | (Multi-Agent Squad)  |   |    Campaign Hub    |   |
-|   +-----------+-----------+   +----------+-----------+   +---------+----------+   |
-+---------------|--------------------------|-------------------------|--------------+
-                |                          |                         |
-                v                          v                         v
-+-----------------------------------------------------------------------------------+
-|                           SAHM BACKEND API (FastAPI)                              |
-|                          app/api/research.py & app/api/chat.py                     |
-+------------------------------------------+----------------------------------------+
-                                           |
-                                           v
-+-----------------------------------------------------------------------------------+
-|                        CENTRAL BRAIN & MEMORY ENGINE                              |
-|   1. Short-Term Memory: Active chat session window                               |
-|   2. Brand Memory Items: Compact distilled facts (80-120 words / ~100 tokens)     |
-|   3. Profile Long-Term Memory (LTM): user_context_summary (<300 tokens)           |
-+------------------------------------------+----------------------------------------+
-                                           |
-                                           v
-+-----------------------------------------------------------------------------------+
-|                     SPECIALIZED MULTI-AGENT SQUAD (LangChain)                    |
-|                                                                                   |
-|    👑 Orchestrator   --> Routes intents & coordinates agent team                  |
-|    🎯 Nour           --> Growth & Marketing Director (Strategy, KPIs, Reviews)    |
-|    ✍️  Omar           --> Senior Copywriter (Ad scripts, Hooks, Arabic/Eng copy)   |
-|    🎨 Karim          --> Creative Director (Visual concepts, Storyboards, UGC)    |
-|    📊 Layla          --> Media Buyer & Quant (Campaign pacing, ROAS, Allocations) |
-|    🔍 Salma          --> Market & Competitor Intelligence (Scraping, SERP, Intel) |
-+-----------------------------------------------------------------------------------+
++---------------------------------------------------------------------------------------------------+
+|                                      SAHM CLIENT (Next.js 14)                                     |
+|  +--------------------+  +--------------------+  +--------------------+  +---------------------+  |
+|  |  🧠 Research Hub   |  | 💬 Assistant Chat  |  | 📅 Content Calendar|  | 🎨 Creatives Studio |  |
+|  | (Live Market Intel)|  | (Multi-Agent Squad)|  | (Auto-Scheduled)   |  | & Campaign Manager  |  |
+|  +---------+----------+  +---------+----------+  +---------+----------+  +----------+----------+  |
++------------|-----------------------|-----------------------|------------------------|-------------+
+             |                       |                       |                        |
+             v                       v                       v                        v
++---------------------------------------------------------------------------------------------------+
+|                                  SAHM BACKEND API (FastAPI)                                       |
+|      /api/v1/research  •  /api/v1/assistant  •  /api/v1/content  •  /api/v1/campaigns           |
+|      /api/v1/creatives •  /api/v1/recommendations • /api/v1/insights • /api/v1/settings          |
++----------------------------------------------------+----------------------------------------------+
+                                                     |
+                                                     v
++---------------------------------------------------------------------------------------------------+
+|                                CENTRAL BRAIN & MEMORY ENGINE                                      |
+|  Tier 1: Working Turn History (Current active session messages)                                   |
+|  Tier 2: Dynamic Session Summary (conversation.summary compressed at token cap)                   |
+|  Tier 3: Brand Memory Items (Vector-embedded; compact 80-120 word text + full report metadata)    |
+|  Tier 4: Global Brand Brain (Profile.user_context_summary < 300 tokens, 3-min debounced update)    |
++----------------------------------------------------+----------------------------------------------+
+                                                     |
+                                                     v
++---------------------------------------------------------------------------------------------------+
+|                       SPECIALIZED MULTI-AGENT SQUAD (LangChain & LangGraph)                       |
+|                                                                                                   |
+|   👑 The Orchestrator   --> Intent classification, deterministic routing & UI Block structuring    |
+|   🔍 Nour (نور)         --> Lead Researcher: Web crawling, competitor teardowns, reviews, ads     |
+|   🎯 Omar (عمر)         --> Chief Strategist: Positioning, 90-day roadmaps, content calendars     |
+|   ✍️ Layla (ليلى)       --> Creative Director: Ad copy, 3-sec visual hooks, video scripts, briefs  |
+|   📊 Karim (كريم)       --> Performance Analyst: Campaign metrics, GA4 traffic, ROAS, conversions  |
+|   ⚙️ Salma (سلمى)       --> Optimizer: Spend re-allocations, A/B tuning, 2-phase human approvals   |
+|   💬 Chat Assistant     --> Fast conversational engine for profile queries, pleasantries & context |
++---------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Core Pillars & Value Streams
+## 2. The Core Problems SAHM Solves
 
-1. **Autonomous Intelligence (Research Tab):**
-   - Live web search and URL scraping.
-   - Ground-truth entity validation (corrects typos like `"Tiee Hose"` → `"Tie House"`, rejects non-existent businesses).
-   - Generates structured market intelligence reports with clickable web source citations.
-2. **Context-Aware Team Collaboration (Assistant Chat):**
-   - Natural conversation with Nour, Omar, Karim, Layla, or Salma.
-   - The Orchestrator automatically selects the best specialist or delegates sub-tasks.
-   - Every agent accesses the shared brand knowledge base before making recommendations.
-3. **Token-Optimized Brand Memory:**
-   - Dual-layer storage prevents context window overflow.
-   - Detailed reports are preserved for human inspection in metadata, while distilled ~100-token summaries are injected into agent prompts.
-4. **Actionable Deliverables:**
-   - Ad scripts with 3-second visual hooks.
-   - 90-day marketing roadmaps.
-   - Competitor counter-positioning matrices.
-   - Keyword cluster maps.
+### Problem 1: Crushing Marketing Headcount Costs
+Running an effective modern growth engine requires at least 4 to 6 specialized roles:
+- A Market Researcher & Competitor Analyst (\$1,000–\$2,500/mo)
+- A Direct-Response Copywriter (\$800–\$2,000/mo)
+- A Creative Director / Visual Concept Designer (\$1,200–\$3,000/mo)
+- A Media Buyer / Quant Optimizer (\$1,000–\$2,500/mo)
+- A Content & Social Media Coordinator (\$600–\$1,500/mo)
+
+For an SMB or early-stage brand in Egypt or the GCC, spending \$4,000–\$10,000/month on human payroll before running a single dollar of paid ads is cost-prohibitive. SAHM provides an entire autonomous department for a fraction of the cost.
+
+### Problem 2: Context Fragmentation & Knowledge Loss
+Traditional marketing tools operate in silos:
+- Google Analytics knows traffic but doesn't know ad copy.
+- Meta Ads Manager knows ROAS but doesn't understand customer reviews or competitor weaknesses.
+- ChatGPT creates isolated text copy with zero memory of the brand's profit margins, past campaign wins, or previous competitor analyses.
+
+SAHM connects every touchpoint into a **unified Brand Memory Engine**. When Omar drafts a campaign or Layla writes an ad script, they automatically inherit the competitors uncovered by Nour, the friction points extracted from Google Maps reviews, and the budget guardrails established by the business owner.
+
+### Problem 3: The Egypt & MENA Regional Execution Gap
+Western AI marketing tools (Jasper, Copy.ai, AdCreative.ai) fail in regional Arabic markets:
+- They produce literal Modern Standard Arabic (MSA / الفصحى) that sounds stiff, robotic, and unnatural in direct-response ads.
+- They do not understand Egyptian consumer psychology, local slang, humorous pattern interrupts, or cultural seasonalities (Ramadan campaigns, Eid offers, White Friday).
+- They ignore local economic realities: Egyptian Pound (EGP) currency devaluations, cash-on-delivery (COD) friction, WhatsApp-first ordering funnels, and consumer price sensitivity.
+
+SAHM is architected from day one with bilingual Arabic/English prompts, Egyptian market entity databases, local currency support (EGP/SAR/AED/USD), and regional marketing heuristics.
 
 ---
 
-## 3. Architecture Assessment (Current State)
+## 3. What SAHM Offers (The Full Product Capabilities)
 
-### What Is Built and Fully Working ✅
+SAHM delivers 8 cohesive feature pillars:
 
-| Component | File Path | Current Status | Notes / Capabilities |
+### 1. Autonomous Research Hub (`/research`)
+- **9 Live Research Tools:** Website Analyzer, Competitor Research, Social Profile Audit, Customer Reviews & Sentiment, Market Dynamics, SEO Keyword Demand, Competitor Creative Audit, Market Gap Detection, and 90-Day Strategy Generation.
+- **Ground-Truth Entity Verification:** AI entity resolver detects whether a queried competitor is real, auto-corrects misspellings (e.g., *"Tiee Hose"* → *"Tie House"*), and rejects hallucinated brand names before running searches.
+- **Real-Time Web Intelligence:** Live search integration (Tavily & DuckDuckGo) with clickable, canonical web citations in every report.
+- **Deep Web Scraping:** BeautifulSoup & Trafilatura landing page scraper for extracting H1s, UVPs, trust badges, pricing anchors, and conversion friction.
+- **Google Maps & Review Extraction:** Playwright-powered headless browser extractor for Google Maps place ratings, customer review counts, and verbatim feedback.
+- **Meta Ad Library Scraping:** Apify Facebook Ads scraper actor integration for monitoring active competitor ad creatives, run dates, copy hooks, and image assets.
+
+### 2. Multi-Agent Assistant Hub (`/assistant`)
+- **Natural Language Orchestration:** Users talk naturally to the team. The Orchestrator determines which specialist handles the request without manual agent selection.
+- **Agent Switcher & Multi-Turn Threading:** Dedicated conversation threads with persistent memory, full message histories, and title auto-generation.
+- **Real-Time Streaming (SSE):** Token-by-token streaming with live agent state indicators (e.g., *"Nour is searching web evidence..."*, *"Structuring UI blocks..."*).
+- **Generative React UI Blocks:** Agent responses do not output wall-of-text JSON. They stream structured React UI Blocks:
+  - `text`: Executive summaries and explanations.
+  - `findings`: Deep bulleted evidence with source URLs, clickable citations, and confidence badges.
+  - `action_card`: One-click actions to trigger follow-up tasks.
+  - `question_with_options`: Interactive multiple-choice prompts for user feedback.
+
+### 3. Automated Content Calendar & Scheduling (`/calendar`)
+- **Direct Multi-Day Post Generation:** Generates comprehensive daily content schedules (concepts, hooks, captions, hashtags, channels, formats, and best posting times).
+- **Database Persistence:** Generated calendar items are automatically saved to the backend `ContentItem` table (`app/db/models.py`) with `scheduled` status.
+- **Omnichannel Support:** Formats for Instagram (Reel, Story, Post), Facebook (Post, Ad), TikTok (Video), Email, and Blog.
+- **Pillar Categorization:** Tagged by strategic pillars: Educational, Engagement, Product Spotlight, Customer Proof, and Promotional.
+
+### 4. Paid Ad Campaigns Hub (`/campaigns`)
+- **Campaign Architecture:** Create and track campaigns with budgets, target channels (Meta, TikTok, Google), date ranges, and core objectives.
+- **Strategy Alignment:** Links creative assets, performance insights, and AI recommendations directly to individual campaigns.
+
+### 5. Creatives Studio (`/creatives`)
+- **Direct-Response Copywriting:** High-converting Meta/TikTok ad copy, 3-second pattern interrupt hooks, headline variations, and WhatsApp closing scripts.
+- **Commercial & Video Scripts:** 15-second and 30-second video storyboards with visual framing cues and voiceover lines.
+- **Reference Asset Analysis:** Upload or link reference creative images to extract a structured `StyleSpec` (color palette, typography, visual weight, lighting).
+- **AI Image Generation:** Generates image ad concepts matching the brand's visual identity using external image providers or fallback mock rendering.
+
+### 6. Analytics, GA4 & Insights Hub (`/insights`)
+- **Google Analytics (GA4) Integration:** Automated connection via Google Analytics Data API (service account auth) fetching sessions, page views, bounce rate, engagement rate, and conversions.
+- **Meta Ad Insights:** Real-time campaign performance reads (ROAS, CPA, CTR, Impressions, Spend).
+- **Anomaly Detection:** Identifies creative fatigue, budget waste, and audience saturation.
+
+### 7. Human-in-the-Loop Safe Approvals (`/settings/audit`, `/recommendations`)
+- **Two-Phase Approval Gate:** Agents can NEVER make direct external ad account changes autonomously.
+- **Phase 1 (Propose & Diff):** Agent generates an AI recommendation with estimated financial impact and a concrete `before` vs `after` diff.
+- **Phase 2 (Confirm & Execute):** A human owner/member must explicitly click "Approve" with confirmation. Only then does the backend execute the change on Meta Graph API and write an immutable record to `audit_logs`.
+
+### 8. Multi-Tenant Brand Memory & Governance (`/settings`)
+- **Zero-Token-Bloat Architecture:** 4-tier memory hierarchy ensures that agents retrieve rich historical context without blowing LLM context windows.
+- **Enterprise Security:** Fernet-encrypted API credentials at rest, SSRF request filtering, strict CORS rules, and per-workspace token budget guards.
+
+---
+
+## 4. Current Architectural State Assessment
+
+### What Is Built and 100% Operational ✅
+
+| Layer / Component | Implementation Location | Operational Status | Key Highlights |
 | :--- | :--- | :--- | :--- |
-| **Research Hub API** | `app/api/research.py` | **100% Operational** | 9 live research tools with real web search, scraping, entity typo verification, and dual-layer memory persistence. |
-| **Ground-Truth Engine** | `app/api/research.py` (`verify_and_resolve_entity`) | **100% Operational** | Prevents hallucinations on fake queries; auto-corrects misspellings of Egyptian/regional brands. |
-| **Memory Distiller** | `app/api/research.py` | **100% Operational** | Distills research reports to 80–120 words (~100 tokens) in `BrandMemoryItem.text`; saves full report in metadata. |
-| **Markdown Parser** | `SAHM-AI-frontend/.../research-view.tsx` | **100% Operational** | Renders `#` through `######` cleanly into styled HTML; zero raw hash leaks; clickable link cards. |
-| **Multi-Agent Squad** | `app/ai/agents/` | **Operational** | Nour, Omar, Karim, Layla, Salma, and Orchestrator have defined system prompts, personas, and tool bindings. |
-| **Live Search Tooling** | `app/ai/tools/search.py`, `app/ai/tools/analyze_website.py` | **Operational** | DuckDuckGo / Tavily web search integration, live HTML extraction, and metadata parsing. |
-| **Brand Memory Store** | `app/db/models.py` (`BrandMemoryItem`, `Profile`) | **Operational** | Multi-tenant isolation by `business_id`; supports embedding vector search or SQL fallback. |
-| **Frontend UI** | `SAHM-AI-frontend/` | **Operational** | Next.js 14 App Router, Tailwind CSS, shadcn/ui components, responsive layout. |
-
-### Current Architectural Gaps & Improvement Opportunities ⚠️
-
-1. **Tool Invocation Parity Between Research Tab & Chat Agents:**
-   - *Current Reality:* The Research tab (`app/api/research.py`) executes tools directly via dedicated REST endpoints with entity verification and web citations.
-   - *Improvement Opportunity:* Chat agents (e.g., Nour, Salma) should call these exact same tool pipelines with streaming status updates so users can say: *"Salma, research Tie House ads"* and receive the exact same high-fidelity report in the chat thread.
-2. **Real Social API Connectors:**
-   - *Current Reality:* `analyze_social_profile` gathers evidence via search engine indexation (`site:instagram.com`).
-   - *Improvement Opportunity:* Connect official Instagram Graph API / TikTok API when credentials are provided by the user.
-3. **Competitor Ad Library Automation:**
-   - *Current Reality:* `analyze_competitor_creatives` searches indexed ad copy and links directly to the Meta Ad Library URL for Egypt.
-   - *Improvement Opportunity:* Integrate Meta Ad Library API directly to extract live active creative images, copy text, and run dates into the response JSON.
-4. **Agent-to-Agent Handoffs:**
-   - *Current Reality:* Orchestrator routes the user prompt to one primary agent.
-   - *Improvement Opportunity:* Multi-turn collaborative chains (e.g., Salma researches competitors → passes data to Karim to design creatives → passes to Omar to write the copy → Nour delivers the unified package).
+| **API Entrypoint & Routers** | `app/main.py`, `app/api/*` | **100% Operational** | FastAPI with 16 modular routers, lifecycle hooks, unified error envelope, request timing headers (`X-DB-Queries`, `X-DB-Time`). |
+| **LangGraph Multi-Agent Engine** | `app/ai/agents/` | **100% Operational** | Fully migrated to LangGraph StateGraphs (`nour_graph`, `omar_graph`, `layla_graph`, `karim_graph`, `salma_graph`). |
+| **Deterministic Orchestrator Brain** | `app/ai/agents/orchestrator/brain.py` | **100% Operational** | `temperature=0.0` routing with `RoutingDecision` schema, plan/fact context separation, and dedicated `chat` fallback agent. |
+| **UI Block Structurer** | `app/ai/agents/orchestrator/brain.py` | **100% Operational** | Translates raw agent tool arguments and Markdown into typed `MessageWithBlocks` (`text`, `findings`, `action_card`). |
+| **Research Hub API** | `app/api/research.py` | **100% Operational** | 9 live tools with ground-truth entity resolution, web scraping, and dual-layer memory storage. |
+| **Content Calendar System** | `app/api/content.py`, `app/ai/tools/strategy/` | **100% Operational** | REST endpoints (`GET /content`, `POST /content/generate`, `PATCH`, `DELETE`) + auto-persistence in `ContentItem` table. |
+| **GA4 Performance Tool** | `app/ai/tools/fetch_ga4_performance.py` | **100% Operational** | Google Analytics Data API client for sessions, bounce rate, and conversions using service account credentials. |
+| **Apify Facebook Ads Scraper** | `app/ai/tools/fetch_competitor_ads.py` | **100% Operational** | Actor-based scraper extracting active ad copy, media URLs, and keywords from Facebook Page URLs. |
+| **Playwright Reviews Scraper** | `app/ai/tools/get_reviews_playwright.py` | **100% Operational** | Headless Chromium extractor for Google Maps review counts, star ratings, and review cards. |
+| **Memory Compaction Engine** | `app/ai/memory/compressor.py` | **100% Operational** | Tiktoken cl100k_base with Arabic token ratios (~1.8 chars/token), session threshold summary, and 3-min debounced LTM. |
+| **Database & Migration Layer** | `app/db/models.py`, `app/db/migrations/` | **100% Operational** | PostgreSQL + pgvector (with SQLite JSON fallback), Alembic migrations, multi-tenant isolation on `business_id`. |
+| **Dual-Tier LLM Provider Router** | `app/core/llm/router.py` | **100% Operational** | Supports OpenAI, Gemini, Claude, Groq, Ollama, DeepSeek, and Mock with 60s cached workspace settings. |
+| **Protected Approvals System** | `app/core/approvals/`, `app/core/tools/protected.py` | **100% Operational** | Strict isolation: external-write tools cannot be registered in agent catalogs; human confirmation mandatory. |
+| **Next.js 14 Frontend** | `SAHM-AI-frontend/src/app/*` | **100% Operational** | Next.js App Router, Tailwind CSS, shadcn/ui primitives, SSE chat streaming, research views, settings panels. |
 
 ---
 
-## 4. Multi-Agent Roster & Persona Matrix
+## 5. Architectural Map: The Two Backend Systems Explained
 
-Each agent in `app/ai/agents/` has a distinct domain of expertise, tone, and tool privileges:
-
-### 👑 The Orchestrator (`app/ai/agents/orchestrator/`)
-- **Role:** Chief of Staff / Dispatcher.
-- **Goal:** Understands user intent, determines which specialist should answer, and routes the query. If a request spans multiple disciplines, it decomposes the task.
-- **Tone:** Professional, decisive, structured.
-
-### 🎯 Nour — Head of Growth & Marketing Strategy (`app/ai/agents/nour/`)
-- **Role:** Strategic Director & Account Lead.
-- **Specialty:** High-level 90-day roadmaps, brand positioning, customer review synthesis, UVPs, unit economics, and campaign KPIs.
-- **Language/Tone:** Confident, executive, bilingual (Egyptian business Arabic & English).
-- **Key Tools:** `brand_context`, `analyze_market`, `analyze_reviews`, `detect_market_gaps`, `generate_marketing_strategy`.
-
-### ✍️ Omar — Senior Direct-Response Copywriter (`app/ai/agents/omar/`)
-- **Role:** Conversion Copywriter & Storyteller.
-- **Specialty:** Meta/TikTok ad copy, 3-second video hooks, carousel caption copy, WhatsApp closing scripts, email newsletters.
-- **Language/Tone:** Punchy, persuasive, culturally native (understands Egyptian consumer psychology, humor, pain points, and urgency).
-- **Key Tools:** `brand_context`, `analyze_competitor_creatives`, `search`.
-
-### 🎨 Karim — Creative Director & Visual Strategist (`app/ai/agents/karim/`)
-- **Role:** Visual Concept & Creative Asset Architect.
-- **Specialty:** Creative briefs, storyboard design, UGC format recommendations, visual pattern interrupts, image prompt generation.
-- **Language/Tone:** Visually descriptive, trend-savvy, focused on production feasibility and high CTRs.
-- **Key Tools:** `generate_image`, `analyze_reference_creative`, `analyze_competitor_creatives`.
-
-### 📊 Layla — Performance Media Buyer & Analytics Lead (`app/ai/agents/layla/`)
-- **Role:** Quantitative Advertising & Media Optimization.
-- **Specialty:** Budget distribution across Meta/TikTok/Google, ROAS modeling, audience targeting structures (CBO vs ABO, Lookalikes), bid strategies.
-- **Language/Tone:** Data-driven, analytical, numbers-first, risk-aware.
-- **Key Tools:** `get_campaign_insights`, `get_breakdowns`, `create_recommendation`.
-
-### 🔍 Salma — Competitive Intelligence & Market Researcher (`app/ai/agents/salma/`)
-- **Role:** Lead Market Scout & Fact Gatherer.
-- **Specialty:** Competitor teardowns, website CRO auditing, keyword demand clustering, live web search.
-- **Language/Tone:** Objective, evidence-based, thorough, always citing sources.
-- **Key Tools:** `analyze_website`, `analyze_competitor`, `analyze_keywords`, `search`.
-
----
-
-## 5. Central Brain & Memory Architecture
+The codebase currently contains two parallel organizational folders under `SAHM-AI-backend/app/`:
 
 ```
-                  +----------------------------------------------+
-                  |               USER REQUEST                   |
-                  +----------------------+-----------------------+
-                                         |
-                                         v
-                  +----------------------------------------------+
-                  |         CONTEXT INJECTION (P0-P2)            |
-                  |                                              |
-                  |  1. Brand Profile (Name, Industry, Currency) |
-                  |  2. Brain LTM: Profile.user_context_summary  |
-                  |     (Strictly < 300 tokens)                  |
-                  |  3. Relevant BrandMemoryItems                |
-                  |     (Each item strictly 80-120 words)        |
-                  |  4. Active Chat History (Recent turns)       |
-                  +----------------------+-----------------------+
-                                         |
-                                         v
-                  +----------------------------------------------+
-                  |          AGENT EXECUTION / LLM               |
-                  +----------------------+-----------------------+
-                                         |
-                                         v
-                  +----------------------------------------------+
-                  |          COMPACT DISTILLATION                |
-                  |  fast_llm distills learnings to 80-120 words |
-                  +----------------------+-----------------------+
-                                         |
-                        +----------------+---------------+
-                        |                                |
-                        v                                v
-         +-----------------------------+  +-----------------------------+
-         |     BrandMemoryItem.text    |  |     Profile LTM Summary     |
-         |    (~100 tokens per item)   |  |   (< 300 tokens combined)   |
-         +-----------------------------+  +-----------------------------+
-```
-
-### The "No-Token-Bloat" Law
-Every team member must strictly follow this principle:
-- **Never save full 1,000-word essays or raw scraped HTML into `BrandMemoryItem.text` or `Profile.user_context_summary`.**
-- AI agents retrieve these memory items on *every single prompt*. Storing 10 long reports would consume 15,000 tokens per user message, slowing down response times and exhausting token limits.
-- **The Golden Rule:** Always distill memory text down to **80–120 words** of bulleted facts, and store the complete report in `metadata_["full_report"]` for UI display only.
-
----
-
-## 6. Project Directory Map (What Lives Where)
-
-```
-d:/NTI-Final-Project/
+SAHM-AI-backend/app/
 │
-├── SAHM-AI-backend/                      # FastAPI Python Backend
-│   ├── app/
-│   │   ├── ai/
-│   │   │   ├── agents/                   # Multi-agent definitions (Nour, Omar, Karim, Layla, Salma, Orchestrator)
-│   │   │   ├── tools/                    # Tool implementations (search, analyze_website, get_reviews, etc.)
-│   │   │   ├── providers/                # LLM & Search provider adapters (OpenAI, Anthropic, Gemini, Tavily, DDG)
-│   │   │   └── memory/                   # Vector store & memory retrieval logic
-│   │   ├── api/
-│   │   │   ├── research.py               # Research Hub REST endpoints, ground-truth engine, dual memory storage
-│   │   │   ├── chat.py                   # Chat & conversation streaming endpoints
-│   │   │   └── deps.py                   # Multi-tenant workspace resolver (X-Workspace-Id) & auth guards
-│   │   ├── core/
-│   │   │   └── tools/                    # Core tool schemas & execution framework
-│   │   ├── db/
-│   │   │   ├── models.py                 # SQLAlchemy 2 models (Business, BrandMemoryItem, Profile, etc.)
-│   │   │   └── session.py                # Database connection pools (Postgres / SQLite)
-│   │   └── main.py                       # FastAPI entrypoint, middleware, routers
-│   ├── .env                              # Backend environment secrets & API keys
-│   └── pyproject.toml / requirements.txt
+├── core/                     # The Foundation & System Services
+│   ├── approvals/            # 2-Phase human approval workflow & Meta change execution
+│   ├── auth.py & security.py # TokenCipher (Fernet encryption), password hashing, JWT/Supabase auth
+│   ├── llm/                  # Low-level client router (OpenAI, Claude, Ollama, Mock)
+│   ├── memory/               # Embedding store (pgvector cosine search + Python fallback)
+│   ├── orchestrator/         # REST message handling service (service.py), block validation
+│   ├── ratelimit.py          # Request throttling & IP rate limiting
+│   └── tools/                # Static tool registry (base.py, registry.py, protected.py)
 │
-└── SAHM-AI-frontend/                     # Next.js 14 Frontend
-    ├── src/
-    │   ├── app/                          # Next.js App Router pages (/research, /assistant, /creatives, etc.)
-    │   ├── components/
-    │   │   ├── research/
-    │   │   │   └── research-view.tsx     # Research Hub UI: tool cards, live execution, MarkdownReport renderer
-    │   │   ├── chat/                     # Assistant conversation threads, agent switcher, message bubbles
-    │   │   └── ui/                       # Reusable shadcn/ui primitives (cards, buttons, badges, dialogs)
-    │   ├── store/                        # Client state (auth tokens, active workspace ID)
-    │   └── lib/                          # Client API fetchers & utilities
-    └── package.json
+└── ai/                       # The Live LangChain & LangGraph Cognitive Engine
+    ├── agents/               # LangGraph compiled state machines (Nour, Omar, Layla, Karim, Salma, Orchestrator)
+    ├── loggers/              # LangGraph event callbacks and agent run tracers
+    ├── memory/               # Token-aware memory compressor & debouncer (compressor.py)
+    ├── providers/            # Live LLM & Search provider instances (get_llm, get_search_provider)
+    ├── settings.py           # Engine timeouts, model provider strings, and API secrets
+    └── tools/                # Live agent tools (search, analyze_website, strategy, GA4, Apify)
 ```
+
+### How They Collaborate:
+1. A user prompt enters `POST /api/v1/assistant/message/stream` handled by `app/core/orchestrator/service.py`.
+2. `service.py` handles database transactions, loads the conversation history, checks token budgets, and resolves workspace context.
+3. It hands execution over to `app/ai/agents/orchestrator/brain.py` (`orchestrate(...)`), which routes to the appropriate LangGraph agent.
+4. The agent executes tools from `app/ai/tools/`, generates output, and returns it to `brain.py`.
+5. `brain.py` structures the result into React UI blocks (`MessageWithBlocks`) and streams it back to the client while `service.py` commits the message to PostgreSQL.
 
 ---
 
-## 7. Strategic Success Metrics for Your Work
-When you improve any tool or agent, judge your success by these four metrics:
-1. **Fact Grounding & Reliability:** Does the tool cite real URLs? Does it handle typos and reject fake brand names?
-2. **Speed & Latency:** Does the tool complete its analysis in under 8–15 seconds?
-3. **Actionability for Marketing:** Does the output contain specific copy angles, target numbers, and execution steps, rather than generic fluff?
-4. **Token Efficiency:** Does the tool save compact memories (<120 words) so that future agent conversations remain fast and affordable?
+## 6. The Multi-Agent Roster
+
+```
+                                  👑 THE ORCHESTRATOR
+                         Intent Classifier & Chief of Staff
+                                          │
+            ┌──────────────┬──────────────┼──────────────┬──────────────┐
+            ▼              ▼              ▼              ▼              ▼
+         🔍 NOUR        🎯 OMAR        ✍️ LAYLA       📊 KARIM       ⚙️ SALMA
+        Researcher     Strategist      Creative       Analyst       Optimizer
+```
+
+### 1. 🔍 Nour (نور) — Lead Market & Competitive Intelligence Scout
+- **Role:** Head of Market Research.
+- **Mission:** Discover ground-truth facts about competitors, category dynamics, and consumer friction. Nour never speculates; every claim is backed by web citations.
+- **LangGraph Node:** `app/ai/agents/nour/graph.py`
+- **Output Schema:** `MarketResearchReport` (market overview, competitor positioning, pricing insights, opportunities, risks, sources, evidence).
+- **Core Tools:** `web_search_tool`, `get_brand_context_tool`, `analyze_website_tool`, `get_reviews_tool`, `fetch_competitor_ads`.
+
+### 2. 🎯 Omar (عمر) — Chief Marketing Strategist
+- **Role:** Growth & Strategic Director.
+- **Mission:** Synthesize research into brand positioning, channel budget splits, 90-day execution roadmaps, and content calendars. Bold, direct, and focused on unit economics.
+- **LangGraph Node:** `app/ai/agents/omar/graph.py`
+- **Output Schema:** `StrategyReport` (positioning, target segments, channel budget shares summing to 100%, content calendar).
+- **Core Tools:** `get_brand_context_tool`, `generate_marketing_strategy`, `generate_campaign_strategy`, `generate_content_calendar`.
+
+### 3. ✍️ Layla (ليلى) — Creative Director & Direct-Response Copywriter
+- **Role:** Creative Director.
+- **Mission:** Craft compelling ad copy, 3-second pattern interrupts, headline angles, WhatsApp closing scripts, and image/video briefs tailored to Egyptian consumer psychology.
+- **LangGraph Node:** `app/ai/agents/layla/graph.py`
+- **Output Schema:** `CreativeBrief` (ad copy, visual directions, audio hooks, target emotions).
+- **Core Tools:** `get_brand_context_tool`, `analyze_reference_creative`, `generate_image`.
+
+### 4. 📊 Karim (كريم) — Performance & Analytics Lead
+- **Role:** Quantitative Media Analyst.
+- **Mission:** Analyze campaign performance, website traffic, conversion funnels, and ROAS. Blunt, minimal, and never interpolates missing metrics.
+- **LangGraph Node:** `app/ai/agents/karim/graph.py`
+- **Output Schema:** `PerformanceReport` (sessions, bounce rates, conversion trends, metric summaries).
+- **Core Tools:** `get_brand_context_tool`, `fetch_ga4_performance`, `get_campaign_insights`.
+
+### 5. ⚙️ Salma (سلمى) — Campaign Optimizer & Operations Lead
+- **Role:** Performance Optimizer.
+- **Mission:** Detect campaign inefficiencies and propose concrete, approvable adjustments (budget reallocations, bid tweaks). Salma proposes changes with evidence and defers execution to human approval.
+- **LangGraph Node:** `app/ai/agents/salma/graph.py`
+- **Output Schema:** `OptimizationPlan` (proposed change, evidence, impact estimation).
+- **Core Tools:** `get_brand_context_tool`, `create_recommendation`, `get_campaign_insights`.
+
+### 6. 💬 Conversational Chat Assistant
+- **Role:** Instant Knowledge & Profile Assistant.
+- **Mission:** Handles casual greetings, follow-up questions, and queries about the brand profile without invoking expensive agent graphs or search loops.
+
+---
+
+## 7. Strategic Success Metrics for Improving the System
+
+When modifying or expanding any tool, agent, or endpoint in SAHM, measure your progress against these 5 engineering KPIs:
+
+1. **Fact Grounding & Citation Integrity:** Does every research claim provide a valid, canonical URL? Does the entity resolver reject fake brand names?
+2. **Speed & Latency:** Does a full research tool run finish in under 8–15 seconds? Does conversational chat stream its first token in under 1.5 seconds?
+3. **Token Efficiency:** Are all memory items strictly distilled to 80–120 words (~100 tokens)? Does the session compressor maintain active history under 1,500 tokens?
+4. **Actionability:** Does the output contain concrete Egyptian pound figures, ad copy hooks, and timeline dates rather than vague generic advice?
+5. **Safety & Zero Unintended Writes:** Are all ad account modifications gated by the two-phase approval workflow and logged in `audit_logs`?

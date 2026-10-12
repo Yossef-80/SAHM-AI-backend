@@ -132,3 +132,13 @@ async def test_session_memory_regenerates_when_growth_exceeds_twenty_five_percen
         watermark = conv.context.get("summary_token_watermark")
         assert watermark is not None
         assert watermark >= 12500
+
+
+def test_conversation_messages_ordering_model_declaration() -> None:
+    """Ensure Conversation.messages relationship orders by created_at and role desc."""
+    from app.db.models import Conversation
+    rel = Conversation.__mapper__.relationships["messages"]
+    order_clauses = [str(x) for x in rel.order_by]
+    assert any("created_at" in c for c in order_clauses)
+    assert any("role DESC" in c for c in order_clauses)
+
