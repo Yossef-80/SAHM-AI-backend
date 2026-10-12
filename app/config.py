@@ -14,7 +14,7 @@ import json
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Tier = Literal["fast", "strong"]
@@ -102,14 +102,27 @@ class Settings(BaseSettings):
     # ---------------------------------------------------------------- llm ----
     # Which provider serves which tier. Switching provider or model is an env
     # change only -- no code edits anywhere else in the repo.
-    llm_provider_fast: LLMProviderName = "mock"
-    llm_provider_strong: LLMProviderName = "mock"
-    llm_model_fast: str = "mock-fast-1"
-    llm_model_strong: str = "mock-strong-1"
+    llm_provider_fast: LLMProviderName = Field(
+        "mock", validation_alias=AliasChoices("LLM_PROVIDER_FAST", "AI_LLM_PROVIDER")
+    )
+    llm_provider_strong: LLMProviderName = Field(
+        "mock", validation_alias=AliasChoices("LLM_PROVIDER_STRONG", "AI_LLM_PROVIDER")
+    )
+    llm_model_fast: str = Field(
+        "mock-fast-1",
+        validation_alias=AliasChoices("LLM_MODEL_FAST", "GEMINI_MODEL", "AI_LLM_MODEL"),
+    )
+    llm_model_strong: str = Field(
+        "mock-strong-1",
+        validation_alias=AliasChoices("LLM_MODEL_STRONG", "GEMINI_MODEL", "AI_LLM_MODEL"),
+    )
 
     # Provider API keys (never logged, never persisted).
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    gemini_api_key: str | None = Field(
+        None, validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY")
+    )
 
     # --- OpenAI-compatible gateways (OpenRouter, Google Gemini, vLLM, ...) ---
     # The provider stays "openai"; these two env vars point the LLM layer at any
@@ -143,7 +156,10 @@ class Settings(BaseSettings):
 
     # -------------------------------------------------------------- memory ----
     # Max tokens in active chat history before older turns are summarized into DB
-    memory_session_max_tokens: int = 1500
+    memory_session_max_tokens: int = Field(
+        10000,
+        validation_alias=AliasChoices("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"),
+    )
     # Inactivity delay in seconds before updating global profile LTM in background (180s = 3 min)
     memory_ltm_debounce_seconds: int = 180
     # Maximum tokens cap for distilled BrandMemoryItem.text

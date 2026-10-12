@@ -29,7 +29,7 @@ ROUTER_SYSTEM_PROMPT = """You are the Orchestrator Hub. You route user prompts t
 Agents and Scopes:
 - nour  → LIVE RESEARCH & COMPETITOR TOOLS: The user explicitly asks to search, find, crawl, or analyze information NOW, or mentions a competitor or tool with @ (e.g. @AbuAuf, @web_analyzer, @reviews, @gap_analysis, @researcher, "حلل موقع", "افحص المنافس", "ريفيوهات", "تقييمات", "فجوات السوق", "search", "find competitors").
 - karim → MEMORY RECALL only: Questions about what was ALREADY researched or stored in memory without asking to run new live tools ("مين المنافسين المسجلين عندنا", "إيه المتخزن في الذاكرة", "what do we know about competitors from previous research").
-- omar  → STRATEGY only: When THIS message explicitly asks for a high-level marketing strategy, strategic roadmap, market positioning, or ad campaign creation / plan ("عايز اعمل حملة اعلانية", "حطلي خطة تسويق", "positioning strategy").
+- omar  → STRATEGY & CONTENT CALENDAR: When THIS message explicitly asks for a high-level marketing strategy, strategic roadmap, market positioning, ad campaign creation / plan, OR a CONTENT CALENDAR / POST SCHEDULING across days or dates for the website calendar ("عايز اعمل حملة اعلانية", "حطلي خطة تسويق", "positioning strategy", "جدول محتوى", "خليهم في الخمس ايام الجايين", "في الكالندر", "عايز اشوفهم في الcalendar", "content calendar", "schedule posts").
 - layla → CONTENT creation only: Creative assets explicitly requested NOW (writing ad copy, headlines, visual briefs, 15s commercial scripts, reels scripts).
 - salma → LIVE CAMPAIGN OPS only: Real-time budget reallocation, ROAS adjustments, or performance optimization on currently RUNNING/active ad campaigns.
 - chat  → CONVERSATIONAL / GENERAL: Questions about the user's stored brand profile ("ايه الي تعرفه عني", "what is my brand scope"), casual pleasantries, follow-ups, clarifications, or requests not asking for new agent work.
@@ -39,7 +39,8 @@ HARD ROUTING RULES:
 2. If the user mentions `@` with a competitor name or tool (e.g. `@Tie House`, `@web_analyzer`, `@reviews`, `@gap_analysis`) requesting live analysis, reviews, web audit, or market gaps → ALWAYS route to 'nour'.
 3. Competitor mentions WITHOUT an explicit request to search the web NOW or run live tools → karim (or chat if about stored profile), NOT nour.
 4. Live campaign ops (salma) vs campaign strategy/creation (omar): 'salma' handles live/running campaign tweaks only; 'omar' handles strategy, roadmaps, and creating new campaigns.
-5. When unsure or if the request is ambiguous or a clarification/greeting → tie-break toward 'chat'.
+5. Content calendar / post scheduling: When the user asks to schedule posts across days/dates, build a content calendar, or display them in the website calendar ("في الكالندر", "calendar", "schedule posts", "جدول نشر", "خليهم في الـX ايام") → ALWAYS route to 'omar'.
+6. When unsure or if the request is ambiguous or a clarification/greeting → tie-break toward 'chat'.
 """
 
 BLOCK_STRUCTURER_PROMPT = """Convert the following text into structured React UI Blocks. 
@@ -157,6 +158,56 @@ def format_tool_payload_to_markdown(tool_name: str, args: dict[str, Any]) -> str
     return rendered or "Research report completed."
 
 
+async def _persist_content_calendar_posts(business_id: str, posts: list[dict[str, Any]]) -> None:
+    """Save generated calendar posts directly to ContentItem table."""
+    try:
+        from datetime import date, timedelta
+        import uuid
+        from app.db.models import ContentItem
+        from app.db.session import session_scope
+
+        today = date.today()
+        async with session_scope() as session:
+            for p in posts:
+                day_num = int(p.get("day", 1))
+                post_date = (today + timedelta(days=max(0, day_num - 1))).strftime("%Y-%m-%d")
+                raw_channel = str(p.get("channel", "instagram")).lower()
+                valid_channels = {"instagram", "facebook", "tiktok", "email", "blog"}
+                channel = raw_channel if raw_channel in valid_channels else "instagram"
+
+                raw_format = str(p.get("format", "post")).lower()
+                valid_formats = {"post", "reel", "story", "ad", "email", "article"}
+                fmt = raw_format if raw_format in valid_formats else "post"
+
+                pillar = str(p.get("content_pillar") or "Marketing")
+                concept = str(p.get("concept") or "")
+                title = concept[:250] if concept else f"{pillar} {fmt.title()}"
+                hook = p.get("caption_hook")
+                cta = p.get("call_to_action", "")
+                caption = f"{hook}\n\n{concept}\n\n👉 {cta}".strip() if hook else concept
+                time_val = str(p.get("best_time") or "18:00")[:5]
+                if ":" not in time_val:
+                    time_val = "18:00"
+
+                item = ContentItem(
+                    id=f"cnt_{uuid.uuid4().hex[:20]}",
+                    business_id=business_id,
+                    date=post_date,
+                    time=time_val,
+                    channel=channel,
+                    format=fmt,
+                    title=title,
+                    hook=hook,
+                    caption=caption,
+                    hashtags=[f"#{channel}", f"#{pillar.replace(' ', '')}"],
+                    status="scheduled",
+                    pillar=pillar,
+                )
+                session.add(item)
+    except Exception as exc:
+        logger.error("failed_to_persist_content_calendar_posts", extra={"error": str(exc), "business_id": business_id})
+
+
 async def orchestrate(
     prompt: str, 
     history: list[dict[str, Any]], 
@@ -164,6 +215,7 @@ async def orchestrate(
     user_context: str | None = None,
     conversation_summary: str | None = None,
     active_plans: str | None = None,
+    business_id: str | None = None,
 ) -> MessageWithBlocks | None:
     """The Brain that reads the prompt and routes it to the correct agent."""
     if event_queue:
@@ -218,8 +270,14 @@ async def orchestrate(
 
         agent_messages.append(HumanMessage(content=f"Context is provided above. Please execute this NEW request: {prompt}"))
 
-        config = {"configurable": {"thread_id": "test_thread"}}
+        config = {"configurable": {"thread_id": "test_thread", "business_id": business_id or "default"}}
         final_state = await graphs[decision.agent].ainvoke({"messages": agent_messages}, config)
+        
+        # If Omar generated a content calendar, persist the posts to the ContentItem DB table
+        if decision.agent == "omar" and business_id:
+            cal_data = final_state.get("content_calendar")
+            if isinstance(cal_data, dict) and cal_data.get("posts"):
+                await _persist_content_calendar_posts(business_id, cal_data["posts"])
         
         if event_queue:
             await event_queue.put({"type": "step_started", "step": "formatting", "detail": "Structuring the final response for the UI..."})

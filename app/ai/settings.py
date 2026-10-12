@@ -125,7 +125,7 @@ class AISettings(BaseSettings):
     postgres_url: str | None = Field(None, validation_alias=_env("AI_POSTGRES_URL"))
 
     # ============================================================ MEMORY ====
-    memory_session_max_tokens: int = Field(1500, validation_alias=_env("MEMORY_SESSION_MAX_TOKENS"))
+    memory_session_max_tokens: int = Field(10000, validation_alias=_env("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"))
     memory_ltm_debounce_seconds: int = Field(180, validation_alias=_env("MEMORY_LTM_DEBOUNCE_SECONDS"))
     memory_item_max_tokens: int = Field(120, validation_alias=_env("MEMORY_ITEM_MAX_TOKENS"))
     memory_global_profile_max_tokens: int = Field(300, validation_alias=_env("MEMORY_GLOBAL_PROFILE_MAX_TOKENS"))
@@ -136,6 +136,18 @@ class AISettings(BaseSettings):
     apify_api_token: str | None = Field(None, validation_alias=_env("APIFY_API_TOKEN", "APIFY_TOKEN"))
     google_maps_reviews_actor_id: str = Field("compass/crawler-google-places", validation_alias=_env("APIFY_MAPS_ACTOR_ID"))
     reviews_timeout_seconds: float = Field(120.0, validation_alias=_env("REVIEWS_TIMEOUT_SECONDS"))
+
+    # =============================================================== GA4 ====
+    ga4_client_email: str | None = Field(None, validation_alias=_env("GA4_CLIENT_EMAIL"))
+    ga4_private_key: str | None = Field(None, validation_alias=_env("GA4_PRIVATE_KEY"))
+
+    @property
+    def GA4_CLIENT_EMAIL(self) -> str | None:
+        return self.ga4_client_email
+
+    @property
+    def GA4_PRIVATE_KEY(self) -> str | None:
+        return self.ga4_private_key
 
     # =========================================================== LOGGING ====
     log_dir: str = Field("./logs", validation_alias=_env("AI_LOG_DIR"))
@@ -158,4 +170,6 @@ def get_ai_settings() -> AISettings:
     return AISettings()
 
 
-__all__ = ["AISettings", "get_ai_settings"]
+settings = get_ai_settings()
+
+__all__ = ["AISettings", "get_ai_settings", "settings"]

@@ -9,7 +9,7 @@ from app.ai.agents.karim.state import KarimState
 from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
 from app.ai.agents.karim.schema import PerformanceReport
-from app.ai.tools import get_brand_context_tool
+from app.ai.tools import get_brand_context_tool, fetch_ga4_performance
 
 @tool(args_schema=PerformanceReport)
 def submit_performance_report(**kwargs) -> str:
@@ -17,10 +17,11 @@ def submit_performance_report(**kwargs) -> str:
     return "REPORT_SUBMITTED_SUCCESSFULLY"
 
 # Define the tools available to Karim
-KARIM_TOOLS = [get_brand_context_tool, submit_performance_report]
+KARIM_TOOLS = [get_brand_context_tool, fetch_ga4_performance, submit_performance_report]
 
 KARIM_PROMPT = """You are Karim, the Analyst.
 Your goal is to analyze campaign metrics and health.
+You have access to fetch_ga4_performance to retrieve website traffic, bounce rates, conversions and user engagement for Google Analytics properties.
 You must call submit_performance_report to submit your final results!
 
 OUTPUT CONTRACT: Answer only from stored data. No recommendations, no campaign CTAs."""

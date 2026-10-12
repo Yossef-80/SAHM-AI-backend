@@ -45,6 +45,7 @@ app/ai/loggers/tools/save_learning.py
 app/ai/loggers/tools/web_search.py
 app/ai/memory/__init__.py
 app/ai/memory/brand_memory.py
+app/ai/memory/compressor.py
 app/ai/providers/__init__.py
 app/ai/providers/_loader.py
 app/ai/providers/reviews.py
@@ -69,7 +70,9 @@ app/ai/tools/__init__.py
 app/ai/tools/analyze_website.py
 app/ai/tools/brand_context.py
 app/ai/tools/brand_research.py
+app/ai/tools/fetch_ga4_performance.py
 app/ai/tools/get_reviews.py
+app/ai/tools/get_reviews_playwright.py
 app/ai/tools/search.py
 app/api/__init__.py
 app/api/assistant.py
@@ -85,6 +88,7 @@ app/api/integrations.py
 app/api/memory.py
 app/api/personas.py
 app/api/recommendations.py
+app/api/research.py
 app/api/settings.py
 app/api/supabase_exchange.py
 app/api/tasks.py
@@ -168,9 +172,11 @@ sahm_backend.egg-info/top_level.txt
 tests/test_api_tools.py
 tests/test_approvals.py
 tests/test_auth.py
+tests/test_blocks_flattener_and_evidence.py
 tests/test_config_surface.py
 tests/test_contract.py
 tests/test_deployment_ops.py
+tests/test_ga4_tool.py
 tests/test_llm_layer.py
 tests/test_profile_field_families.py
 tests/test_registry_policy.py

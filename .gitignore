@@ -39,3 +39,5 @@ sahm.db-shm
 *.db-journal
 var/
 uploads/
+logs/
+*.log

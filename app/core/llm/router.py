@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +47,18 @@ _ClientKey = tuple[str, str, str, str, tuple[tuple[str, str], ...], str]
 
 _clients: dict[_ClientKey, LLMClient] = {}
 
+#: In-memory 60s TTL cache for workspace settings to eliminate redundant DB SELECTs
+_WORKSPACE_SETTINGS_CACHE: dict[str, tuple[LlmProviderSettings | None, float]] = {}
+_LLM_SETTINGS_CACHE_TTL = 60.0
+
+
+def invalidate_workspace_llm_cache(business_id: str | None = None) -> None:
+    """Drop cached workspace LLM settings. If business_id is None, clears all."""
+    if business_id is None:
+        _WORKSPACE_SETTINGS_CACHE.clear()
+    else:
+        _WORKSPACE_SETTINGS_CACHE.pop(business_id, None)
+
 
 def build_client(tier: TierName, settings: Settings | None = None) -> LLMClient:
     """Construct a client for ``tier`` from config. Not cached."""
@@ -59,13 +72,28 @@ def build_client(tier: TierName, settings: Settings | None = None) -> LLMClient:
         CLAUDE_API_URL if provider == "claude" else OPENAI_COMPATIBLE_URLS.get(provider, API_URL)
     )
     header_fp = tuple(sorted((str(k), str(v)) for k, v in cfg.llm_extra_headers.items()))
-    credential = cfg.anthropic_api_key if provider == "claude" else cfg.openai_api_key
+    credential = (
+        cfg.anthropic_api_key
+        if provider == "claude"
+        else (cfg.gemini_api_key or cfg.openai_api_key if provider == "gemini" else cfg.openai_api_key)
+    )
     credential_fp = hashlib.sha256((credential or "").encode()).hexdigest()
     key: _ClientKey = (tier, provider, model, base_url, header_fp, credential_fp)
 
     cached = _clients.get(key)
     if cached is not None:
         return cached
+
+    # Loud warning if mock client is selected when real provider keys are present
+    if provider == "mock" and (cfg.anthropic_api_key or cfg.openai_api_key or getattr(cfg, "gemini_api_key", None)):
+        _logger.warning(
+            "llm_mock_selected_despite_available_keys",
+            extra={
+                "tier": tier,
+                "provider": provider,
+                "reason": "mock_configured_for_tier",
+            },
+        )
 
     client: LLMClient
     if provider == "mock":
@@ -81,7 +109,7 @@ def build_client(tier: TierName, settings: Settings | None = None) -> LLMClient:
         )
     elif provider in OPENAI_COMPATIBLE_URLS:
         client = OpenAIClient(
-            api_key=cfg.openai_api_key,
+            api_key=credential,
             model=model,
             timeout=cfg.llm_timeout_seconds,
             max_retries=cfg.llm_max_retries,
@@ -115,11 +143,20 @@ async def resolve_workspace_tier(
 ) -> dict[str, object]:
     """Return effective, masked metadata for a workspace LLM tier."""
     cfg = settings or get_settings()
-    row = await db.scalar(
-        select(LlmProviderSettings).where(
-            LlmProviderSettings.business_id == business_id
+
+    # In-memory TTL cache (60s) check to eliminate redundant database queries
+    now_mono = time.monotonic()
+    cached = _WORKSPACE_SETTINGS_CACHE.get(business_id)
+    if cached is not None and now_mono < cached[1]:
+        row = cached[0]
+    else:
+        row = await db.scalar(
+            select(LlmProviderSettings).where(
+                LlmProviderSettings.business_id == business_id
+            )
         )
-    )
+        _WORKSPACE_SETTINGS_CACHE[business_id] = (row, now_mono + _LLM_SETTINGS_CACHE_TTL)
+
     provider_value = getattr(row, f"{tier}_provider", None) if row else None
     model_value = getattr(row, f"{tier}_model", None) if row else None
     base_url_value = getattr(row, f"{tier}_base_url", None) if row else None
@@ -131,6 +168,8 @@ async def resolve_workspace_tier(
         env_key = cfg.openai_api_key
     elif provider == "claude":
         env_key = cfg.anthropic_api_key
+    elif provider == "gemini":
+        env_key = getattr(cfg, "gemini_api_key", None) or cfg.openai_api_key
     else:
         env_key = None
     cipher = TokenCipher(cfg.token_encryption_key)
@@ -187,8 +226,9 @@ def get_llm(tier: TierName = "strong", settings: Settings | None = None) -> LLMC
 
 
 def reset_clients() -> None:
-    """Drop cached clients. Used by tests and on settings reload."""
+    """Drop cached clients and workspace settings. Used by tests and on settings reload."""
     _clients.clear()
+    invalidate_workspace_llm_cache()
 
 
 async def close_clients() -> None:

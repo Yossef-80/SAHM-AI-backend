@@ -25,10 +25,27 @@ from sqlalchemy.ext.asyncio import (
 from app.config import get_settings
 from app.core.logging import get_logger, redact
 
+from contextvars import ContextVar
+
 _logger = get_logger(__name__)
 
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
+
+#: Per-request database metrics context variable
+_request_db_metrics: ContextVar[dict[str, Any] | None] = ContextVar("_request_db_metrics", default=None)
+
+
+def init_request_db_metrics() -> dict[str, Any]:
+    """Initialize request-scoped DB metrics tracker."""
+    metrics = {"query_count": 0, "total_duration_ms": 0}
+    _request_db_metrics.set(metrics)
+    return metrics
+
+
+def get_request_db_metrics() -> dict[str, Any] | None:
+    """Retrieve current request-scoped DB metrics tracker."""
+    return _request_db_metrics.get()
 
 
 def _clean_db_trace_param(val: Any) -> Any:
@@ -99,11 +116,22 @@ def _engine_kwargs(url: str, echo: bool) -> dict[str, Any]:
         kwargs["connect_args"] = {"check_same_thread": False}
         return kwargs
 
-    # Postgres: sane pool defaults, pre-ping to survive restarts.
-    kwargs.update({"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20})
+    # Postgres: sane pool defaults, pre-ping to survive restarts, warm pool reuse
+    kwargs.update({
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_recycle": 1800,
+        "pool_timeout": 30,
+    })
 
     if is_pooler_url(url):
-        kwargs["connect_args"] = {"statement_cache_size": 0}
+        kwargs["connect_args"] = {
+            "statement_cache_size": 0,
+            "command_timeout": 30.0,
+            "timeout": 10.0,
+        }
+        kwargs["pool_size"] = 15
         # The pooler already multiplexes; a local overflow pool on top of it just
         # queues requests in the wrong place and multiplies the backend
         # connections we are trying not to exhaust.
@@ -131,7 +159,7 @@ def _setup_db_tracing(engine: AsyncEngine) -> None:
         op = stmt_clean.split()[0].upper() if stmt_clean else "SQL"
         raw_params = dict(parameters) if isinstance(parameters, dict) else parameters
         cleaned_params = _clean_db_trace_param(raw_params)
-        db_logger.info(
+        db_logger.debug(
             f"[DATABASE - {op}] Executing query",
             extra={
                 "operation": op,
@@ -148,14 +176,32 @@ def _setup_db_tracing(engine: AsyncEngine) -> None:
         stmt_clean = statement.strip()
         op = stmt_clean.split()[0].upper() if stmt_clean else "SQL"
         rowcount = getattr(cursor, "rowcount", -1)
-        db_logger.info(
-            f"[DATABASE - {op} RESULT] Completed in {duration_ms}ms (rows: {rowcount})",
-            extra={
-                "operation": op,
-                "duration_ms": duration_ms,
-                "rowcount": rowcount,
-            },
-        )
+
+        # Track query count and duration in request state if active
+        metrics = _request_db_metrics.get()
+        if metrics is not None:
+            metrics["query_count"] += 1
+            metrics["total_duration_ms"] += duration_ms
+
+        if duration_ms > 1000:
+            db_logger.warning(
+                f"[DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: {duration_ms}ms (op: {op})",
+                extra={
+                    "operation": op,
+                    "duration_ms": duration_ms,
+                    "rowcount": rowcount,
+                    "statement": stmt_clean[:300],
+                },
+            )
+        else:
+            db_logger.debug(
+                f"[DATABASE - {op} RESULT] Completed in {duration_ms}ms (rows: {rowcount})",
+                extra={
+                    "operation": op,
+                    "duration_ms": duration_ms,
+                    "rowcount": rowcount,
+                },
+            )
 
     @event.listens_for(sync_engine, "handle_error")
     def handle_error(context):

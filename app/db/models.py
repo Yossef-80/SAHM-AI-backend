@@ -20,10 +20,12 @@ from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     String,
     Text,
@@ -36,6 +38,29 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 JSON_TYPE = JSON().with_variant(JSONB, "postgresql")
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
+
+
+class DateString(TypeDecorator):
+    """Date column stored as DATE in Postgres/SQLite, exposed as YYYY-MM-DD str in Python."""
+
+    impl = Date
+    cache_ok = True
+
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            import datetime
+            try:
+                return datetime.date.fromisoformat(value)
+            except Exception:
+                return value
+        return value
+
+    def process_result_value(self, value: Any, dialect: Any) -> Any:
+        if value is None:
+            return None
+        return str(value)
 
 from app.config import get_settings
 from app.schemas.common import (
@@ -214,6 +239,9 @@ class BrandMemoryItem(Base):
     """A single memory unit, vector-embedded for similarity retrieval."""
 
     __tablename__ = "brand_memory_items"
+    __table_args__ = (
+        Index("ix_brand_memory_items_biz_kind", "business_id", "kind"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     business_id: Mapped[str] = mapped_column(
@@ -238,6 +266,9 @@ class BrandMemoryItem(Base):
 
 class Conversation(Base, TimestampMixin):
     __tablename__ = "conversations"
+    __table_args__ = (
+        Index("ix_conversations_biz_updated", "business_id", "updated_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     business_id: Mapped[str] = mapped_column(
@@ -258,6 +289,9 @@ class Conversation(Base, TimestampMixin):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        Index("ix_messages_conv_created", "conversation_id", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     conversation_id: Mapped[str] = mapped_column(
@@ -726,6 +760,36 @@ class UsageRecord(Base):
     )
 
 
+class ContentItem(Base, TimestampMixin):
+    """A scheduled or drafted social/content calendar item."""
+
+    __tablename__ = "content_items"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    date: Mapped[str] = mapped_column(DateString, nullable=False, index=True)  # YYYY-MM-DD
+    time: Mapped[str | None] = mapped_column(String(5), nullable=True)  # HH:MM
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    format: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    hook: Mapped[str | None] = mapped_column(Text, nullable=True)
+    caption: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hashtags: Mapped[list[str]] = mapped_column(JSON_TYPE, default=list, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="scheduled", nullable=False)
+    campaign_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    creative_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("creatives.id", ondelete="SET NULL"), nullable=True
+    )
+    pillar: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    business: Mapped[Business] = relationship("Business", lazy="raise")
+    campaign: Mapped[Campaign | None] = relationship("Campaign", lazy="raise")
+
+
 __all__ = [
     "EMBEDDING_DIM",
     "AgentTask",
@@ -736,6 +800,7 @@ __all__ = [
     "BrandProfile",
     "Business",
     "Campaign",
+    "ContentItem",
     "Conversation",
     "Creative",
     "Embedding",

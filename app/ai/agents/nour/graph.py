@@ -8,7 +8,7 @@ from langgraph.prebuilt import ToolNode
 
 from app.ai.agents.nour.state import NourState
 from app.ai.providers.llm import get_llm
-from app.ai.tools import web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool
+from app.ai.tools import web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool, fetch_competitor_ads
 from app.ai.settings import get_ai_settings
 from app.ai.enums import AgentName
 from app.ai.agents.nour.schema import MarketResearchReport
@@ -19,7 +19,7 @@ def submit_research_report(**kwargs) -> str:
     return "REPORT_SUBMITTED_SUCCESSFULLY"
 
 # Define the tools available to Nour
-NOUR_TOOLS = [web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool, submit_research_report]
+NOUR_TOOLS = [web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool, fetch_competitor_ads, submit_research_report]
 
 # System prompt for Nour
 NOUR_PROMPT = """You are Nour, an expert digital marketing agent and competitive intelligence analyst.
@@ -29,6 +29,7 @@ CRITICAL INSTRUCTIONS FOR RESEARCH & ANALYSIS:
 1. TARGETED TOOL EXECUTION:
    - If the user specifies `@web_analyzer` or asks to analyze a website/URL: use `analyze_website_tool(url=...)`. If only a competitor name is given, search for their website or locate their URL, then run `analyze_website_tool`.
    - If the user specifies `@reviews` or asks for customer reviews/sentiment/ratings: use `get_reviews_tool(query=...)` or search specifically for customer feedback, Google reviews, and consumer sentiment.
+   - If the user specifies competitor ads, Facebook ads, ad copy, or creative intelligence: use `fetch_competitor_ads(competitor_name=..., competitor_url=...)`.
    - If the user specifies `@gap_analysis` or asks for market gaps: identify unserved needs, weaknesses in competitor offerings, pricing discrepancies, and positioning gaps.
    - If the user mentions `@CompetitorName` (e.g. `@Tie House`, `@AbuAuf`): focus your analysis specifically on that competitor.
 2. FACT-CHECKING: When analyzing competitors from web searches, carefully verify that the business is actually in the correct industry and market.

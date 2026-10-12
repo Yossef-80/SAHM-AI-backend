@@ -156,6 +156,7 @@ _SENSITIVE_KEYS = frozenset(
         "app_secret",
         "anthropic_api_key",
         "openai_api_key",
+        "gemini_api_key",
         "meta_access_token",
         "tavily_api_key",
         "serper_api_key",

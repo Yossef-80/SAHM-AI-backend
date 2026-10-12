@@ -594,7 +594,7 @@ async def manage_session_memory_with_token_cap(
             from app.ai.settings import get_ai_settings
             max_tokens = get_ai_settings().memory_session_max_tokens
         except Exception:
-            max_tokens = 1500
+            max_tokens = 10000
 
     try:
         from app.ai.settings import get_ai_settings
@@ -620,12 +620,6 @@ async def manage_session_memory_with_token_cap(
         ]
         return history, conversation.summary
 
-    # 2. Threshold exceeded: summarize older turns and keep only the latest turns
-    logger.info(
-        "session_memory_token_cap_exceeded", 
-        extra={"conversation_id": conversation.id, "tokens": total_tokens, "max_tokens": max_tokens}
-    )
-
     # Retain the configured number of recent messages for immediate conversational context
     if len(valid_msgs) > retain_count:
         older_msgs = valid_msgs[:-retain_count]
@@ -633,6 +627,58 @@ async def manage_session_memory_with_token_cap(
     else:
         older_msgs = valid_msgs[:-1]
         recent_msgs = valid_msgs[-1:]
+
+    # 2. Watermark / growth gating check
+    conv_ctx = dict(getattr(conversation, "context", None) or {})
+    last_summary_tokens = conv_ctx.get("summary_token_watermark")
+
+    if conversation.summary:
+        if last_summary_tokens is not None and last_summary_tokens > 0:
+            growth = (total_tokens - last_summary_tokens) / last_summary_tokens
+            if growth < 0.25:
+                logger.info(
+                    "session_memory_growth_gated",
+                    extra={
+                        "conversation_id": conversation.id,
+                        "growth": round(growth, 3),
+                        "total_tokens": total_tokens,
+                        "last_summary_tokens": last_summary_tokens,
+                    },
+                )
+                compact_history = [
+                    {
+                        "role": m.role,
+                        "content": m.content or "",
+                        "persona_id": m.persona_id,
+                        "blocks": m.blocks or [],
+                    }
+                    for m in recent_msgs
+                ]
+                return compact_history, conversation.summary
+        else:
+            # Existing summary without watermark recorded: record current tokens and reuse summary
+            conversation.context = {**conv_ctx, "summary_token_watermark": total_tokens}
+            await db.flush()
+            logger.info(
+                "session_memory_watermark_initialized",
+                extra={"conversation_id": conversation.id, "total_tokens": total_tokens},
+            )
+            compact_history = [
+                {
+                    "role": m.role,
+                    "content": m.content or "",
+                    "persona_id": m.persona_id,
+                    "blocks": m.blocks or [],
+                }
+                for m in recent_msgs
+            ]
+            return compact_history, conversation.summary
+
+    # 3. Threshold exceeded & growth >= 25% (or no prior summary): summarize older turns
+    logger.info(
+        "session_memory_token_cap_exceeded", 
+        extra={"conversation_id": conversation.id, "tokens": total_tokens, "max_tokens": max_tokens}
+    )
 
     older_text = "\n".join([f"{m.role.upper()}: {_message_to_text(m)}" for m in older_msgs])
     current_summary = conversation.summary or "No previous summary."
@@ -672,10 +718,18 @@ async def manage_session_memory_with_token_cap(
 
         # Update the database
         conversation.summary = new_summary
+        conversation.context = {
+            **(conversation.context or {}),
+            "summary_token_watermark": total_tokens,
+        }
         await db.flush()
         logger.info(
             "conversation_summary_updated",
-            extra={"conversation_id": conversation.id, "tokens": count_tokens(new_summary)},
+            extra={
+                "conversation_id": conversation.id,
+                "tokens": count_tokens(new_summary),
+                "watermark_tokens": total_tokens,
+            },
         )
     except Exception as e:
         logger.error("conversation_summary_failed", extra={"conversation_id": conversation.id, "error": str(e)})

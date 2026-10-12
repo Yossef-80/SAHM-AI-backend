@@ -30,10 +30,12 @@ Nothing in this module logs a password, a raw token, or a token hash. See
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
 import secrets
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -220,30 +222,72 @@ async def create_session(
     return token
 
 
+_SESSION_TOUCH_INTERVAL_SECONDS = 300  # 5 minutes
+_SESSION_LAST_TOUCHED: dict[str, float] = {}
+
+
+async def _background_touch(session_id: str) -> None:
+    try:
+        from sqlalchemy import update
+        from app.db.session import session_scope
+
+        async with session_scope() as session:
+            await session.execute(
+                update(Session).where(Session.id == session_id).values(last_used_at=_now())
+            )
+    except Exception as exc:
+        _logger.warning("session_touch_failed", extra={"session_id": session_id, "error": str(exc)})
+
+
+def _touch_session_async(session_id: str) -> None:
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_background_touch(session_id))
+    except RuntimeError:
+        pass
+
+
 async def resolve_session(db: AsyncSession, token: str | None) -> User | None:
     """Turn a raw bearer token into its ``User``, or ``None``.
 
     Rejects an unknown, revoked or expired token -- all three as the same
     ``None``, so a client cannot tell "logged out" from "tampered with". On
-    success ``last_used_at`` is refreshed, which is what makes a session list
-    answerable later.
+    success ``last_used_at`` is refreshed on initial use and throttled asynchronously
+    thereafter, eliminating blocking round-trips from the request path.
     """
     if not token:
         return None
-    stmt = select(Session).where(Session.token_hash == hash_token(token))
-    row = await db.scalar(stmt)
-    if row is None:
+    stmt = (
+        select(Session, User)
+        .join(User, Session.user_id == User.id)
+        .where(Session.token_hash == hash_token(token))
+    )
+    res = (await db.execute(stmt)).first()
+    if res is None:
         return None
+    row, user = res
     if row.revoked_at is not None:
         return None
     expires_at = _as_utc(row.expires_at)
     if expires_at is not None and expires_at <= _now():
         return None
-    user = await db.scalar(select(User).where(User.id == row.user_id))
-    if user is None or not user.is_active:
+    if not user.is_active:
         return None
-    row.last_used_at = _now()
-    await db.flush()
+
+    # Debounce/throttle last_used_at touch:
+    # 1. On initial use (row.last_used_at is None), set immediately so test/auth invariants hold.
+    # 2. Subsequent requests within 5 minutes skip the DB update completely (0 ms overhead).
+    # 3. After 5 minutes, an asynchronous background task is dispatched without blocking the request.
+    now_mono = time.monotonic()
+    last_touched = _SESSION_LAST_TOUCHED.get(row.id, 0.0)
+    if row.last_used_at is None:
+        row.last_used_at = _now()
+        _SESSION_LAST_TOUCHED[row.id] = now_mono
+        await db.flush()
+    elif now_mono - last_touched >= _SESSION_TOUCH_INTERVAL_SECONDS:
+        _SESSION_LAST_TOUCHED[row.id] = now_mono
+        _touch_session_async(row.id)
+
     return user
 
 

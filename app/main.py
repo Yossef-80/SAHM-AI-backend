@@ -24,6 +24,7 @@ from app.api import (
     auth,
     business,
     campaigns,
+    content as content_router,
     creatives,
     insights,
     integrations,
@@ -179,6 +180,9 @@ def create_app() -> FastAPI:
         bind_request_id(request_id)
         request.state.request_id = request_id
 
+        from app.db.session import get_request_db_metrics, init_request_db_metrics
+        init_request_db_metrics()
+
         query_params = dict(request.query_params)
         client_host = request.client.host if request.client else "unknown"
         body_preview = None
@@ -217,13 +221,23 @@ def create_app() -> FastAPI:
         duration_ms = int((time.monotonic() - started) * 1000)
         response.headers["x-request-id"] = request_id
 
+        db_metrics = get_request_db_metrics()
+        if db_metrics:
+            response.headers["X-DB-Queries"] = str(db_metrics["query_count"])
+            response.headers["X-DB-Time"] = f"{db_metrics['total_duration_ms']}ms"
+
+        db_q_count = db_metrics.get("query_count", 0) if db_metrics else 0
+        db_time_ms = db_metrics.get("total_duration_ms", 0) if db_metrics else 0
+
         _logger.info(
-            f"[ROUTING - OUTGOING] {response.status_code} {request.method} {request.url.path} ({duration_ms}ms)",
+            f"[ROUTING - OUTGOING] {response.status_code} {request.method} {request.url.path} ({duration_ms}ms, DB: {db_time_ms}ms/{db_q_count}q)",
             extra={
                 "method": request.method,
                 "path": request.url.path,
                 "status": response.status_code,
                 "duration_ms": duration_ms,
+                "db_queries": db_q_count,
+                "db_time_ms": db_time_ms,
             },
         )
         return response
@@ -235,6 +249,7 @@ def create_app() -> FastAPI:
     app.include_router(personas_router.router, prefix=prefix)
     app.include_router(business.router, prefix=prefix)
     app.include_router(campaigns.router, prefix=prefix)
+    app.include_router(content_router.router, prefix=prefix)
     app.include_router(creatives.router, prefix=prefix)
     app.include_router(insights.router, prefix=prefix)
     app.include_router(recommendations.router, prefix=prefix)

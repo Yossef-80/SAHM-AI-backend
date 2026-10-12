@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
@@ -213,25 +213,46 @@ async def get_or_create_conversation(
 
 
 async def list_conversations(db: AsyncSession, business_id: str) -> list[ConversationSummary]:
+    last_msg_subquery = (
+        select(Message.content)
+        .where(Message.conversation_id == Conversation.id)
+        .order_by(Message.created_at.desc())
+        .limit(1)
+        .correlate(Conversation)
+        .scalar_subquery()
+    )
+
+    msg_count_subquery = (
+        select(func.count(Message.id))
+        .where(Message.conversation_id == Conversation.id)
+        .correlate(Conversation)
+        .scalar_subquery()
+    )
+
     stmt = (
-        select(Conversation)
+        select(
+            Conversation.id,
+            Conversation.title,
+            Conversation.created_at,
+            Conversation.updated_at,
+            msg_count_subquery.label("message_count"),
+            last_msg_subquery.label("last_message_content"),
+        )
         .where(Conversation.business_id == business_id)
         .order_by(Conversation.updated_at.desc())
     )
-    rows = (await db.execute(stmt)).scalars().all()
+    rows = (await db.execute(stmt)).all()
     out: list[ConversationSummary] = []
     for row in rows:
-        preview = ""
-        if row.messages:
-            last = row.messages[-1]
-            preview = (last.content or "")[:120]
+        conv_id, title, created_at, updated_at, count, last_content = row
+        preview = (last_content or "")[:120] if last_content else ""
         out.append(
             ConversationSummary(
-                id=row.id,
-                title=row.title,
-                created_at=row.created_at,
-                updated_at=row.updated_at,
-                message_count=len(row.messages),
+                id=conv_id,
+                title=title,
+                created_at=created_at,
+                updated_at=updated_at,
+                message_count=count or 0,
                 last_message_preview=preview,
             )
         )
@@ -313,6 +334,7 @@ async def handle_message(
     request_id: str,
     business: Business,
     event_queue: asyncio.Queue[dict[str, Any]] | None = None,
+    defer_post_memory: bool = False,
 ) -> AssistantMessageResponse:
     """Run one assistant turn synchronously.
 
@@ -414,6 +436,7 @@ async def handle_message(
         user_context=user_context,
         conversation_summary=conv_summary,
         active_plans=active_plans,
+        business_id=business.id,
     )
     blocks_raw = final_gui.model_dump(mode="json", by_alias=True)["blocks"] if final_gui else []
     final = {"blocks": blocks_raw}
@@ -448,12 +471,13 @@ async def handle_message(
     )
     await db.commit()
 
-    # Trigger 3-minute inactivity debounced Long-Term Memory background update
-    try:
-        from app.ai.memory.compressor import memory_debouncer
-        memory_debouncer.schedule_ltm_update(business.id)
-    except Exception as exc:
-        _logger.warning("ltm_debouncer_schedule_failed", extra={"error": str(exc)})
+    if not defer_post_memory:
+        # Trigger 3-minute inactivity debounced Long-Term Memory background update
+        try:
+            from app.ai.memory.compressor import memory_debouncer
+            memory_debouncer.schedule_ltm_update(business.id)
+        except Exception as exc:
+            _logger.warning("ltm_debouncer_schedule_failed", extra={"error": str(exc)})
 
     message = MessageSchema(
         id=_new_id("msg"),

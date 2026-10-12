@@ -45,7 +45,7 @@ from app.core.tools.settings import (
     connector_spec,
     load_connector_settings,
 )
-from app.core.llm.router import resolve_workspace_tier
+from app.core.llm.router import invalidate_workspace_llm_cache, resolve_workspace_tier
 from app.db.models import LlmProviderSettings, ToolSettings as ToolSettingsRow
 from app.schemas.llm_settings import LlmSettingsOut, LlmSettingsUpdate, LlmTierOut
 from app.schemas.settings import (
@@ -362,6 +362,7 @@ async def update_llm_settings(
             setattr(row, f"{tier}_extra_headers_enc", encrypted)
     row.updated_by = principal.user_id if principal is not None else None
     await db.commit()
+    invalidate_workspace_llm_cache(ws.business_id)
 
     fast = await resolve_workspace_tier(db, ws.business_id, "fast", settings)
     strong = await resolve_workspace_tier(db, ws.business_id, "strong", settings)

@@ -112,9 +112,16 @@ async def get_principal(request: Request, db: SessionDep, settings: SettingsDep)
 
     With Supabase Auth enabled, the token is a Supabase-issued JWT.
     We verify it via JWKS, then load/create the local profile.
+    Memoizes the principal on ``request.state.principal`` to eliminate duplicate
+    queries when multiple dependencies depend on authentication in the same request.
     """
+    if hasattr(request, "state") and hasattr(request.state, "principal"):
+        return request.state.principal
+
     token = bearer_token(request)
     if token is None:
+        if hasattr(request, "state"):
+            request.state.principal = None
         return None
 
     # 1. Supabase Auth path (when token is a 3-part JWT)
@@ -128,28 +135,40 @@ async def get_principal(request: Request, db: SessionDep, settings: SettingsDep)
             if supabase_user_id and email:
                 profile = await get_or_create_profile(db, supabase_user_id, email, full_name)
                 principal = await load_principal_from_profile(db, profile)
-                return Principal(
+                res = Principal(
                     user_id=principal.user_id,
                     email=email,
                     full_name=full_name,
                     memberships=principal.memberships,
                 )
+                if hasattr(request, "state"):
+                    request.state.principal = res
+                return res
         except SupabaseAuthError:
             pass
 
     # 2. Database session auth path (opaque session token stored in PostgreSQL)
-    cached_user_id = getattr(request.state, "auth_user_id", None)
+    cached_user_id = getattr(request.state, "auth_user_id", None) if hasattr(request, "state") else None
     if cached_user_id:
         user = await db.get(User, cached_user_id)
         if user is None:
+            if hasattr(request, "state"):
+                request.state.principal = None
             return None
-        return await load_principal(db, user)
+        principal = await load_principal(db, user)
+        if hasattr(request, "state"):
+            request.state.principal = principal
+        return principal
 
     user = await resolve_session(db, token)
     if user is None:
+        if hasattr(request, "state"):
+            request.state.principal = None
         return None
-    await db.commit()
-    return await load_principal(db, user)
+    principal = await load_principal(db, user)
+    if hasattr(request, "state"):
+        request.state.principal = principal
+    return principal
 
 
 #: Optional authentication. ``None`` when the request carried no valid token.
@@ -370,12 +389,19 @@ async def resolve_workspace(
     ``principal`` carries a default only so this stays callable directly with
     the three P0 positional arguments (the isolation tests do exactly that).
     FastAPI always injects it through ``AuthDep``.
+    Memoized on ``request.state.workspace_context``.
     """
+    if hasattr(request, "state") and hasattr(request.state, "workspace_context"):
+        return request.state.workspace_context
+
     requested = request.headers.get(WORKSPACE_HEADER)
 
     if principal is not None:
         # Authenticated: the membership table decides, not the header alone.
-        return await _resolve_for_principal(db, principal, requested)
+        ctx = await _resolve_for_principal(db, principal, requested)
+        if hasattr(request, "state"):
+            request.state.workspace_context = ctx
+        return ctx
 
     if requested:
         business = await db.scalar(select(Business).where(Business.id == requested))
@@ -384,7 +410,10 @@ async def resolve_workspace(
                 f"workspace '{requested}' not found",
                 detail={"header": WORKSPACE_HEADER, "value": requested},
             )
-        return _bind(business)
+        ctx = _bind(business)
+        if hasattr(request, "state"):
+            request.state.workspace_context = ctx
+        return ctx
 
     if settings.require_workspace_header:
         raise WorkspaceRequiredError(
@@ -399,7 +428,10 @@ async def resolve_workspace(
             "workspace_not_resolved_falling_back_to_single_tenant",
             extra={"environment": settings.environment},
         )
-    return _bind(await _single_tenant_business(db))
+    ctx = _bind(await _single_tenant_business(db))
+    if hasattr(request, "state"):
+        request.state.workspace_context = ctx
+    return ctx
 
 
 WorkspaceDep = Annotated[WorkspaceContext, Depends(resolve_workspace)]
