@@ -2,11 +2,10 @@
 
 Why this exists
 ---------------
-Only two tools have a direct HTTP endpoint (``POST /creatives/analyze-reference``
-and ``POST /creatives/generate``). The other eleven can only be reached through a
-model tool-call inside a task run, which makes them impossible to test
-deterministically over HTTP. This script calls the handlers directly against a
-throwaway SQLite database, so you get a repeatable pass/fail for all thirteen.
+The catalogue and invoke routes expose every registered tool, but this script
+still provides a direct handler-level exercise against a throwaway SQLite
+database. Tools that fetch websites or use external providers need explicit
+mock/fixture overrides before running this script offline.
 
 Usage (from the ``sahm-ai backend`` folder)::
 
@@ -15,7 +14,8 @@ Usage (from the ``sahm-ai backend`` folder)::
     python scripts/exercise_tools.py --list     # list tools and their inputs
 
 It never touches your configured ``DATABASE_URL`` -- a temporary file-backed
-SQLite database is used so this is always safe to run.
+SQLite database is used. Provider-enabled handlers may still make external calls;
+review their settings or install mock/fixture overrides before running offline.
 """
 
 from __future__ import annotations

@@ -115,8 +115,38 @@ async def build_diff(db: AsyncSession, recommendation: RecommendationRow) -> lis
     """The before -> after diff the review dialog shows.
 
     Only fields present in the recommendation's payload are included, so the
-    dialog never implies a change that is not being made.
+    dialog never implies a change that is not being made. A Meta ad plan gets a
+    compact, explicit hierarchy summary; its complete non-secret settings remain
+    on ``recommendation.payload.plan`` for the review UI.
     """
+    if recommendation.action_type == "create_meta_ad_plan":
+        payload = recommendation.payload or {}
+        summary = payload.get("campaign_summary") if isinstance(payload, dict) else {}
+        plan = payload.get("plan") if isinstance(payload, dict) else {}
+        summary = summary if isinstance(summary, dict) else {}
+        plan = plan if isinstance(plan, dict) else {}
+        return [
+            ChangeDiff(
+                field="meta_creation_plan",
+                before=None,
+                after={
+                    "campaign": summary.get("name"),
+                    "objective": summary.get("objective"),
+                    "daily_budget": summary.get("daily_budget"),
+                    "currency": summary.get("currency"),
+                    "special_ad_categories": plan.get("specialAdCategories"),
+                    "page_id": plan.get("pageId"),
+                    "billing_event": plan.get("billingEvent"),
+                    "optimization_goal": plan.get("optimizationGoal"),
+                    "destination_type": plan.get("destinationType"),
+                    "destination_url": plan.get("destinationUrl"),
+                    "creative_ids": plan.get("creativeIds", []),
+                    "meta_status": "PAUSED",
+                    "hierarchy": "Campaign → Ad Set → Creative(s) → Ad(s)",
+                },
+            )
+        ]
+
     diffs: list[ChangeDiff] = []
     payload = recommendation.payload or {}
     for key in sorted(payload):
@@ -154,6 +184,7 @@ def _to_schema(row: RecommendationRow) -> Recommendation:
         executed_at=row.executed_at,
         requires_approval=bool(row.requires_approval),
         estimated_impact=row.estimated_impact,
+        execution_result=row.execution_result,
     )
 
 
@@ -174,6 +205,7 @@ async def approve_recommendation(
     *,
     actor: str = "user",
     request_id: str | None = None,
+    settings: Any | None = None,
 ) -> ApproveRecommendationResponse:
     """Phase 1 records the diff; phase 2 executes.
 
@@ -194,6 +226,26 @@ async def approve_recommendation(
         raise ApprovalStateError(
             f"recommendation '{recommendation_id}' was rejected and cannot be approved"
         )
+    if (
+        row.action_type == "create_meta_ad_plan"
+        and request.confirm
+        and row.status != RecommendationStatus.APPROVED.value
+    ):
+        raise ApprovalStateError(
+            "a Meta ad plan must complete phase 1 and have its diff reviewed before confirmation"
+        )
+    if row.action_type == "create_meta_ad_plan" and not request.confirm:
+        from app.ai.marketing.meta_ads import preflight_meta_ad_plan
+        from app.config import get_settings
+
+        issues = await preflight_meta_ad_plan(
+            db, row, settings=settings or get_settings()
+        )
+        if issues:
+            raise ApprovalRequired(
+                "The Meta ad plan cannot be approved until its required settings are complete.",
+                detail={"issues": issues},
+            )
 
     before = {
         "status": row.status,
@@ -243,7 +295,9 @@ async def approve_recommendation(
         row.diff = [d.model_dump(mode="json") for d in diffs]
         await db.flush()
 
-    outcome = await _execute(db, row, actor=actor, request_id=request_id)
+    outcome = await _execute(
+        db, row, actor=actor, request_id=request_id, settings=settings
+    )
 
     after = {
         "status": row.status,
@@ -299,15 +353,45 @@ async def _tenant_of_campaign(
 
 
 async def _execute(
-    db: AsyncSession, row: RecommendationRow, *, actor: str, request_id: str | None
-) -> ApplyChangeOutput:
-    """The single call site of the protected ``apply_change`` tool."""
+    db: AsyncSession,
+    row: RecommendationRow,
+    *,
+    actor: str,
+    request_id: str | None,
+    settings: Any | None = None,
+) -> Any:
+    """The only call site of protected Meta write bridges.
+
+    The legacy generic action path retains its existing ToolContext-based
+    handler. The new multi-object campaign path deliberately does not create a
+    ToolContext; it delegates through the narrow protected bridge.
+    """
+    if row.action_type == "create_meta_ad_plan":
+        from app.config import get_settings
+
+        outcome = await protected.execute_meta_ad_plan_protected(
+            db,
+            row,
+            confirmed_by=actor,
+            settings=settings or get_settings(),
+        )
+        if outcome.status == "ok":
+            row.status = RecommendationStatus.EXECUTED.value
+            row.executed_at = _now()
+        else:
+            # Failed/partial external writes stay visibly failed. The executor
+            # records any created IDs and independently blocks an automatic
+            # replay on the next confirmation attempt.
+            row.status = RecommendationStatus.FAILED.value
+        await db.flush()
+        return outcome
+
     from app.core.tools.base import ToolContext
 
     workspace_id, business_id = await _tenant_of_campaign(db, row.campaign_id)
 
-    # A ToolContext is required by the handler. It is built here, inside the
-    # approvals service, which is the only place allowed to do this.
+    # A ToolContext is required by the legacy handler. It is built here, inside
+    # the approvals service, which is the only place allowed to do this.
     ctx = ToolContext(
         workspace_id=workspace_id,
         business_id=business_id,

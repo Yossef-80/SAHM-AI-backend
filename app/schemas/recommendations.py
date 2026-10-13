@@ -35,6 +35,7 @@ class Recommendation(ApiModel):
     created_at: datetime
     updated_at: datetime
     executed_at: datetime | None = None
+    execution_result: dict[str, object] | None = None
     requires_approval: bool = False
     estimated_impact: str | None = None
 
@@ -54,6 +55,23 @@ class ApproveRecommendationResponse(ApiModel):
     requires_confirmation: bool = False
     message: str = ""
     audit_log_id: str | None = None
+
+
+class ActivateRecommendationRequest(ApiModel):
+    """Phase 1 (no confirm) previews. Phase 2 (confirm=True) starts delivery."""
+
+    confirm: bool = False
+
+
+class ActivateRecommendationResponse(ApiModel):
+    recommendation: Recommendation
+    executed: bool = False
+    requires_confirmation: bool = False
+    #: Meta objects that would be (phase 1) or were (phase 2) switched ACTIVE.
+    targets: list[str] = Field(default_factory=list)
+    activated: list[str] = Field(default_factory=list)
+    message: str = ""
+    unavailable_reason: str | None = None
 
 
 class RejectRecommendationRequest(ApiModel):

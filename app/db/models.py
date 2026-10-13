@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import math
 import uuid
+from datetime import date as date_type
 from datetime import datetime
 from typing import Any
 
@@ -340,6 +341,45 @@ class Campaign(Base, TimestampMixin):
     )
 
 
+class ContentItem(Base, TimestampMixin):
+    """One editable, workspace-owned content-calendar entry."""
+
+    __tablename__ = "content_items"
+    __table_args__ = (
+        Index("ix_content_items_business_date", "business_id", "date"),
+        CheckConstraint(
+            "channel IN ('instagram','facebook','tiktok','email','blog')",
+            name="ck_content_items_channel",
+        ),
+        CheckConstraint(
+            "format IN ('post','reel','story','ad','email','article')",
+            name="ck_content_items_format",
+        ),
+        CheckConstraint(
+            "status IN ('idea','draft','scheduled','published')",
+            name="ck_content_items_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True
+    )
+    campaign_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("campaigns.id", ondelete="SET NULL"), index=True
+    )
+    date: Mapped[date_type] = mapped_column(Date, nullable=False, index=True)
+    time: Mapped[str | None] = mapped_column(String(5))
+    channel: Mapped[str] = mapped_column(String(20), nullable=False)
+    format: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    hook: Mapped[str | None] = mapped_column(Text)
+    caption: Mapped[str | None] = mapped_column(Text)
+    hashtags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="idea", nullable=False, index=True)
+    pillar: Mapped[str | None] = mapped_column(String(200))
+
+
 class Creative(Base, TimestampMixin):
     """A generated or uploaded creative asset."""
 
@@ -353,7 +393,11 @@ class Creative(Base, TimestampMixin):
     persona_id: Mapped[str | None] = mapped_column(String(64))
     task_name: Mapped[str | None] = mapped_column(String(60))
     kind: Mapped[str] = mapped_column(String(30), default="image")
-    url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    # Text, not String(1000): this holds an inline data URL. Generated and
+    # uploaded creatives both store their bytes here, and Meta is sent those
+    # bytes, so the value runs to megabytes. SQLite ignores VARCHAR length,
+    # which hid the overflow; Postgres would have rejected every creative.
+    url: Mapped[str] = mapped_column(Text, nullable=False)
     prompt: Mapped[str] = mapped_column(Text, default="")
     aspect_ratio: Mapped[str] = mapped_column(String(10), default="1:1")
     provider: Mapped[str | None] = mapped_column(String(40))
@@ -694,6 +738,7 @@ class ToolSettings(Base, TimestampMixin):
     #: Meta: the app and the ad account this workspace manages.
     meta_app_id: Mapped[str | None] = mapped_column(String(120))
     meta_ad_account_id: Mapped[str | None] = mapped_column(String(120))
+    meta_page_id: Mapped[str | None] = mapped_column(String(120))
     #: Google Places / DataForSEO.
     google_places_base_url: Mapped[str | None] = mapped_column(String(500))
     dataforseo_login: Mapped[str | None] = mapped_column(String(200))
@@ -760,34 +805,7 @@ class UsageRecord(Base):
     )
 
 
-class ContentItem(Base, TimestampMixin):
-    """A scheduled or drafted social/content calendar item."""
 
-    __tablename__ = "content_items"
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    business_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    date: Mapped[str] = mapped_column(DateString, nullable=False, index=True)  # YYYY-MM-DD
-    time: Mapped[str | None] = mapped_column(String(5), nullable=True)  # HH:MM
-    channel: Mapped[str] = mapped_column(String(32), nullable=False)
-    format: Mapped[str] = mapped_column(String(32), nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    hook: Mapped[str | None] = mapped_column(Text, nullable=True)
-    caption: Mapped[str | None] = mapped_column(Text, nullable=True)
-    hashtags: Mapped[list[str]] = mapped_column(JSON_TYPE, default=list, nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="scheduled", nullable=False)
-    campaign_id: Mapped[str | None] = mapped_column(
-        String(64), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    creative_id: Mapped[str | None] = mapped_column(
-        String(64), ForeignKey("creatives.id", ondelete="SET NULL"), nullable=True
-    )
-    pillar: Mapped[str | None] = mapped_column(String(100), nullable=True)
-
-    business: Mapped[Business] = relationship("Business", lazy="raise")
-    campaign: Mapped[Campaign | None] = relationship("Campaign", lazy="raise")
 
 
 __all__ = [

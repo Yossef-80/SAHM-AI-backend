@@ -18,9 +18,9 @@ from app.core.llm.base import (
     BaseLLMClient,
     LLMResult,
     Msg,
+    TierName,
     ToolCall,
     ToolSpec,
-    TierName,
     is_retryable_exception,
     is_retryable_status,
     schema_instruction,
@@ -123,7 +123,24 @@ class ClaudeClient(BaseLLMClient):
                     )
                 api_messages.append({"role": "assistant", "content": content})
                 continue
-            api_messages.append({"role": msg.role, "content": msg.content or ""})
+            if msg.images:
+                content: list[dict[str, Any]] = []
+                if msg.content:
+                    content.append({"type": "text", "text": msg.content})
+                content.extend(
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": image.media_type,
+                            "data": image.data,
+                        },
+                    }
+                    for image in msg.images
+                )
+                api_messages.append({"role": msg.role, "content": content})
+            else:
+                api_messages.append({"role": msg.role, "content": msg.content or ""})
 
         body: dict[str, Any] = {
             "model": self.model,

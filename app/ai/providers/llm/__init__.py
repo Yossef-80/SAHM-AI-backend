@@ -22,6 +22,7 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel
 
 from app.ai.enums import LLMProvider, StructuredOutputMethod
+from app.ai.errors import ProviderNotConfiguredError
 from app.ai.loggers.providers.llm import logger
 from app.ai.providers._loader import load_provider_module
 from app.ai.settings import AISettings, get_ai_settings
@@ -72,4 +73,56 @@ def get_llm(
     return LLMHandle(chat=chat, provider=choice, model_name=model_name, structured_method=method)
 
 
-__all__ = ["LLMHandle", "get_llm"]
+def get_vlm_llm(*, settings: AISettings | None = None) -> LLMHandle:
+    """Return Layla's vision-capable handle without changing global LLM selection.
+
+    ``AI_ADS_VLM_PROVIDER`` and ``AI_ADS_VLM_MODEL`` can select an independent
+    VLM (for example Gemini) for reference-image analysis. If they are unset,
+    the legacy dedicated Ollama tunnel is used when configured; otherwise the
+    existing general app.ai provider/model selection is reused unchanged.
+    """
+    cfg = settings or get_ai_settings()
+
+    if cfg.ads_vlm_provider is not None:
+        vlm_model = (cfg.ads_vlm_model or "").strip()
+        if cfg.ads_vlm_provider == LLMProvider.OLLAMA:
+            vlm_model = vlm_model or (cfg.vlm_ollama_model or "").strip()
+        if not vlm_model:
+            raise ProviderNotConfiguredError(
+                f"AI_ADS_VLM_PROVIDER={cfg.ads_vlm_provider.value} is configured, "
+                "but AI_ADS_VLM_MODEL is missing. Set it to the exact vision-capable "
+                "model identifier for the selected provider."
+            )
+
+        # Use the selected VLM provider's structured-output default rather than
+        # inheriting a global method configured for the system LLM provider.
+        vlm_settings = cfg.model_copy(update={"structured_output_method": None})
+        if cfg.ads_vlm_provider == LLMProvider.OLLAMA and cfg.ads_vlm_base_url:
+            vlm_settings = vlm_settings.model_copy(
+                update={"ollama_base_url": cfg.ads_vlm_base_url}
+            )
+        return get_llm(
+            provider=cfg.ads_vlm_provider,
+            model=vlm_model,
+            settings=vlm_settings,
+        )
+
+    if not cfg.ads_vlm_base_url:
+        return get_llm(settings=cfg)
+
+    vlm_model = (cfg.vlm_ollama_model or "").strip()
+    if not vlm_model:
+        raise ProviderNotConfiguredError(
+            "AI_ADS_VLM_BASE_URL is configured, but VLM_OLLAMA_MODEL is missing. "
+            "Set it to the exact vision-capable model tag installed on the dedicated VLM server."
+        )
+
+    vlm_settings = cfg.model_copy(update={"ollama_base_url": cfg.ads_vlm_base_url})
+    return get_llm(
+        provider=LLMProvider.OLLAMA,
+        model=vlm_model,
+        settings=vlm_settings,
+    )
+
+
+__all__ = ["LLMHandle", "get_llm", "get_vlm_llm"]

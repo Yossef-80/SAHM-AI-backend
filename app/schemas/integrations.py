@@ -9,8 +9,25 @@ from pydantic import Field
 from app.schemas.common import ApiModel
 
 
+class MetaInterestSuggestion(ApiModel):
+    """One resolved interest, in the shape Meta's `flexible_spec` expects."""
+
+    id: str
+    name: str
+    audience_size: int | None = None
+    path: list[str] = Field(default_factory=list)
+
+
+class MetaTargetingSearchResponse(ApiModel):
+    available: bool = True
+    unavailable_reason: str | None = None
+    results: list[MetaInterestSuggestion] = Field(default_factory=list)
+
+
 class MetaIntegrationStatus(ApiModel):
     connected: bool = False
+    campaign_ready: bool = False
+    page_configured: bool = False
     ad_account_id: str | None = None
     ad_account_name: str | None = None
     token_expires_at: datetime | None = None

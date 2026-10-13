@@ -9,6 +9,7 @@ passed through.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -17,21 +18,73 @@ from app.schemas.common import ApiModel
 
 
 class AnalyzeReferenceRequest(ApiModel):
-    # Exactly one of image_url / upload_id must be provided.
+    # Exactly one of image_url / upload_id / image_data must be provided.
     image_url: str | None = None
     upload_id: str | None = None
+    # Small browser uploads arrive as a base64 data URL; bytes are validated and
+    # moved to private storage before the vision tool is invoked.
+    image_data: str | None = Field(default=None, max_length=3_000_000)
     campaign_id: str | None = None
+    source_name: str = Field(default="", max_length=160)
     # Extra instructions for the vision model (e.g. "focus on the hook").
     focus: str | None = None
 
     def model_post_init(self, __context: object) -> None:
-        if not self.image_url and not self.upload_id:
-            raise ValueError("either imageUrl or uploadId is required")
+        supplied = sum(bool(value) for value in (self.image_url, self.upload_id, self.image_data))
+        if supplied != 1:
+            raise ValueError("provide exactly one of imageUrl, uploadId, or imageData")
+
+
+class GenerateLaylaTextRequest(ApiModel):
+    """A focused Layla writing request from the creative workspace."""
+
+    tool: Literal[
+        "generate_creative_brief",
+        "generate_commercial_script",
+        "generate_image_prompt",
+        "generate_video_prompt",
+        "generate_ad_copy",
+        "generate_ad_variations",
+    ]
+    brief: str = Field(min_length=3, max_length=12000)
+    language: Literal["en", "ar"] = "en"
+    campaign_id: str | None = None
+    creative_id: str | None = None
+
+
+class GenerateLaylaTextResponse(ApiModel):
+    id: str
+    tool: Literal[
+        "generate_creative_brief",
+        "generate_commercial_script",
+        "generate_image_prompt",
+        "generate_video_prompt",
+        "generate_ad_copy",
+        "generate_ad_variations",
+    ]
+    output: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class StyleElement(ApiModel):
+    """One observed reference element with approximate relative layout."""
+
+    element: str = ""
+    relative_position: str = ""
+    relative_size: str = ""
+    visual_attributes: str = ""
+    exact_text: str = ""
+    layer_order: int | None = None
 
 
 class StyleSpec(ApiModel):
-    """Structured style extracted from a reference creative."""
+    """Structured style/layout extracted from a reference creative."""
 
+    canvas_ratio: str = ""
+    background: str = ""
+    lighting: str = ""
+    visible_text: list[str] = Field(default_factory=list)
+    elements: list[StyleElement] = Field(default_factory=list)
     palette: list[str] = Field(default_factory=list, description="hex colors, ordered")
     composition: str = ""
     typography: str = ""
@@ -46,13 +99,29 @@ class StyleSpec(ApiModel):
 
 class ReferenceAnalysis(ToolOutput):
     id: str = ""
-    source: str = Field(default="", description="image_url or upload id")
+    source: str = Field(default="", description="private upload id or sanitized source label")
+    source_name: str = ""
     summary: str = ""
     style: StyleSpec = Field(default_factory=StyleSpec)
     observed_offers: list[str] = Field(default_factory=list)
     observed_cta: list[str] = Field(default_factory=list)
     model: str = ""
     created_at: datetime | None = None
+
+
+class CreativeReferenceItem(ApiModel):
+    """A persisted VLM analysis that can be reused in later creative chats."""
+
+    id: str
+    source_name: str = "Saved reference"
+    summary: str = ""
+    style: StyleSpec = Field(default_factory=StyleSpec)
+    favorite: bool = False
+    created_at: datetime | None = None
+
+
+class CreativeReferenceUpdate(ApiModel):
+    favorite: bool
 
 
 class GenerateCreativeRequest(ApiModel):
@@ -83,3 +152,8 @@ class GeneratedAsset(ToolOutput):
 class GenerateCreativeResponse(ApiModel):
     assets: list[GeneratedAsset] = Field(default_factory=list)
     reference_analysis: ReferenceAnalysis | None = None
+    # Without these the endpoint returned HTTP 200 + `{"assets": []}` whenever the
+    # image provider was missing or refused, which the client rendered as a green
+    # "0 creatives generated" toast. The reason now reaches the caller.
+    status: str = "ok"
+    unavailable_reason: str | None = None

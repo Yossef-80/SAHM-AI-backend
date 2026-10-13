@@ -1,7 +1,7 @@
 """The unified tools API: catalogue and deterministic invocation.
 
 Covers ``GET /api/v1/tools`` and ``POST /api/v1/tools/{name}/invoke``. Before
-these routes existed only two of the thirteen tools had an HTTP endpoint, so
+these routes existed only two of the sixteen tools had an HTTP endpoint, so
 ``save_learning`` and ``get_brand_context`` had no HTTP-level coverage at all;
 ``test_save_learning_writes_a_memory_row`` closes that gap.
 """
@@ -19,7 +19,7 @@ from app.db.models import BrandMemoryItem
 
 #: Every tool that has ever been agent-callable. Frozen so adding a tool without
 #: covering it here is a deliberate, visible change.
-EXPECTED_TOOL_COUNT = 13
+EXPECTED_TOOL_COUNT = 16
 
 
 # ------------------------------------------------------------- catalogue ----
@@ -191,6 +191,10 @@ async def test_catalogue_reports_each_tools_destination(api_client) -> None:
     # Local-only tools must say so rather than invent a URL.
     assert by_name["save_learning"]["connector"]["url"] is None
     assert by_name["get_brand_context"]["connector"]["provider"] == "database"
+    assert by_name["brand_report"]["connector"]["provider"] == "composite_research"
+    assert by_name["brand_report"]["connector"]["url"] is None
+    assert by_name["full_analysis"]["connector"]["provider"] == "local_analysis"
+    assert by_name["route_file_to_tool"]["connector"]["provider"] == "local_file_router"
 
     # web_search resolves through SEARCH_PROVIDER, not a literal URL.
     search = by_name["web_search"]["connector"]

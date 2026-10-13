@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 
@@ -16,9 +17,25 @@ class MessageContext(ApiModel):
     campaign_id: str | None = None
     creative_id: str | None = None
     insight_id: str | None = None
+    reference_analysis_id: str | None = None
+    workflow: Literal["creative_prompt"] | None = None
+    prompt_type: Literal["image", "video"] | None = None
+    # Explicit UI choice of what this turn should produce. When present it
+    # overrides the keyword guess in core_bridge._validate_explicit_intent, so
+    # the user no longer has to phrase a message to match a regex to get an
+    # image. `chat` is a real value, not an absence: it keeps the regex fallback.
+    creative_mode: Literal["chat", "prompt", "design"] | None = None
+    persona_id: str | None = None
     business_id: str | None = None
     competitor_id: str | None = None
     competitor_name: str | None = None
+
+
+class AssistantAnswer(ApiModel):
+    """A validated selection from one of this conversation's question blocks."""
+
+    message_id: str
+    option_ids: list[str] = Field(default_factory=list, min_length=1, max_length=12)
 
 
 class AssistantMessageRequest(ApiModel):
@@ -27,6 +44,8 @@ class AssistantMessageRequest(ApiModel):
     context: MessageContext | None = None
     # Force a persona instead of letting the orchestrator classify.
     persona_id: str | None = None
+    # Selection from a question_with_options block (e.g. Layla plan approval).
+    answer: AssistantAnswer | None = None
     # Opt into streaming-ish long-task handling: returns a task_id immediately.
     async_mode: bool = False
     # User's chosen application interface language (e.g. 'ar' or 'en')
@@ -35,6 +54,8 @@ class AssistantMessageRequest(ApiModel):
 
 class AssistantMessageResponse(ApiModel):
     message: Message
+    # Persisted user row, additive for clients that need stable IDs across reloads.
+    user_message: Message | None = None
     # Present when async_mode=True or the run was long enough to be queued.
     task_id: str | None = None
     blocks: list[Block] = Field(default_factory=list)

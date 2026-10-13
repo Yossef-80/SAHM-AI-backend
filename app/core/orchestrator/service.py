@@ -21,10 +21,19 @@ from typing import Any
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.security import redact_sensitive_data
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
-from app.core.orchestrator.blocks import validate_blocks
-from app.db.models import AgentTask, Business, Conversation, Message, Profile, BrandMemoryItem
+from app.core.orchestrator.blocks import compose_blocks, task_progress_block, validate_blocks
+from app.db.models import (
+    AgentTask,
+    BrandMemoryItem,
+    BrandProfile as BrandProfileRow,
+    Business,
+    Conversation,
+    Message,
+    Profile,
+)
 from app.schemas.assistant import (
     AssistantMessageRequest,
     AssistantMessageResponse,
@@ -245,6 +254,19 @@ async def list_conversations(db: AsyncSession, business_id: str) -> list[Convers
     return out
 
 
+def _message_schema(row: Message) -> MessageSchema:
+    """Serialize a persisted message without changing its database identity."""
+    return MessageSchema(
+        id=row.id,
+        role=row.role,
+        content=row.content or "",
+        blocks=[block for block in (row.blocks or [])],
+        created_at=row.created_at,
+        task_id=row.task_id,
+        persona_id=row.persona_id,
+    )
+
+
 async def get_conversation(
     db: AsyncSession, conversation_id: str, *, business_id: str | None = None
 ) -> ConversationDetail:
@@ -272,18 +294,7 @@ async def get_conversation(
         conversation.messages,
         key=_msg_sort_key,
     )
-    messages = [
-        MessageSchema(
-            id=m.id,
-            role=m.role,
-            content=m.content or "",
-            blocks=[b for b in (m.blocks or [])],
-            created_at=m.created_at,
-            task_id=m.task_id,
-            persona_id=m.persona_id,
-        )
-        for m in sorted_messages
-    ]
+    messages = [_message_schema(row) for row in sorted_messages]
     ctx = conversation.context or {}
     return ConversationDetail(
         id=conversation.id,
@@ -365,15 +376,25 @@ async def handle_message(
             {"type": "conversation_started", "conversationId": conversation.id}
         )
 
-    # Merge sticky context.
-    context = dict(conversation.context or {})
+    # Merge sticky context. Reference identity and workflow metadata are persisted;
+    # image bytes and the full VLM payload are deliberately loaded only for this turn.
+    context = dict(redact_sensitive_data(conversation.context or {}))
     if request.context:
-        context.update(
-            {k: v for k, v in request.context.model_dump().items() if v is not None}
-        )
-    conversation.context = context
+        supplied_context = redact_sensitive_data(request.context.model_dump())
+        context.update({k: v for k, v in supplied_context.items() if v is not None})
+    if request.persona_id:
+        context["persona_id"] = request.persona_id
+    # Assign a *copy*. A plain JSON column is not mutation-tracked, so handing the
+    # row the working dict makes that same object the ORM's committed-state
+    # baseline; every later in-place mutation silently mutates the baseline too,
+    # so the re-assignment after orchestrate() compares equal and emits no UPDATE.
+    # That is why creative_prompt_stage (and persona_id) never reached the DB and
+    # each turn restarted at `collecting_details`.
+    conversation.context = dict(context)
+    safe_message = str(redact_sensitive_data(request.message))
 
-    # Query conversation messages chronologically to evaluate token volume
+    # Query conversation messages chronologically. The AI layer owns workflow
+    # state transitions; this bridge only validates answer IDs against persisted UI blocks.
     msg_rows = (
         await db.execute(
             select(Message)
@@ -381,6 +402,43 @@ async def handle_message(
             .order_by(Message.created_at.asc(), desc(Message.role))
         )
     ).scalars().all()
+
+    validated_prompt_answer: dict[str, Any] | None = None
+    if request.answer:
+        latest_assistant = next(
+            (row for row in reversed(msg_rows) if row.role == "assistant"),
+            None,
+        )
+        has_question = latest_assistant is not None and any(
+            isinstance(block, dict) and block.get("type") == "question_with_options"
+            for block in (latest_assistant.blocks or [])
+        )
+        if (
+            latest_assistant is not None
+            and has_question
+            and str(latest_assistant.id) == request.answer.message_id
+        ):
+            valid_options: set[str] = set()
+            for block in latest_assistant.blocks or []:
+                if not isinstance(block, dict) or block.get("type") != "question_with_options":
+                    continue
+                valid_options.update(
+                    str(option.get("id"))
+                    for option in (block.get("options") or [])
+                    if isinstance(option, dict) and option.get("id")
+                )
+            selected = [option for option in request.answer.option_ids if option in valid_options]
+            if selected:
+                updated_blocks = [dict(item) if isinstance(item, dict) else item for item in latest_assistant.blocks]
+                for updated in updated_blocks:
+                    if isinstance(updated, dict) and updated.get("type") == "question_with_options":
+                        updated["answeredOptionIds"] = selected
+                latest_assistant.blocks = updated_blocks
+                if context.get("workflow") == "creative_prompt":
+                    validated_prompt_answer = {
+                        "message_id": str(latest_assistant.id),
+                        "option_ids": selected,
+                    }
 
     # Manage session memory with configurable token threshold:
     # Below threshold: passes raw past questions and answers like a normal chat agent.
@@ -396,27 +454,92 @@ async def handle_message(
     # A bare "try again" is an instruction about the preceding user request.
     # Routing only that short phrase sent it to normal chat, where the model
     # could claim it was starting research without actually invoking a task.
-    routed_message = _resolve_retry_message(request.message, history)
+    routed_message = _resolve_retry_message(safe_message, history)
     if context.get("competitor_name") and str(context["competitor_name"]).lower() not in routed_message.lower():
         routed_message = f"[Target Competitor: {context['competitor_name']}] {routed_message}"
 
     user_now = _now()
-    await _persist_message(
+    user_row = await _persist_message(
         db,
         conversation_id=conversation.id,
         role="user",
-        content=request.message,
-        blocks=[{"type": "text", "text": request.message}],
+        content=safe_message,
+        blocks=[{"type": "text", "text": safe_message}],
         created_at=user_now,
     )
     if not conversation.title:
-        conversation.title = request.message[:80]
+        conversation.title = safe_message[:80]
 
     # Load Long-Term Memory (Profile.user_context_summary - FACTS ONLY)
     profile_row = await db.scalar(
         select(Profile).where(Profile.business_id == business.id).limit(1)
     )
-    user_context = profile_row.user_context_summary if profile_row else None
+    user_context = str(redact_sensitive_data(profile_row.user_context_summary)) if profile_row and profile_row.user_context_summary else None
+
+    # The Settings form writes the canonical profile to Business/BrandProfile,
+    # while the optional AI long-term store may lag or be empty. Read the saved
+    # workspace profile here and pass it ephemerally to app.ai on every turn.
+    brand_profile_row = await db.scalar(
+        select(BrandProfileRow).where(BrandProfileRow.business_id == business.id).limit(1)
+    )
+    business_profile_context = {
+        "name": str(business.name or "")[:200],
+        "industry": str(business.industry or "")[:120],
+        "website_url": str(business.website_url or "")[:500],
+        "country": str(business.country or "")[:2],
+        "language": str(business.language or "")[:8],
+        "currency": str(business.currency or "")[:8],
+        "monthly_budget": business.monthly_budget,
+        "brand_voice": str(brand_profile_row.brand_voice or "")[:2000] if brand_profile_row else "",
+        "visual_style": str(brand_profile_row.visual_style or "")[:2000] if brand_profile_row else "",
+        "target_audience": str(brand_profile_row.target_audience or "")[:2000] if brand_profile_row else "",
+        "key_offers": [str(item)[:200] for item in (brand_profile_row.key_offers or [])[:20]] if brand_profile_row else [],
+        "goals": [str(item)[:200] for item in (brand_profile_row.goals or [])[:20]] if brand_profile_row else [],
+        "competitors": [str(item)[:200] for item in (brand_profile_row.competitors or [])[:20]] if brand_profile_row else [],
+    }
+
+    # Rehydrate a workspace-scoped reference analysis for Layla. The database
+    # read lives in the conversation bridge; interpretation stays in app/ai.
+    ai_context = dict(context)
+    ai_context["latest_user_message"] = safe_message
+    ai_context["business_profile_context"] = redact_sensitive_data(business_profile_context)
+    if (
+        context.get("workflow") == "creative_prompt"
+        and not context.get("creative_prompt_user_facts")
+    ):
+        evidence_history: list[dict[str, str]] = []
+        evidence_chars = 0
+        for row in reversed(msg_rows):
+            if row.role not in {"user", "assistant"} or not row.content:
+                continue
+            content = str(redact_sensitive_data(row.content))[:2000]
+            if evidence_history and evidence_chars + len(content) > 12000:
+                break
+            evidence_history.append({"role": row.role, "content": content})
+            evidence_chars += len(content)
+            if len(evidence_history) >= 24:
+                break
+        ai_context["creative_prompt_evidence_history"] = list(reversed(evidence_history))
+    if validated_prompt_answer:
+        ai_context["creative_prompt_answer"] = validated_prompt_answer
+    reference_id = str(context.get("reference_analysis_id") or "").strip()
+    if reference_id:
+        reference = await db.get(BrandMemoryItem, reference_id)
+        if (
+            reference is None
+            or reference.business_id != business.id
+            or reference.kind != "reference_analysis"
+        ):
+            raise NotFoundError("creative reference not found")
+        reference_metadata = reference.metadata_ or {}
+        style = reference_metadata.get("style")
+        if not isinstance(style, dict):
+            raise NotFoundError("creative reference analysis is incomplete")
+        ai_context["reference_analysis_context"] = {
+            "source_name": str(reference_metadata.get("source_name") or "Saved reference")[:160],
+            "summary": str(reference_metadata.get("summary") or "")[:2000],
+            "style": style,
+        }
 
     # Load Active Plans separately from BrandMemoryItem (PLANS ONLY)
     plan_item = await db.scalar(
@@ -439,14 +562,71 @@ async def handle_message(
         conversation_summary=conv_summary,
         active_plans=active_plans,
         business_id=business.id,
+        workspace_id=business.workspace_id or "",
+        conversation_id=conversation.id,
+        request_id=request_id,
+        db=db,
+        core_llm=llm,
+        fast_llm=fast_llm,
+        context=ai_context,
+        forced_agent=request.persona_id or context.get("persona_id"),
         language=request.language,
     )
+    next_prompt_stage = getattr(final_gui, "creative_prompt_stage", None) if final_gui else None
+    if final_gui and getattr(final_gui, "creative_prompt_workflow", False):
+        context["workflow"] = "creative_prompt"
+        prompt_type = getattr(final_gui, "creative_prompt_type", None)
+        if prompt_type in {"image", "video"}:
+            context["prompt_type"] = prompt_type
+        context["persona_id"] = "layla"
+    if context.get("workflow") == "creative_prompt":
+        if next_prompt_stage:
+            context["creative_prompt_stage"] = next_prompt_stage
+        reference_shown_key = (
+            getattr(final_gui, "creative_prompt_reference_shown_key", None)
+            if final_gui
+            else None
+        )
+        if reference_shown_key:
+            context["creative_prompt_reference_shown_key"] = str(reference_shown_key)[:120]
+        user_facts = getattr(final_gui, "creative_prompt_user_facts", None) if final_gui else None
+        if isinstance(user_facts, list):
+            safe_facts = redact_sensitive_data(user_facts)
+            context["creative_prompt_user_facts"] = [
+                str(item)[:4000] for item in safe_facts[-16:] if str(item).strip()
+            ]
+        semantic_facts = (
+            getattr(final_gui, "creative_prompt_confirmed_facts", None)
+            if final_gui
+            else None
+        )
+        if isinstance(semantic_facts, dict):
+            context["creative_prompt_confirmed_facts"] = redact_sensitive_data(
+                semantic_facts
+            )
+        unresolved_fields = (
+            getattr(final_gui, "creative_prompt_unresolved_fields", None)
+            if final_gui
+            else None
+        )
+        if isinstance(unresolved_fields, list):
+            context["creative_prompt_unresolved_fields"] = [
+                str(field)[:40] for field in unresolved_fields[:16]
+            ]
+        # `context` is the *same* dict object already assigned to the row above
+        # (line ~229). A plain JSON column is not mutation-tracked, so re-assigning
+        # the identical object records no change and the unit of work skips the
+        # UPDATE -- every key added here (creative_prompt_stage above all) was
+        # silently lost, and the next turn restarted at `collecting_details`,
+        # which re-asked answered questions and re-presented an approved plan.
+        conversation.context = dict(context)
     blocks_raw = final_gui.model_dump(mode="json", by_alias=True)["blocks"] if final_gui else []
+    blocks_raw = redact_sensitive_data(blocks_raw)
     final = {"blocks": blocks_raw}
     # END OVERRIDE
     raw_blocks = validate_blocks(list(final.get("blocks") or []))
     
-    # Server-side gate on CREATE_CAMPAIGN action cards (Task 3)
+    # Server-side gate on CREATE_CAMPAIGN action cards
     blocks = _gate_campaign_action_cards(
         raw_blocks,
         user_message=request.message,
@@ -455,7 +635,10 @@ async def handle_message(
         business_budget=business.monthly_budget,
         history=history,
     )
-    agent_result = final.get("agent_result") or {}
+    persona_id = getattr(final_gui, "persona_id", None) if final_gui else None
+    if not persona_id:
+        agent_result = final.get("agent_result") or {}
+        persona_id = str(agent_result.get("persona_id") or "") or None
 
     from app.schemas.blocks import blocks_to_plaintext
 
@@ -468,16 +651,19 @@ async def handle_message(
     if asst_now <= user_now:
         asst_now = user_now + timedelta(milliseconds=100)
 
-    asst_row = await _persist_message(
+    assistant_row = await _persist_message(
         db,
         conversation_id=conversation.id,
         role="assistant",
         content=content,
         blocks=blocks,
         task_id=final.get("task_id"),
-        persona_id=str(agent_result.get("persona_id") or ""),
+        persona_id=persona_id,
         created_at=asst_now,
     )
+    # Return the same durable IDs the conversation endpoint will return.
+    user_message = _message_schema(user_row)
+    assistant_message = _message_schema(assistant_row)
     await db.commit()
 
     if not defer_post_memory:
@@ -487,18 +673,9 @@ async def handle_message(
             memory_debouncer.schedule_ltm_update(business.id)
         except Exception as exc:
             _logger.warning("ltm_debouncer_schedule_failed", extra={"error": str(exc)})
-
-    message = MessageSchema(
-        id=asst_row.id,
-        role="assistant",
-        content=content,
-        blocks=blocks,
-        created_at=asst_now,
-        task_id=final.get("task_id"),
-        persona_id=str(agent_result.get("persona_id") or ""),
-    )
     return AssistantMessageResponse(
-        message=message,
+        message=assistant_message,
+        user_message=user_message,
         task_id=final.get("task_id"),
         blocks=blocks,
         conversation_id=conversation.id,
@@ -533,6 +710,27 @@ async def create_task(
     )
     db.add(task)
     await db.flush()
+    if conversation_id:
+        progress = task_progress_block(
+            task_id=task.id,
+            task_name=task.task_name,
+            persona_id=task.persona_id,
+            status=task.status,
+            steps=task.steps,
+            progress=task.progress,
+        )
+        await _persist_message(
+            db,
+            conversation_id=conversation_id,
+            role="assistant",
+            content=f"{persona_id.title()} started {task_name.replace('_', ' ')}.",
+            blocks=validate_blocks([progress]),
+            task_id=task.id,
+            persona_id=persona_id,
+        )
+        conversation = await db.get(Conversation, conversation_id)
+        if conversation is not None:
+            conversation.updated_at = _now()
     return task
 
 
@@ -587,6 +785,24 @@ async def run_task_in_background(
         await db.commit()
 
         try:
+            # Legacy queued Layla writing tasks must not fall back to the core
+            # task runner/LLM. New requests use /creatives/generate-text in
+            # app.ai; fail any pre-deployment queued task closed with guidance.
+            direct_layla_tasks = {
+                "creative_brief",
+                "commercial_script",
+                "image_prompt",
+                "video_prompt",
+                "ad_copy",
+                "ad_variations",
+            }
+            if persona_id.strip().lower() == "layla" and task_name in direct_layla_tasks:
+                from app.core.errors import TaskNotAllowedError
+
+                raise TaskNotAllowedError(
+                    "Legacy Layla text tasks are disabled; use /creatives/generate-text."
+                )
+
             from app.core.agents.persona import load_persona
             from app.core.agents.runtime import run_agent
             from app.core.tools.base import ToolContext
@@ -598,6 +814,21 @@ async def run_task_in_background(
             business = await db.get(Business, task.business_id) if task.business_id else None
             workspace_id = business.workspace_id or "" if business is not None else ""
             persona = await load_persona(persona_id, db, workspace_id)
+            # The creative dialog passes its selected locale per task. Honour it
+            # for Layla's writing runs without persisting a workspace persona
+            # override or affecting the normal assistant's configured language.
+            requested_language = str(inputs.get("language") or "").strip().lower()
+            if persona_id == "layla" and task_name in {
+                "creative_brief",
+                "commercial_script",
+                "image_prompt",
+                "video_prompt",
+                "ad_copy",
+                "ad_variations",
+            } and requested_language in {"en", "ar"}:
+                from app.schemas.common import Language
+
+                persona = persona.model_copy(update={"language": Language(requested_language)})
             ctx = ToolContext(
                 workspace_id=workspace_id,
                 business_id=task.business_id or "",
@@ -606,6 +837,10 @@ async def run_task_in_background(
                 request_id=request_id,
                 task_id=task.id,
                 persona_id=persona.id,
+                conversation_id=task.conversation_id,
+                campaign_id=(str(inputs.get("campaign_id") or inputs.get("campaignId") or "") or None),
+                creative_id=(str(inputs.get("creative_id") or inputs.get("creativeId") or "") or None),
+                insight_id=(str(inputs.get("insight_id") or inputs.get("insightId") or "") or None),
             )
             result = await run_agent(
                 persona, task_name, inputs, ctx, llm=llm, user_message=user_message
@@ -621,13 +856,54 @@ async def run_task_in_background(
             task.tokens_in = result.usage.tokens_in
             task.tokens_out = result.usage.tokens_out
             task.model = result.usage.model
+            task.blocks = compose_blocks(
+                result.model_dump(mode="json"),
+                persona_id=persona.id,
+                task_name=task_name,
+                task_id=task.id,
+            )
+            tool_steps = [
+                {
+                    "name": call.tool,
+                    "status": (
+                        StepStatus.FAILED.value
+                        if call.status in {"error", "blocked"}
+                        else StepStatus.SUCCEEDED.value
+                    ),
+                    "detail": call.output_summary[:500],
+                }
+                for call in result.tool_calls_made
+            ]
             task.progress = 1.0
             task.finished_at = _now()
+            if task.error:
+                task.steps = tool_steps + [
+                    {
+                        "name": "complete",
+                        "status": StepStatus.FAILED.value,
+                        "detail": task.error[:500],
+                    }
+                ]
+            else:
+                task.steps = tool_steps + [
+                    {
+                        "name": "complete",
+                        "status": StepStatus.SUCCEEDED.value,
+                        "detail": "Result saved.",
+                    }
+                ]
             await db.commit()
         except Exception as exc:
             _logger.warning("background_task_failed", extra={"task_id": task_id, "error": str(exc)})
             task.status = TaskStatus.FAILED.value
             task.error = str(exc)
+            task.progress = 1.0
+            task.steps = [
+                {"name": "complete", "status": StepStatus.FAILED.value, "detail": task.error[:500]}
+            ]
+            task.blocks = validate_blocks(
+                [{"type": "error", "message": "The task failed before a result could be saved.", "retryable": True}]
+            )
             task.finished_at = _now()
             await db.commit()
 

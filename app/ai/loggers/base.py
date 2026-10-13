@@ -32,23 +32,8 @@ from pathlib import Path
 from typing import Any
 
 from app.ai.enums import LogFormat, LogKind
+from app.ai.security import redact_sensitive_data
 from app.ai.settings import AISettings, get_ai_settings
-
-#: Keys whose values must never reach a log file.
-_SENSITIVE_KEYS = frozenset(
-    {
-        "api_key",
-        "apikey",
-        "authorization",
-        "access_token",
-        "token",
-        "password",
-        "secret",
-        "tavily_api_key",
-        "openai_api_key",
-        "anthropic_api_key",
-    }
-)
 
 #: Long values are cut so a single huge tool output can't bloat the log.
 _MAX_VALUE_CHARS = 1500
@@ -58,17 +43,15 @@ _lock = threading.Lock()
 
 
 def redact(data: Any) -> Any:
-    """Replace values of sensitive keys, recursively, and truncate long strings."""
-    if isinstance(data, dict):
-        return {
-            k: ("***REDACTED***" if str(k).lower() in _SENSITIVE_KEYS else redact(v))
-            for k, v in data.items()
-        }
-    if isinstance(data, (list, tuple)):
-        return [redact(v) for v in data]
-    if isinstance(data, str) and len(data) > _MAX_VALUE_CHARS:
-        return data[:_MAX_VALUE_CHARS] + f"...(+{len(data) - _MAX_VALUE_CHARS} chars)"
-    return data
+    """Recursively mask credential-shaped fields/values and truncate long strings."""
+    safe = redact_sensitive_data(data)
+    if isinstance(safe, dict):
+        return {key: redact(value) for key, value in safe.items()}
+    if isinstance(safe, (list, tuple)):
+        return [redact(value) for value in safe]
+    if isinstance(safe, str) and len(safe) > _MAX_VALUE_CHARS:
+        return safe[:_MAX_VALUE_CHARS] + f"...(+{len(safe) - _MAX_VALUE_CHARS} chars)"
+    return safe
 
 
 class _TextFormatter(logging.Formatter):
@@ -78,11 +61,11 @@ class _TextFormatter(logging.Formatter):
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created))
         fields: dict[str, Any] = getattr(record, "fields", {}) or {}
         kv = " ".join(f"{k}={v!r}" for k, v in fields.items())
-        line = f"{ts} | {record.levelname:<7} | {record.component} | {record.getMessage()}"
+        line = f"{ts} | {record.levelname:<7} | {record.component} | {redact(record.getMessage())}"
         if kv:
             line += f" | {kv}"
         if record.exc_info:
-            line += "\n" + self.formatException(record.exc_info)
+            line += "\n" + str(redact(self.formatException(record.exc_info)))
         return line
 
 
@@ -94,11 +77,11 @@ class _JsonFormatter(logging.Formatter):
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(record.created)),
             "level": record.levelname,
             "component": record.component,
-            "event": record.getMessage(),
+            "event": redact(record.getMessage()),
             **(getattr(record, "fields", {}) or {}),
         }
         if record.exc_info:
-            payload["exc"] = self.formatException(record.exc_info)
+            payload["exc"] = redact(self.formatException(record.exc_info))
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 

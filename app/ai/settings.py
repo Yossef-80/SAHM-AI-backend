@@ -4,11 +4,12 @@ Selecting a provider is a one-line ``.env`` change, validated against the enums
 in ``app.ai.enums``. A typo (e.g. ``AI_LLM_PROVIDER=olama``) fails loudly at
 startup instead of silently falling back.
 
-    AI_LLM_PROVIDER=ollama        # ollama | openai | anthropic | mock
+    AI_LLM_PROVIDER=ollama        # ollama | openai | anthropic | gemini | groq | openrouter | mock
     AI_SEARCH_PROVIDER=tavily     # tavily | mock | none
     AI_DB_PROVIDER=sqlite         # memory | sqlite | postgres
 
-Per-agent overrides live in each agent's ``config.py`` (e.g. ``NOUR_LLM_PROVIDER``).
+Live search/review providers are metered and require their explicit ``AI_ALLOW_PAID_*`` opt-in.
+Provider-specific model defaults live in ``app.ai.config``; environment variables override them.
 """
 
 from __future__ import annotations
@@ -18,6 +19,14 @@ from functools import lru_cache
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.ai.config import (
+    DEFAULT_ANTHROPIC_MODEL,
+    DEFAULT_GEMINI_MODEL,
+    DEFAULT_GROQ_MODEL,
+    DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OPENAI_MODEL,
+    DEFAULT_OPENROUTER_MODEL,
+)
 from app.ai.enums import (
     DatabaseProvider,
     LLMProvider,
@@ -61,62 +70,85 @@ class AISettings(BaseSettings):
     # ===================================================== LLM (generic) ====
     #: Overrides the provider-specific model below when set.
     llm_model: str | None = Field(None, validation_alias=_env("AI_LLM_MODEL"))
-    llm_temperature: float = Field(0.2, validation_alias=_env("AI_LLM_TEMPERATURE"))
-    llm_max_tokens: int = Field(4096, validation_alias=_env("AI_LLM_MAX_TOKENS"))
-    llm_timeout_seconds: float = Field(180.0, validation_alias=_env("AI_LLM_TIMEOUT_SECONDS"))
-    llm_max_retries: int = Field(2, validation_alias=_env("AI_LLM_MAX_RETRIES"))
+    llm_temperature: float = Field(0.2, ge=0, le=2, validation_alias=_env("AI_LLM_TEMPERATURE"))
+    llm_max_tokens: int = Field(4096, gt=0, validation_alias=_env("AI_LLM_MAX_TOKENS"))
+    llm_timeout_seconds: float = Field(180.0, gt=0, validation_alias=_env("AI_LLM_TIMEOUT_SECONDS"))
+    llm_max_retries: int = Field(2, ge=0, validation_alias=_env("AI_LLM_MAX_RETRIES"))
+
+    # ======================================================= ADS VLM (optional) ====
+    #: Optional dedicated provider/model for reference-image analysis only.
+    #: When unset, get_vlm_llm preserves the existing dedicated-Ollama/general-LLM fallback.
+    ads_vlm_provider: LLMProvider | None = Field(
+        None, validation_alias=_env("AI_ADS_VLM_PROVIDER")
+    )
+    ads_vlm_model: str | None = Field(None, validation_alias=_env("AI_ADS_VLM_MODEL"))
 
     # ============================================================ OLLAMA ====
     ollama_base_url: str | None = Field(
         None, validation_alias=_env("OLLAMA_BASE_URL", "NGROK_URL", "OLLAMA_URL")
     )
+    #: Optional dedicated Ollama-compatible endpoint for Layla reference-image
+    #: analysis. It does not alter the general LLM provider or model selection.
+    ads_vlm_base_url: str | None = Field(None, validation_alias=_env("AI_ADS_VLM_BASE_URL"))
+    #: Model tag installed on the dedicated VLM endpoint. Keep independent from
+    #: OLLAMA_MODEL, which belongs to the general Ollama/LLM server.
+    vlm_ollama_model: str | None = Field(None, validation_alias=_env("VLM_OLLAMA_MODEL"))
+    #: Pixel budget for the temporary image copy sent to the VLM. The original
+    #: upload remains untouched; Qwen3-VL uses fewer visual patches at lower sizes.
+    ads_vlm_max_pixels: int = Field(
+        1_000_000,
+        ge=262_144,
+        le=4_000_000,
+        validation_alias=_env("AI_ADS_VLM_MAX_PIXELS"),
+    )
     ollama_model: str = Field(
-        "qwen3:8b", validation_alias=_env("OLLAMA_MODEL", "NGROK_MODEL_ID", "OLLAMA_MODEL_ID")
+        DEFAULT_OLLAMA_MODEL, validation_alias=_env("OLLAMA_MODEL", "NGROK_MODEL_ID", "OLLAMA_MODEL_ID")
     )
     #: Context window. Big values (e.g. 256k defaults on some GGUFs) make Colab
     #: GPUs time out -- keep this as small as your prompts allow.
-    ollama_num_ctx: int = Field(8192, validation_alias=_env("OLLAMA_NUM_CTX"))
+    ollama_num_ctx: int = Field(8192, gt=0, validation_alias=_env("OLLAMA_NUM_CTX"))
     #: How long Ollama keeps the model loaded between calls (avoids reload cost).
     ollama_keep_alive: str = Field("30m", validation_alias=_env("OLLAMA_KEEP_ALIVE"))
     #: ``None`` = don't send; ``False`` disables "thinking" on Qwen3-style models (faster).
     ollama_reasoning: bool | None = Field(None, validation_alias=_env("OLLAMA_REASONING"))
     ollama_timeout_seconds: float = Field(
-        1000.0, validation_alias=_env("OLLAMA_TIMEOUT_SECONDS", "NGROK_TIMEOUT_SECONDS")
+        1000.0, gt=0, validation_alias=_env("OLLAMA_TIMEOUT_SECONDS", "NGROK_TIMEOUT_SECONDS")
     )
 
     # ============================================================ OPENAI ====
     openai_api_key: str | None = Field(None, validation_alias=_env("OPENAI_API_KEY"))
-    openai_model: str = Field("gpt-4o-mini", validation_alias=_env("OPENAI_MODEL"))
+    openai_model: str = Field(DEFAULT_OPENAI_MODEL, validation_alias=_env("OPENAI_MODEL"))
     #: Set to use any OpenAI-compatible server (vLLM, LM Studio, Groq...).
     openai_base_url: str | None = Field(None, validation_alias=_env("OPENAI_BASE_URL"))
 
     # ========================================================= ANTHROPIC ====
     anthropic_api_key: str | None = Field(None, validation_alias=_env("ANTHROPIC_API_KEY"))
-    anthropic_model: str = Field("claude-haiku-4-5", validation_alias=_env("ANTHROPIC_MODEL"))
+    anthropic_model: str = Field(DEFAULT_ANTHROPIC_MODEL, validation_alias=_env("ANTHROPIC_MODEL"))
 
     # ============================================================ GEMINI ====
     gemini_api_key: str | None = Field(None, validation_alias=_env("GEMINI_API_KEY", "GOOGLE_API_KEY"))
-    gemini_model: str = Field("gemini-1.5-flash", validation_alias=_env("GEMINI_MODEL"))
+    gemini_model: str = Field(DEFAULT_GEMINI_MODEL, validation_alias=_env("GEMINI_MODEL"))
     
     # ============================================================== GROQ ====
     groq_api_key: str | None = Field(None, validation_alias=_env("GROQ_API_KEY"))
-    groq_model: str = Field("llama3-8b-8192", validation_alias=_env("GROQ_MODEL"))
+    groq_model: str = Field(DEFAULT_GROQ_MODEL, validation_alias=_env("GROQ_MODEL"))
 
     # ======================================================== OPENROUTER ====
     openrouter_api_key: str | None = Field(None, validation_alias=_env("OPENROUTER_API_KEY"))
-    openrouter_model: str = Field("google/gemini-flash-1.5-exp", validation_alias=_env("OPENROUTER_MODEL"))
+    openrouter_model: str = Field(DEFAULT_OPENROUTER_MODEL, validation_alias=_env("OPENROUTER_MODEL"))
 
     # ============================================================ SEARCH ====
     tavily_api_key: str | None = Field(None, validation_alias=_env("TAVILY_API_KEY"))
     search_depth: SearchDepth = Field(SearchDepth.BASIC, validation_alias=_env("AI_SEARCH_DEPTH"))
-    search_timeout_seconds: float = Field(20.0, validation_alias=_env("AI_SEARCH_TIMEOUT_SECONDS"))
+    allow_paid_search_calls: bool = Field(False, validation_alias=_env("AI_ALLOW_PAID_SEARCH_CALLS"))
+    search_timeout_seconds: float = Field(20.0, gt=0, validation_alias=_env("AI_SEARCH_TIMEOUT_SECONDS"))
     #: Snippets are truncated to this many characters to protect the context window.
-    search_snippet_chars: int = Field(600, validation_alias=_env("AI_SEARCH_SNIPPET_CHARS"))
+    search_snippet_chars: int = Field(600, gt=0, validation_alias=_env("AI_SEARCH_SNIPPET_CHARS"))
 
     # ========================================================== WEBSITES ====
-    website_timeout_seconds: float = Field(15.0, validation_alias=_env("WEBSITE_FETCH_TIMEOUT_SECONDS"))
-    website_max_bytes: int = Field(2_000_000, validation_alias=_env("WEBSITE_MAX_BYTES"))
-    website_max_redirects: int = Field(3, validation_alias=_env("WEBSITE_MAX_REDIRECTS"))
+    website_timeout_seconds: float = Field(15.0, gt=0, validation_alias=_env("WEBSITE_FETCH_TIMEOUT_SECONDS"))
+    website_max_bytes: int = Field(2_000_000, gt=0, validation_alias=_env("WEBSITE_MAX_BYTES"))
+    website_max_redirects: int = Field(3, ge=0, validation_alias=_env("WEBSITE_MAX_REDIRECTS"))
     #: Page text handed back to the LLM is capped to this many characters.
     website_text_chars: int = Field(4000, validation_alias=_env("AI_WEBSITE_TEXT_CHARS"))
 
@@ -125,18 +157,19 @@ class AISettings(BaseSettings):
     postgres_url: str | None = Field(None, validation_alias=_env("AI_POSTGRES_URL"))
 
     # ============================================================ MEMORY ====
-    memory_session_max_tokens: int = Field(10000, validation_alias=_env("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"))
-    brand_memory_token_limit: int = Field(10000, validation_alias=_env("BRAND_MEMORY_TOKEN_LIMIT", "BRAND_IDENTITY_TOKEN_LIMIT", "MEMORY_BRAND_MAX_TOKENS"))
-    memory_ltm_debounce_seconds: int = Field(180, validation_alias=_env("MEMORY_LTM_DEBOUNCE_SECONDS"))
-    memory_item_max_tokens: int = Field(120, validation_alias=_env("MEMORY_ITEM_MAX_TOKENS"))
-    memory_global_profile_max_tokens: int = Field(300, validation_alias=_env("MEMORY_GLOBAL_PROFILE_MAX_TOKENS"))
-    memory_retain_recent_turns: int = Field(2, validation_alias=_env("MEMORY_RETAIN_RECENT_TURNS"))
+    memory_session_max_tokens: int = Field(10000, gt=0, validation_alias=_env("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"))
+    brand_memory_token_limit: int = Field(10000, gt=0, validation_alias=_env("BRAND_MEMORY_TOKEN_LIMIT", "BRAND_IDENTITY_TOKEN_LIMIT", "MEMORY_BRAND_MAX_TOKENS"))
+    memory_ltm_debounce_seconds: int = Field(180, ge=0, validation_alias=_env("MEMORY_LTM_DEBOUNCE_SECONDS"))
+    memory_item_max_tokens: int = Field(120, gt=0, validation_alias=_env("MEMORY_ITEM_MAX_TOKENS"))
+    memory_global_profile_max_tokens: int = Field(300, gt=0, validation_alias=_env("MEMORY_GLOBAL_PROFILE_MAX_TOKENS"))
+    memory_retain_recent_turns: int = Field(2, ge=1, validation_alias=_env("MEMORY_RETAIN_RECENT_TURNS"))
 
     # =========================================================== REVIEWS ====
     google_places_api_key: str | None = Field(None, validation_alias=_env("GOOGLE_PLACES_API_KEY"))
     apify_api_token: str | None = Field(None, validation_alias=_env("APIFY_API_TOKEN", "APIFY_TOKEN"))
     google_maps_reviews_actor_id: str = Field("compass/crawler-google-places", validation_alias=_env("APIFY_MAPS_ACTOR_ID"))
-    reviews_timeout_seconds: float = Field(120.0, validation_alias=_env("REVIEWS_TIMEOUT_SECONDS"))
+    reviews_timeout_seconds: float = Field(120.0, gt=0, validation_alias=_env("REVIEWS_TIMEOUT_SECONDS"))
+    allow_paid_review_calls: bool = Field(False, validation_alias=_env("AI_ALLOW_PAID_REVIEW_CALLS"))
 
     # =============================================================== GA4 ====
     ga4_client_email: str | None = Field(None, validation_alias=_env("GA4_CLIENT_EMAIL"))
@@ -155,10 +188,10 @@ class AISettings(BaseSettings):
     log_level: LogLevel = Field(LogLevel.INFO, validation_alias=_env("AI_LOG_LEVEL"))
     log_format: LogFormat = Field(LogFormat.TEXT, validation_alias=_env("AI_LOG_FORMAT"))
     log_to_console: bool = Field(False, validation_alias=_env("AI_LOG_TO_CONSOLE"))
-    log_max_bytes: int = Field(5_000_000, validation_alias=_env("AI_LOG_MAX_BYTES"))
-    log_backup_count: int = Field(3, validation_alias=_env("AI_LOG_BACKUP_COUNT"))
+    log_max_bytes: int = Field(5_000_000, gt=0, validation_alias=_env("AI_LOG_MAX_BYTES"))
+    log_backup_count: int = Field(3, ge=0, validation_alias=_env("AI_LOG_BACKUP_COUNT"))
 
-    @field_validator("ollama_base_url", mode="after")
+    @field_validator("ollama_base_url", "ads_vlm_base_url", mode="after")
     @classmethod
     def _strip_url(cls, v: str | None) -> str | None:
         """Ngrok URLs are often pasted with a trailing slash or spaces."""

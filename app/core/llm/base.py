@@ -14,7 +14,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from app.core.errors import LLMOutputError, LLMProviderError
 from app.schemas.common import Usage
@@ -33,11 +33,19 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any] = {}
 
 
+class ImagePart(BaseModel):
+    """A validated base64 image attached to a user message."""
+
+    media_type: Literal["image/png", "image/jpeg", "image/webp"]
+    data: str
+
+
 class Msg(BaseModel):
-    """One message in a conversation."""
+    """One message in a conversation, optionally with image input."""
 
     role: Literal["system", "user", "assistant", "tool"]
     content: str | None = None
+    images: list[ImagePart] = Field(default_factory=list)
     # Set on assistant messages that request tool calls.
     tool_calls: list[ToolCall] = []
     # Set on tool result messages, to match them back to their call.
@@ -487,6 +495,7 @@ def is_retryable_exception(exc: Exception) -> bool:
 
 __all__ = [
     "BaseLLMClient",
+    "ImagePart",
     "LLMClient",
     "LLMResult",
     "Msg",

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.ai.errors import ProviderError
 from app.ai.loggers.tools.get_reviews import logger
 from app.ai.providers.reviews import get_apify, get_google_places
+from app.ai.settings import get_ai_settings
 
 MIN_MATCH = 0.50    # below this we return NO reviews (avoid another business's feedback)
 CONFIDENT = 0.75
@@ -39,6 +40,16 @@ def _result(status: str, **fields) -> str:
 def run_get_reviews(p: GetReviewsInput, *, google=None, apify=None) -> str:
     """The whole logic. Never raises. ``google`` / ``apify`` are injectable for tests."""
     warnings: list[str] = []
+    # Both Google Places and Apify may incur usage charges. Tests may inject
+    # deterministic fakes; real provider calls require a separate explicit opt-in.
+    if google is None and apify is None and not get_ai_settings().allow_paid_review_calls:
+        return _result(
+            "unavailable",
+            unavailable_reason=(
+                "Live review providers are metered and disabled until an administrator enables "
+                "AI_ALLOW_PAID_REVIEW_CALLS. No provider was contacted."
+            ),
+        )
 
     try:
         if p.provider == "apify":

@@ -1,0 +1,2 @@
+2026-10-11 21:16:54 | WARNING | tool.web_search | web_search_blocked_by_cost_guard | provider='tavily'
+2026-10-11 21:16:55 | WARNING | tool.web_search | web_search_blocked_by_cost_guard | provider='tavily'

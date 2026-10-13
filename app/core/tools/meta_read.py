@@ -18,7 +18,12 @@ from app.core.security import TokenCipher
 from app.core.tools.base import Tool, ToolContext
 from app.db.models import Campaign, Integration
 from app.schemas.common import Evidence, ToolSideEffect
-from app.schemas.insights import BreakdownPayload, InsightsPayload, MetricSeries
+from app.schemas.insights import (
+    BreakdownPayload,
+    DailyMetrics,
+    InsightsPayload,
+    MetricSeries,
+)
 from app.schemas.tools import GetBreakdownsInput, GetCampaignInsightsInput
 
 _logger = get_logger(__name__)
@@ -118,6 +123,45 @@ async def _meta_config(ctx: ToolContext, cfg: Any) -> tuple[str, str]:
     )
 
 
+#: Metrics that are safe to add across days.
+_ADDITIVE_METRICS = frozenset({"spend", "impressions", "clicks", "conversions", "reach"})
+
+
+def _parse_day(value: object) -> date | None:
+    """Parse Meta's ``date_start`` (``YYYY-MM-DD``) without raising."""
+    if not isinstance(value, str) or len(value) < 10:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+def _derive_ratio_metrics(totals: dict[str, float]) -> dict[str, float]:
+    """Recompute ratio metrics from the summed additive base.
+
+    Summing ctr/cpc/cpm/cost_per_conversion across days would be wrong, so they
+    are derived from the totals instead. ``frequency`` is an approximation: it
+    uses the sum of daily reach, which double-counts users seen on several days.
+    """
+    spend = totals.get("spend", 0.0)
+    impressions = totals.get("impressions", 0.0)
+    clicks = totals.get("clicks", 0.0)
+    conversions = totals.get("conversions", 0.0)
+    reach = totals.get("reach", 0.0)
+    derived: dict[str, float] = {}
+    if impressions:
+        derived["ctr"] = round(clicks / impressions * 100, 4)
+        derived["cpm"] = round(spend / impressions * 1000, 4)
+    if clicks:
+        derived["cpc"] = round(spend / clicks, 4)
+    if conversions:
+        derived["cost_per_conversion"] = round(spend / conversions, 4)
+    if reach:
+        derived["frequency"] = round(impressions / reach, 4)
+    return derived
+
+
 def _default_range(payload: Any) -> tuple[date, date]:
     end = payload.date_end or date.today()
     start = payload.date_start or (end - timedelta(days=29))
@@ -169,6 +213,8 @@ async def _handle_get_campaign_insights(
                     "time_range": json_dumps({"since": start.isoformat(), "until": end.isoformat()}),
                     "fields": ",".join(metrics),
                     "level": "campaign",
+                    # One row per day so the UI can draw a trend, not one total.
+                    "time_increment": "1",
                 },
             )
             resp.raise_for_status()
@@ -191,10 +237,32 @@ async def _handle_get_campaign_insights(
             }
         )
 
-    raw = rows[0]
-    metrics_out = {
-        k: float(v) for k, v in raw.items() if k not in ("date_start", "date_stop") and _is_num(v)
-    }
+    daily: list[DailyMetrics] = []
+    totals: dict[str, float] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        values = {
+            k: float(v)
+            for k, v in row.items()
+            if k not in ("date_start", "date_stop") and _is_num(v)
+        }
+        for key, value in values.items():
+            if key in _ADDITIVE_METRICS:
+                totals[key] = totals.get(key, 0.0) + value
+        daily.append(
+            DailyMetrics(
+                date=_parse_day(row.get("date_start")) or start,
+                impressions=values.get("impressions", 0.0),
+                clicks=values.get("clicks", 0.0),
+                conversions=values.get("conversions", 0.0),
+                spend=values.get("spend", 0.0),
+            )
+        )
+    daily.sort(key=lambda item: item.date)
+
+    # Ratios are derived from the totals, never summed across days.
+    metrics_out = {**totals, **_derive_ratio_metrics(totals)}
     return InsightsPayload(
         campaign_id=payload.campaign_id,
         meta_campaign_id=meta_campaign_id,
@@ -209,11 +277,17 @@ async def _handle_get_campaign_insights(
             )
             for k, v in metrics_out.items()
         ],
+        daily=daily,
         retrieved_at=_now(),
         evidence=[
             Evidence(
                 source=source,
-                detail=f"Meta campaign {meta_campaign_id}, {start} to {end}",
+                detail=(
+                    f"Meta campaign {meta_campaign_id}, {start} to {end}: "
+                    f"{len(daily)} daily row(s). Ratio metrics are recomputed "
+                    "from summed spend/impressions/clicks/conversions; "
+                    "frequency uses the sum of daily reach and is approximate."
+                ),
                 retrieved_at=_now(),
             )
         ],

@@ -19,6 +19,10 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Tier = Literal["fast", "strong"]
 
+#: Groq model-family prefix used only to shape compatible request payloads;
+#: this does not select a provider or a model.
+GROQ_GPT_OSS_MODEL_PREFIX = "openai/gpt-oss"
+
 #: Providers that the LLM router knows how to construct.
 LLMProviderName = Literal[
     "mock", "claude", "openai", "groq", "gemini", "deepseek", "mistral",
@@ -194,11 +198,14 @@ class Settings(BaseSettings):
     image_api_key: str | None = None
     image_model: str = "mock-image-1"
     image_base_url: str | None = None
+    # Placeholder SVGs are never returned unless an operator explicitly opts in.
+    image_allow_mock_assets: bool = False
 
     # ---------------------------------------------------------------- meta ---
     # Meta Marketing API. When absent, meta_read tools return "unavailable".
     meta_access_token: str | None = None
     meta_ad_account_id: str | None = None
+    meta_page_id: str | None = None
     meta_app_id: str | None = None
     meta_app_secret: str | None = None
     meta_graph_base_url: str = "https://graph.facebook.com"
@@ -220,6 +227,10 @@ class Settings(BaseSettings):
 
     # --------------------------------------------------------------- uploads --
     upload_dir: str = "./var/uploads"
+    # Public HTTPS origin used only for generated image bytes that the provider
+    # returns as base64. Files receive unguessable asset IDs and are served by
+    # the read-only public-assets route so Meta can fetch them during approval.
+    public_asset_base_url: str | None = None
     upload_max_bytes: int = 10_000_000
     upload_allowed_types: tuple[str, ...] | str = (
         "image/png",

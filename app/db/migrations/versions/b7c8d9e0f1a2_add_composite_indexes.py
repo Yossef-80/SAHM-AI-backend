@@ -1,7 +1,7 @@
 """add composite indexes for hot query paths
 
 Revision ID: b7c8d9e0f1a2
-Revises: e5a1b2c3d4e5
+Revises: d2f1a7c04b18
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from alembic import op
 
 
 revision: str = "b7c8d9e0f1a2"
-down_revision: Union[str, None] = "e5a1b2c3d4e5"
+down_revision: Union[str, None] = "d2f1a7c04b18"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

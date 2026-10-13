@@ -1,10 +1,9 @@
-"""Website Analyzer Tool for SAHM OS.
+"""Evidence-first website analyzer used by Nour.
 
-Bilingual (Arabic & English) deep website analysis tool.
-Extracts metadata, OpenGraph tags, JSON-LD Schema.org entities (Products, Offers,
-Ratings, LocalBusiness), prices & currencies (EGP, LE, USD, Arabic numerals),
-bilingual CTAs, trust signals (COD, guarantees, shipping), and clean body content.
-Fully protected with SSRF checks, token budget boundaries, and graceful error handling.
+The extraction is deliberately deterministic: every reported offer, price, CTA,
+trust phrase, and important link points back to page text or structured JSON-LD.
+It fetches only the supplied public HTTP(S) page, validates every redirect hop,
+and never follows discovered links automatically.
 """
 
 from __future__ import annotations
@@ -12,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 from bs4 import BeautifulSoup
@@ -21,387 +20,395 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from app.ai.settings import get_ai_settings
-from app.core.errors import BlockedTargetError
-from app.core.security import resolve_and_check
+from app.core.errors import BlockedTargetError, ToolUnavailable
+from app.core.security import check_redirect, resolve_and_check
 
-MAX_HTML_BYTES = 4 * 1024 * 1024  # 4 MB
-MAX_BODY_CHARS = 5000
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "ar,en;q=0.9,en-US;q=0.8",
-}
+class ObservedFact(BaseModel):
+    category: str
+    label: str
+    value: str
+    evidence: str
+    source_url: str
 
-# Bilingual Trust Signals
-TRUST_KEYWORDS = [
-    # English
-    "guarantee", "warranty", "secure payment", "verified", "authentic",
-    "free shipping", "cash on delivery", "cod", "return policy", "refund",
-    "installment", "money back",
-    # Arabic
-    "ضمان", "شحن مجاني", "الدفع عند الاستلام", "استرجاع", "استبدال",
-    "سياسة الاسترجاع", "تقسيط", "أصلي", "معتمد", "دفع آمن", "استرداد الأموال",
-]
 
-# Bilingual CTAs
-CTA_KEYWORDS = [
-    # English
-    "buy now", "shop now", "add to cart", "checkout", "order now",
-    "contact us", "whatsapp", "learn more", "get started", "book now",
-    # Arabic
-    "اطلب الآن", "اطلب الان", "اطلب", "اشتري الآن", "اشتري الان", "اشتري",
-    "تسوق الآن", "تسوق الان", "تسوق", "تواصل معنا", "تواصل", "واتساب",
-    "أضف للسلة", "اضف للسلة", "أضف إلى السلة", "اضف الى السلة",
-    "اعرف المزيد", "ابدأ الآن", "ابدأ الان", "احجز الآن", "احجز الان",
-]
+class WebsiteAudit(BaseModel):
+    status: str
+    source: str = "user_supplied_public_website"
+    requested_url: str
+    final_url: str | None = None
+    reason: str | None = None
+    title: str | None = None
+    description: str | None = None
+    language: str | None = None
+    headings: list[str] = Field(default_factory=list)
+    offers_and_prices: list[ObservedFact] = Field(default_factory=list)
+    calls_to_action: list[ObservedFact] = Field(default_factory=list)
+    trust_signals: list[ObservedFact] = Field(default_factory=list)
+    important_links: list[ObservedFact] = Field(default_factory=list)
+    observations: list[ObservedFact] = Field(default_factory=list)
+    visible_text_excerpt: str = ""
+    not_observed: list[str] = Field(default_factory=list)
+    analysis_boundaries: list[str] = Field(default_factory=list)
 
-# Regex for Egyptian Pounds (EGP, LE, L.E., جنيه, ج.م), USD, and Arabic numerals
-PRICE_REGEX = re.compile(
-    r"(?:EGP|LE|L\.E\.|جنيه(?:اً)?|ج\.م)\s*"
-    r"[\d٠-٩0-9,٬]+(?:[.٫][\d٠-٩0-9]{1,2})?"
-    r"|[\d٠-٩0-9,٬]+(?:[.٫][\d٠-٩0-9]{1,2})?\s*"
-    r"(?:EGP|LE|L\.E\.|جنيه(?:اً)?|ج\.م)"
-    r"|(?:USD\s*)?[\$]\s*[\d0-9,]+(?:\.\d{1,2})?"
-    r"|USD\s*[\d0-9,]+(?:\.\d{1,2})?",
+
+def normalize_url(url: str) -> str:
+    """Normalize a user-supplied URL without allowing credentials or odd schemes."""
+    value = str(url or "").strip()
+    if not value:
+        raise ValueError("a website URL is required")
+    if not re.match(r"^[a-z][a-z0-9+.-]*://", value, re.IGNORECASE):
+        value = "https://" + value
+    parts = urlsplit(value)
+    if parts.scheme.lower() not in {"http", "https"}:
+        raise ValueError("only public HTTP or HTTPS pages can be analyzed")
+    if not parts.hostname:
+        raise ValueError("the URL must include a hostname")
+    if parts.username is not None or parts.password is not None:
+        raise ValueError("URLs containing usernames or passwords are not accepted")
+    return urlunsplit((parts.scheme.lower(), parts.netloc, parts.path or "/", parts.query, ""))
+
+
+async def _fetch_public_html(url: str) -> tuple[str, str]:
+    """Fetch one public HTML page with SSRF, redirect, timeout, and size guards."""
+    settings = get_ai_settings()
+    current = normalize_url(url)
+    current = resolve_and_check(current, allowed_schemes=("http", "https")).url
+
+    async with httpx.AsyncClient(
+        timeout=settings.website_timeout_seconds,
+        follow_redirects=False,
+        trust_env=False,
+        headers={
+            "User-Agent": "SahmResearchBot/1.0 (+public-page analysis)",
+            "Accept": "text/html,application/xhtml+xml;q=0.9",
+        },
+    ) as client:
+        for redirect_count in range(settings.website_max_redirects + 1):
+            async with client.stream("GET", current) as response:
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    location = response.headers.get("location", "").strip()
+                    if not location:
+                        raise ToolUnavailable("website redirected without a location header")
+                    if redirect_count >= settings.website_max_redirects:
+                        raise ToolUnavailable("too many redirects while fetching the website")
+                    redirected = str(response.url.join(location))
+                    current = check_redirect(
+                        redirected, allowed_schemes=("http", "https")
+                    ).url
+                    continue
+
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+                if content_type and content_type not in {"text/html", "application/xhtml+xml"}:
+                    raise ToolUnavailable("the supplied URL did not return an HTML page")
+                content_length = response.headers.get("content-length")
+                try:
+                    declared_size = int(content_length) if content_length else None
+                except ValueError:
+                    declared_size = None
+                if declared_size is not None and declared_size > settings.website_max_bytes:
+                    raise ToolUnavailable(
+                        f"website response is larger than the {settings.website_max_bytes} byte cap"
+                    )
+
+                # Stream into a bounded buffer; post-hoc checks on response.content
+                # would already have allowed a chunked response to exhaust memory.
+                raw = bytearray()
+                async for chunk in response.aiter_bytes():
+                    if len(raw) + len(chunk) > settings.website_max_bytes:
+                        raise ToolUnavailable(
+                            f"website response exceeded the {settings.website_max_bytes} byte cap"
+                        )
+                    raw.extend(chunk)
+                return bytes(raw).decode(response.encoding or "utf-8", errors="replace"), str(response.url)
+
+    raise ToolUnavailable("too many redirects while fetching the website")
+
+
+def _clean_text(value: Any, limit: int = 240) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    else:
+        text = str(value)
+    return re.sub(r"\s+", " ", text).strip()[:limit]
+
+
+def _json_ld_nodes(soup: BeautifulSoup) -> list[dict[str, Any]]:
+    """Parse only explicit JSON-LD data; malformed scripts are ignored."""
+    nodes: list[dict[str, Any]] = []
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            nodes.append(value)
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+
+    for script in soup.find_all("script", attrs={"type": re.compile(r"application/ld\+json", re.I)}):
+        raw = script.string or script.get_text(" ", strip=True)
+        try:
+            walk(json.loads(raw))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return nodes
+
+
+def _types(node: dict[str, Any]) -> set[str]:
+    raw = node.get("@type", [])
+    if isinstance(raw, str):
+        raw = [raw]
+    return {str(item).rsplit("/", 1)[-1].lower() for item in raw if item}
+
+
+def _schema_offers(nodes: list[dict[str, Any]], source_url: str) -> list[ObservedFact]:
+    facts: list[ObservedFact] = []
+    for node in nodes:
+        node_types = _types(node)
+        if "product" not in node_types and "offer" not in node_types and "aggregateoffer" not in node_types:
+            continue
+        name = _clean_text(node.get("name"), 120)
+        raw_offers = node.get("offers") if "product" in node_types else node
+        offer_nodes = raw_offers if isinstance(raw_offers, list) else [raw_offers]
+        for offer in offer_nodes:
+            if not isinstance(offer, dict):
+                continue
+            currency = _clean_text(offer.get("priceCurrency"), 12)
+            price = _clean_text(offer.get("price") or offer.get("lowPrice"), 40)
+            availability = _clean_text(offer.get("availability"), 80)
+            pieces = [piece for piece in (f"{price} {currency}".strip(), availability) if piece]
+            if not pieces:
+                continue
+            label = name or _clean_text(offer.get("name"), 120) or "Structured offer"
+            evidence_obj = {key: offer[key] for key in ("price", "lowPrice", "highPrice", "priceCurrency", "availability", "url") if key in offer}
+            facts.append(
+                ObservedFact(
+                    category="structured_offer",
+                    label=label,
+                    value="; ".join(pieces),
+                    evidence="JSON-LD Offer/Product data: " + _clean_text(evidence_obj, 360),
+                    source_url=source_url,
+                )
+            )
+            if len(facts) >= 20:
+                return facts
+    return facts
+
+
+_PRICE_RE = re.compile(
+    r"(?:\b(?:EGP|LE|L\.E\.|USD|EUR|SAR|AED)\s*\d[\d,]*(?:\.\d+)?|"
+    r"[$€£]\s*\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s*"
+    r"(?:EGP|LE|L\.E\.|USD|EUR|SAR|AED|جنيه|ج\.م))",
+    re.IGNORECASE,
+)
+_CTA_RE = re.compile(
+    r"buy|shop|order|subscribe|book|contact|call|whats.?app|sign.?up|"
+    r"get started|learn more|add to cart|ابدأ|اشتر|اطلب|تسوق|احجز|تواصل|اتصل|اشترك|اعرف المزيد",
+    re.IGNORECASE,
+)
+_TRUST_RE = re.compile(
+    r"return|refund|warranty|guarantee|secure payment|verified|certified|"
+    r"customer review|rating|delivery|shipping|privacy policy|استرجاع|استبدال|"
+    r"ضمان|توصيل|شحن|تقييم|آراء العملاء|الدفع الآمن",
+    re.IGNORECASE,
+)
+_IMPORTANT_PATH_RE = re.compile(
+    r"price|pricing|product|shop|store|contact|about|delivery|shipping|faq|"
+    r"return|refund|policy|service|menu|offers|pricing|أسعار|منتج|تواصل|توصيل",
     re.IGNORECASE,
 )
 
 
-class AnalyzeWebsiteInput(BaseModel):
-    url: str = Field(description="The full public HTTP or HTTPS URL of the website or competitor page to analyze.")
-
-
-def _clean_text(text: str) -> str:
-    return re.sub(r"\s+", " ", text or "").strip()
-
-
-def _first_meta(soup: BeautifulSoup, selectors: list[dict[str, str]]) -> str:
-    for attrs in selectors:
-        tag = soup.find("meta", attrs=attrs)
-        if tag and tag.get("content"):
-            val = _clean_text(tag["content"])
-            if val:
-                return val[:500]
-    return ""
-
-
-def _extract_open_graph(soup: BeautifulSoup) -> dict[str, str]:
-    result: dict[str, str] = {}
-    keys = [
-        "og:title", "og:description", "og:image", "og:type",
-        "og:url", "og:site_name", "og:price:amount", "og:price:currency",
-    ]
-    for key in keys:
-        tag = soup.find("meta", attrs={"property": key}) or soup.find("meta", attrs={"name": key})
-        if tag and tag.get("content"):
-            val = _clean_text(tag["content"])
-            if val:
-                result[key] = val[:500]
-    return result
-
-
-def _schema_nodes(value: Any):
-    if isinstance(value, list):
-        for item in value:
-            yield from _schema_nodes(item)
-    elif isinstance(value, dict):
-        if "@graph" in value:
-            yield from _schema_nodes(value["@graph"])
-        else:
-            yield value
-
-
-def _extract_json_ld(soup: BeautifulSoup) -> list[dict[str, Any]]:
-    output: list[dict[str, Any]] = []
-    accepted = {
-        "Product", "Organization", "LocalBusiness", "Store",
-        "WebSite", "WebPage", "Offer", "AggregateRating",
-    }
-
-    for script in soup.find_all("script", attrs={"type": re.compile(r"ld\+json", re.I)}):
-        raw = script.string or script.get_text(" ", strip=True)
-        if not raw:
-            continue
-        try:
-            payload = json.loads(raw.strip())
-        except (json.JSONDecodeError, TypeError):
-            continue
-
-        for node in _schema_nodes(payload):
-            types = node.get("@type", [])
-            if isinstance(types, str):
-                types = [types]
-            if not accepted.intersection(set(types)):
-                continue
-
-            item: dict[str, Any] = {}
-            for key in ("@type", "name", "description", "url", "sku", "priceRange", "telephone"):
-                val = node.get(key)
-                if val is not None:
-                    item[key] = val if isinstance(val, (dict, list)) else str(val)[:300]
-
-            brand = node.get("brand")
-            if brand:
-                item["brand"] = brand.get("name", brand) if isinstance(brand, dict) else str(brand)[:100]
-
-            offers = node.get("offers")
-            if offers:
-                offer_list = offers if isinstance(offers, list) else [offers]
-                item["offers"] = [
-                    {k: offer.get(k) for k in ("price", "priceCurrency", "availability", "url") if offer.get(k) is not None}
-                    for offer in offer_list[:5]
-                    if isinstance(offer, dict)
-                ]
-
-            rating = node.get("aggregateRating")
-            if isinstance(rating, dict):
-                item["aggregateRating"] = {
-                    k: rating.get(k) for k in ("ratingValue", "reviewCount", "bestRating") if rating.get(k) is not None
-                }
-
-            if item:
-                output.append(item)
-            if len(output) >= 8:
-                return output
-
-    return output
-
-
-def _extract_headings(soup: BeautifulSoup) -> dict[str, list[str]]:
-    headings: dict[str, list[str]] = {}
-    for level in ("h1", "h2", "h3"):
-        headings[level] = [
-            _clean_text(tag.get_text(" ", strip=True))[:150]
-            for tag in soup.find_all(level)
-            if tag.get_text(strip=True)
-        ][:8]
-    return headings
-
-
-def _extract_prices(text: str, json_ld: list[dict[str, Any]]) -> list[dict[str, str]]:
-    found: list[dict[str, str]] = []
-    seen: set[str] = set()
-
-    for match in PRICE_REGEX.finditer(text or ""):
-        start, end = match.span()
-        price = match.group(0).strip()
-        key = price.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-
-        context = _clean_text((text or "")[max(0, start - 45):min(len(text or ""), end + 45)])
-        found.append({"price": price, "context": context[:120]})
-        if len(found) >= 12:
-            break
-
-    for item in json_ld:
-        for offer in item.get("offers", []):
-            if offer.get("price") is None:
-                continue
-            curr = str(offer.get("priceCurrency") or "").strip()
-            price_val = str(offer.get("price") or "").strip()
-            full_price = f"{curr} {price_val}".strip()
-            key = full_price.casefold()
-            if key not in seen:
-                seen.add(key)
-                found.append({"price": full_price, "source": "Schema Offer"})
-        if len(found) >= 15:
-            break
-
-    return found[:15]
-
-
-def _extract_ctas(soup: BeautifulSoup, base_url: str) -> list[dict[str, str]]:
-    output: list[dict[str, str]] = []
-    seen: set[str] = set()
-
-    for tag in soup.find_all(["a", "button", "input"]):
-        text = _clean_text(tag.get_text(" ", strip=True) or tag.get("aria-label", "") or tag.get("value", ""))
-        classes = " ".join(tag.get("class", []))
-        identity = f"{classes} {tag.get('id', '')}".lower()
-
-        if not text or not (2 <= len(text) <= 80):
-            continue
-
-        class_match = any(word in identity for word in ("btn", "button", "cta", "buy", "shop", "cart", "order", "checkout"))
-        text_match = any(word in text.casefold() for word in CTA_KEYWORDS)
-
-        if not (class_match or text_match):
-            continue
-
-        key = text.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-
-        href = urljoin(base_url, tag.get("href", "")) if tag.get("href") else ""
-        item = {"text": text}
-        if href and href.startswith("http"):
-            item["url"] = href[:250]
-        output.append(item)
-        if len(output) >= 15:
-            break
-
-    return output
-
-
-def _extract_important_links(soup: BeautifulSoup, base_url: str) -> list[dict[str, str]]:
-    base_host = (urlparse(base_url).hostname or "").lower().removeprefix("www.")
-    keywords = (
-        "product", "products", "shop", "collection", "category",
-        "service", "offer", "contact", "about", "cart",
-        "منتج", "منتجات", "تسوق", "خدمة", "عروض", "تواصل", "من-نحن",
-    )
-    output: list[dict[str, str]] = []
-    seen: set[str] = set()
-
-    for tag in soup.find_all("a", href=True):
-        raw_href = tag["href"].strip()
-        href = urljoin(base_url, raw_href)
-        parsed = urlparse(href)
-        host = (parsed.hostname or "").lower().removeprefix("www.")
-
-        if parsed.scheme not in {"http", "https"} or host != base_host:
-            continue
-
-        text = _clean_text(tag.get_text(" ", strip=True) or tag.get("aria-label", ""))
-        relevant = any(k in href.lower() for k in keywords) or any(k in text.casefold() for k in keywords)
-
-        if not text or not relevant:
-            continue
-
-        clean_url = href.split("#", 1)[0]
-        if clean_url in seen:
-            continue
-        seen.add(clean_url)
-
-        output.append({"text": text[:80], "url": clean_url})
-        if len(output) >= 10:
-            break
-
-    return output
-
-
-@tool(args_schema=AnalyzeWebsiteInput)
-def analyze_website_tool(url: str, config: RunnableConfig | None = None) -> str:
-    """Fetch and deeply analyze a website URL in both Arabic and English.
-    
-    Extracts brand positioning, core offers, Egyptian & USD price anchors,
-    CTAs, trust signals (free shipping, cash on delivery, warranties),
-    and structured JSON-LD schemas.
-    
-    Args:
-        url: The website URL to inspect (e.g. https://brand.com/products).
-    """
-    settings = get_ai_settings()
-    url = (url or "").strip()
-    if not url:
-        return "Error: URL is empty."
-
-    if not re.match(r"^https?://", url, re.IGNORECASE):
-        url = "https://" + url
-
-    # 1. SSRF & Inbound Security Check
-    try:
-        safe = resolve_and_check(url)
-        target_url = safe.url
-    except BlockedTargetError as exc:
-        return f"Error: Target URL blocked for security reasons: {exc.message}"
-    except Exception as exc:
-        return f"Error validating URL {url}: {str(exc)}"
-
-    timeout = float(getattr(settings, "website_timeout_seconds", 25.0) or 25.0)
-
-    # 2. Fetch Website with Content-Length bounds
-    try:
-        with httpx.Client(
-            timeout=httpx.Timeout(timeout, connect=8.0),
-            follow_redirects=True,
-            max_redirects=5,
-            headers=HEADERS,
-        ) as client:
-            resp = client.get(target_url)
-            if resp.status_code >= 400:
-                return f"Error: Website returned HTTP {resp.status_code}."
-
-            content_type = resp.headers.get("content-type", "").lower()
-            if content_type and "html" not in content_type and "xhtml" not in content_type:
-                return f"Notice: URL returned non-HTML content ({content_type})."
-
-            length = resp.headers.get("content-length")
-            if length and length.isdigit() and int(length) > MAX_HTML_BYTES:
-                return "Error: HTML document exceeds the 4 MB limit."
-
-            html = resp.text
-            final_url = str(resp.url)
-    except httpx.TimeoutException:
-        return f"Error: Connection to {url} timed out."
-    except httpx.HTTPError as exc:
-        return f"Error: Could not reach {url} ({exc.__class__.__name__})."
-    except Exception as exc:
-        return f"Unexpected error fetching {url}: {str(exc)}"
-
-    # 3. Parse HTML
+def _extract_audit(html: str, final_url: str, requested_url: str, max_chars: int) -> WebsiteAudit:
     soup = BeautifulSoup(html, "html.parser")
+    json_ld = _json_ld_nodes(soup)
+    title_tag = soup.title
+    title = _clean_text(title_tag.get_text(" ", strip=True) if title_tag else "", 240) or None
+    description_tag = soup.find("meta", attrs={"name": re.compile(r"^description$", re.I)})
+    description = _clean_text(description_tag.get("content") if description_tag else "", 500) or None
+    html_tag = soup.find("html")
+    language = _clean_text(html_tag.get("lang") if html_tag else "", 16) or None
 
-    title_tag = soup.find("title")
-    title = _clean_text(title_tag.get_text(" ", strip=True))[:250] if title_tag else ""
-    meta_description = _first_meta(soup, [{"name": "description"}, {"property": "og:description"}])
-    og_tags = _extract_open_graph(soup)
-    json_ld = _extract_json_ld(soup)
-    headings = _extract_headings(soup)
-    ctas = _extract_ctas(soup, final_url)
-    important_links = _extract_important_links(soup, final_url)
+    headings = [
+        _clean_text(node.get_text(" ", strip=True), 180)
+        for node in soup.find_all(["h1", "h2", "h3"])
+        if node.get_text(" ", strip=True)
+    ][:24]
 
-    # 4. Extract Main Content Text
-    content_soup = BeautifulSoup(html, "html.parser")
-    for tag in content_soup(["script", "style", "nav", "footer", "header", "iframe", "noscript", "svg", "form"]):
-        tag.decompose()
+    offers = _schema_offers(json_ld, final_url)
+    offer_nodes = soup.find_all("meta", attrs={"property": re.compile(r"(?:product|og):price:(?:amount|currency)", re.I)})
+    for node in offer_nodes[:12]:
+        value = _clean_text(node.get("content"), 80)
+        if value:
+            offers.append(
+                ObservedFact(
+                    category="visible_price_metadata",
+                    label=_clean_text(node.get("property"), 80) or "Page price metadata",
+                    value=value,
+                    evidence=f'<meta property="{node.get("property", "")}" content="{value}">',
+                    source_url=final_url,
+                )
+            )
 
-    main_nodes = content_soup.select("main, article, [role='main']")
-    content_node = (
-        max(main_nodes, key=lambda node: len(node.get_text(" ", strip=True)))
-        if main_nodes
-        else (content_soup.body or content_soup)
+    # Extract display text only after JSON-LD, metadata, and headings have been read.
+    for element in soup(["script", "style", "noscript", "svg", "template"]):
+        element.decompose()
+    visible_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True)).strip()
+
+    for match in list(_PRICE_RE.finditer(visible_text))[:20]:
+        start, end = max(0, match.start() - 65), min(len(visible_text), match.end() + 65)
+        quote = visible_text[start:end]
+        if not any(f.evidence == quote for f in offers):
+            offers.append(
+                ObservedFact(
+                    category="visible_price_text",
+                    label="Price-like text observed",
+                    value=match.group(0),
+                    evidence=quote,
+                    source_url=final_url,
+                )
+            )
+
+    ctas: list[ObservedFact] = []
+    trust: list[ObservedFact] = []
+    important_links: list[ObservedFact] = []
+    seen_ctas: set[tuple[str, str]] = set()
+    seen_links: set[str] = set()
+
+    for element in soup.find_all(["a", "button", "input"]):
+        label = _clean_text(element.get("aria-label") or element.get("value") or element.get_text(" ", strip=True), 120)
+        if not label:
+            continue
+        href = str(element.get("href") or "").strip()
+        target = urljoin(final_url, href) if href else ""
+        parsed_target = urlsplit(target) if target else None
+        if _CTA_RE.search(label):
+            key = (label.lower(), target)
+            if key not in seen_ctas:
+                seen_ctas.add(key)
+                ctas.append(
+                    ObservedFact(
+                        category="call_to_action",
+                        label="Visible CTA",
+                        value=f"{label}" + (f" → {target}" if target else ""),
+                        evidence=f'Visible control text: "{label}"',
+                        source_url=final_url,
+                    )
+                )
+        if target and parsed_target and parsed_target.scheme in {"http", "https"}:
+            if _IMPORTANT_PATH_RE.search(parsed_target.path + " " + label) and target not in seen_links:
+                seen_links.add(target)
+                important_links.append(
+                    ObservedFact(
+                        category="important_link",
+                        label=label or parsed_target.path or "Important link",
+                        value=target,
+                        evidence=f'Visible anchor text: "{label}"; href: {target}',
+                        source_url=final_url,
+                    )
+                )
+
+    for sentence in re.split(r"(?<=[.!?؟])\s+|[\n|]", visible_text):
+        snippet = _clean_text(sentence, 220)
+        if snippet and _TRUST_RE.search(snippet):
+            trust.append(
+                ObservedFact(
+                    category="trust_or_service_claim",
+                    label="Page text mentioning trust, service, or policy",
+                    value=snippet,
+                    evidence=f'Visible page text: "{snippet}"',
+                    source_url=final_url,
+                )
+            )
+        if len(trust) >= 15:
+            break
+
+    observations: list[ObservedFact] = []
+    if title:
+        observations.append(ObservedFact(category="page_metadata", label="Title", value=title, evidence=f"HTML title: {title}", source_url=final_url))
+    if description:
+        observations.append(ObservedFact(category="page_metadata", label="Meta description", value=description, evidence=f"HTML meta description: {description}", source_url=final_url))
+    observations.extend(
+        ObservedFact(category="heading", label=f"Heading {index + 1}", value=value, evidence=f"Visible heading: {value}", source_url=final_url)
+        for index, value in enumerate(headings)
+    )
+    observations.extend(offers)
+    observations.extend(ctas)
+    observations.extend(trust)
+    observations.extend(important_links)
+
+    not_observed: list[str] = []
+    if not offers:
+        not_observed.append("No explicit price or offer was observed in the page text or structured data.")
+    if not trust:
+        not_observed.append("No matching trust, review, delivery, or policy wording was observed in the extracted page text.")
+    if not ctas:
+        not_observed.append("No recognizable call-to-action control was observed.")
+    return WebsiteAudit(
+        status="ok",
+        requested_url=requested_url,
+        final_url=final_url,
+        title=title,
+        description=description,
+        language=language,
+        headings=headings,
+        offers_and_prices=offers,
+        calls_to_action=ctas,
+        trust_signals=trust,
+        important_links=important_links,
+        observations=observations,
+        visible_text_excerpt=visible_text[:max_chars],
+        not_observed=not_observed,
+        analysis_boundaries=[
+            "These are observations from one fetched public page, not a full-site audit.",
+            "Discovered links are listed but are not fetched automatically.",
+            "Do not infer audience size, market share, conversion rate, campaign performance, or budget from page appearance.",
+            "Keep any downstream inference or recommendation separate from these quoted observations and name its evidence.",
+        ],
     )
 
-    full_text = _clean_text(content_node.get_text(" ", strip=True))
-    if len(full_text) < 200:
-        fallback_soup = BeautifulSoup(html, "html.parser")
-        for tag in fallback_soup(["script", "style", "nav", "footer", "header", "iframe", "noscript", "svg"]):
-            tag.decompose()
-        full_text = _clean_text(fallback_soup.get_text(" ", strip=True))
 
-    prices = _extract_prices(full_text, json_ld)
-    lowered = full_text.casefold()
-    trust_signals = [w for w in TRUST_KEYWORDS if w.casefold() in lowered][:15]
+def _error_audit(requested_url: str, reason: str) -> str:
+    return WebsiteAudit(
+        status="unavailable",
+        requested_url=requested_url,
+        reason=reason,
+        analysis_boundaries=["No website facts were extracted; do not replace missing data with guesses."],
+    ).model_dump_json(indent=2)
 
-    max_chars = int(getattr(settings, "website_text_chars", MAX_BODY_CHARS) or MAX_BODY_CHARS)
-    body_snippet = full_text[:max_chars]
 
-    extracted_report = {
-        "url": final_url,
-        "title": title or og_tags.get("og:title", ""),
-        "meta_description": meta_description or og_tags.get("og:description", ""),
-        "brand_name": og_tags.get("og:site_name", ""),
-        "trust_signals_found": trust_signals,
-        "pricing_cues": prices,
-        "calls_to_action": ctas,
-        "headings": headings,
-        "structured_data_entities": json_ld,
-        "important_links": important_links,
-        "body_text_excerpt": body_snippet,
-    }
+@tool
+async def analyze_website_tool(url: str, config: RunnableConfig) -> str:
+    """Analyze one supplied public website page for evidence-backed marketing signals.
 
-    return (
-        f"### Website Analysis for {final_url}\n\n"
-        f"**Title:** {extracted_report['title']}\n"
-        f"**Description:** {extracted_report['meta_description']}\n\n"
-        f"```json\n{json.dumps(extracted_report, ensure_ascii=False, indent=2)}\n```"
-    )
+    Extracts metadata, headings, JSON-LD/visible prices, offers, CTAs, trust or
+    service wording, and important links. It does not fetch discovered links,
+    access private networks, or claim anything not observed on the supplied page.
+
+    Args:
+        url: The public HTTP(S) page the user or a verified search result supplied.
+    """
+    requested_url = str(url or "").strip()
+    try:
+        normalized = normalize_url(requested_url)
+        html, final_url = await _fetch_public_html(normalized)
+        audit = _extract_audit(
+            html,
+            final_url,
+            requested_url=normalized,
+            max_chars=get_ai_settings().website_text_chars,
+        )
+        return audit.model_dump_json(indent=2)
+    except (BlockedTargetError, ToolUnavailable, ValueError) as exc:
+        return _error_audit(requested_url, str(exc))
+    except httpx.HTTPStatusError as exc:
+        return _error_audit(requested_url, f"website returned HTTP {exc.response.status_code}")
+    except httpx.HTTPError as exc:
+        return _error_audit(requested_url, f"website fetch failed: {type(exc).__name__}")
+    except Exception as exc:  # defensive boundary for a tool called by the LLM
+        return _error_audit(requested_url, f"website analysis failed: {type(exc).__name__}")

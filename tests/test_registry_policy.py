@@ -98,12 +98,13 @@ def test_no_agent_module_imports_protected_tools() -> None:
     assert not offenders, "unexpected importers of protected tools: " + ", ".join(offenders)
 
 
-def test_all_thirteen_tools_are_registered() -> None:
+def test_all_sixteen_tools_are_registered() -> None:
     registry = register_all()
-    assert len(registry.all()) == 13
+    assert len(registry.all()) == 16
     expected = {
         "web_search", "analyze_website", "get_social_profile", "get_reviews",
-        "get_keywords", "get_competitor_ads", "get_brand_context", "save_learning",
+        "get_keywords", "get_competitor_ads", "brand_report", "full_analysis",
+        "route_file_to_tool", "get_brand_context", "save_learning",
         "get_campaign_insights", "get_breakdowns", "analyze_reference_creative",
         "generate_image", "create_recommendation",
     }

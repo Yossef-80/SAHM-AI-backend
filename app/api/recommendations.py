@@ -16,9 +16,12 @@ from app.api.deps import (
     assert_owned,
     require_role,
 )
+from app.ai.marketing import meta_ads
 from app.core.approvals import service as approvals
 from app.db.models import Recommendation as RecommendationRow
 from app.schemas.recommendations import (
+    ActivateRecommendationRequest,
+    ActivateRecommendationResponse,
     ApproveRecommendationRequest,
     ApproveRecommendationResponse,
     Recommendation,
@@ -106,6 +109,75 @@ async def approve_recommendation(
         payload,
         actor=actor.user_id if actor else "anonymous",
         request_id=request_id,
+        settings=settings,
+    )
+
+
+def _activation_targets(row: RecommendationRow) -> list[str]:
+    """Meta object labels recorded by plan execution, in parent-first order."""
+    execution = row.execution_result if isinstance(row.execution_result, dict) else {}
+    created_raw = execution.get("created_ids")
+    created = created_raw if isinstance(created_raw, dict) else {}
+    targets: list[str] = []
+    for step in ("campaign", "ad_set"):
+        value = created.get(step)
+        if isinstance(value, str) and value:
+            targets.append(step)
+    ads_raw = created.get("ads")
+    if isinstance(ads_raw, list):
+        targets.extend(f"ad:{ad}" for ad in ads_raw if isinstance(ad, str) and ad)
+    return targets
+
+
+@router.post("/{recommendation_id}/activate", response_model=ActivateRecommendationResponse)
+async def activate_recommendation(
+    recommendation_id: str,
+    payload: ActivateRecommendationRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+    principal: AuthDep,
+    settings: SettingsDep,
+) -> ActivateRecommendationResponse:
+    """Start delivery on an already-created PAUSED Meta plan.
+
+    Everything the wizard creates is PAUSED, so without this a campaign can
+    never actually run. It is two-phase like approval: creating Meta objects is
+    reversible, switching them to ACTIVE spends real budget and is not.
+    """
+    actor = await require_role(principal, settings, ws, minimum="member")
+    row = await _load_owned(db, recommendation_id, ws)
+    targets = _activation_targets(row)
+
+    if not payload.confirm:
+        return ActivateRecommendationResponse(
+            recommendation=approvals._to_schema(row),
+            executed=False,
+            requires_confirmation=True,
+            targets=targets,
+            message=(
+                "Confirm to switch these Meta objects to ACTIVE. The campaign "
+                "will start delivering and spending its budget."
+            ),
+        )
+
+    result = await meta_ads.activate_meta_ad_plan(
+        db,
+        row,
+        actor=actor.user_id if actor else "anonymous",
+        settings=settings,
+    )
+    await db.commit()
+    # The commit expires every attribute on the row; without this refresh the
+    # schema conversion below would trigger lazy IO outside the greenlet and 500.
+    await db.refresh(row)
+    return ActivateRecommendationResponse(
+        recommendation=approvals._to_schema(row),
+        executed=result.status == "ok",
+        requires_confirmation=False,
+        targets=targets,
+        activated=result.activated,
+        message=result.detail,
+        unavailable_reason=result.unavailable_reason,
     )
 
 

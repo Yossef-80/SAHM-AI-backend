@@ -15,6 +15,7 @@ from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.ai.enums import LearningCategory
+from app.ai.security import redact_sensitive_data
 
 DEFAULT_BUSINESS_ID = "default"
 
@@ -51,12 +52,15 @@ def learnings_namespace(business_id: str) -> tuple[str, ...]:
 
 
 def put_brand_profile(store: BaseStore, business_id: str, profile: BrandProfile) -> None:
-    store.put(profile_namespace(business_id), "profile", profile.model_dump(mode="json"))
+    safe_profile = redact_sensitive_data(profile.model_dump(mode="json"))
+    store.put(profile_namespace(business_id), "profile", safe_profile)
 
 
 def get_brand_profile(store: BaseStore, business_id: str) -> BrandProfile | None:
     item = store.get(profile_namespace(business_id), "profile")
-    return BrandProfile.model_validate(item.value) if item else None
+    if item is None:
+        return None
+    return BrandProfile.model_validate(redact_sensitive_data(item.value))
 
 
 def business_id_from(config: dict | None) -> str:

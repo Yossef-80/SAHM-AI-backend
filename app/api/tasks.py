@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import RequestIdDep, SessionDep, SettingsDep, WorkspaceDep
@@ -10,15 +10,62 @@ from app.core.agents.persona import load_persona
 from app.core.orchestrator.service import (
     cancel_task,
     create_task,
+    get_conversation,
     get_task,
     run_task_in_background,
     stream_task,
 )
 from app.db.models import AgentTask
 from app.schemas.tasks import AgentTask as AgentTaskSchema
-from app.schemas.tasks import CancelTaskResponse
+from app.schemas.tasks import CancelTaskResponse, StartTaskBody
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+_SENSITIVE_INPUT_MARKERS = (
+    "token",
+    "apikey",
+    "secret",
+    "password",
+    "passwd",
+    "credential",
+    "authorization",
+    "cookie",
+    "privatekey",
+    "encryptionkey",
+)
+
+
+def _without_credentials(value: object) -> object:
+    """Drop credential-shaped task inputs before persistence or prompt assembly."""
+    if isinstance(value, dict):
+        safe: dict[str, object] = {}
+        for key, item in value.items():
+            normalized_key = "".join(char for char in str(key).lower() if char.isalnum())
+            if any(marker in normalized_key for marker in _SENSITIVE_INPUT_MARKERS):
+                continue
+            safe[str(key)] = _without_credentials(item)
+        return safe
+    if isinstance(value, list):
+        return [_without_credentials(item) for item in value]
+    return value
+
+
+def _normalize_task_inputs(inputs: dict[str, object]) -> dict[str, object]:
+    """Translate UI context identifiers to the agent/tool snake_case contract."""
+    sanitized = _without_credentials(inputs)
+    normalized = dict(sanitized) if isinstance(sanitized, dict) else {}
+    for ui_key, agent_key in (
+        ("campaignId", "campaign_id"),
+        ("creativeId", "creative_id"),
+        ("insightId", "insight_id"),
+    ):
+        if agent_key not in normalized and ui_key in normalized:
+            normalized[agent_key] = normalized[ui_key]
+        normalized.pop(ui_key, None)
+    normalized.pop("conversationId", None)
+    normalized.pop("conversation_id", None)
+    return normalized
 
 
 def _to_schema(row: AgentTask) -> AgentTaskSchema:
@@ -88,8 +135,34 @@ async def start_task(
     db: SessionDep,
     settings: SettingsDep,
     request_id: RequestIdDep,
+    body: StartTaskBody | None = Body(default=None),
 ) -> AgentTaskSchema:
-    """Queue a long-running task and return immediately."""
+    """Queue a long-running task and return immediately.
+
+    Existing query-only clients remain valid. The optional body carries the
+    non-secret task inputs and (for chat action cards) the conversation link.
+    """
+    direct_layla_tasks = {
+        "creative_brief",
+        "commercial_script",
+        "image_prompt",
+        "video_prompt",
+        "ad_copy",
+        "ad_variations",
+    }
+    if persona_id.strip().lower() == "layla" and task in direct_layla_tasks:
+        from app.core.errors import TaskNotAllowedError
+
+        if task in {"image_prompt", "video_prompt"}:
+            raise TaskNotAllowedError(
+                "Image and video prompts must use Layla's guided conversation workflow.",
+                detail={"endpoint": "/assistant/message", "workflow": "creative_prompt", "task": task},
+            )
+        raise TaskNotAllowedError(
+            "Layla's direct writing tools now use the app.ai creative endpoint.",
+            detail={"endpoint": "/creatives/generate-text", "task": task},
+        )
+
     persona = await load_persona(persona_id, db, ws.workspace_id)
     if not persona.can_run_task(task):
         from app.core.errors import TaskNotAllowedError
@@ -98,13 +171,19 @@ async def start_task(
             f"persona '{persona_id}' may not run task '{task}'",
             detail={"allowed_tasks": persona.allowed_tasks},
         )
+    task_inputs = _normalize_task_inputs(body.inputs) if body else {}
+    conversation_id = body.conversation_id if body else None
+    if conversation_id:
+        # Never attach work to another workspace's conversation.
+        await get_conversation(db, conversation_id, business_id=ws.business_id)
+
     row = await create_task(
         db,
         task_name=task,
         persona_id=persona_id,
-        conversation_id=None,
+        conversation_id=conversation_id,
         business_id=ws.business_id,
-        inputs={},
+        inputs=task_inputs,
         request_id=request_id,
     )
     await db.commit()
@@ -124,7 +203,7 @@ async def start_task(
             llm=llm,
             persona_id=persona_id,
             task_name=task,
-            inputs={},
+            inputs=task_inputs,
             user_message=f"Run the {task} task.",
             request_id=request_id,
         )

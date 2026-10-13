@@ -199,14 +199,22 @@ async def test_every_unavailable_output_carries_a_reason(tool_ctx: ToolContext) 
             )
 
 
-async def test_generate_image_mock_mode_is_marked_as_mock(tool_ctx: ToolContext) -> None:
-    """Placeholder assets are labelled, so they can never be mistaken for real."""
+async def test_generate_image_mock_requires_explicit_opt_in(tool_ctx: ToolContext) -> None:
+    """Default mock configuration never masquerades as a generated creative."""
     from app.core.tools.media import _handle_generate_image
     from app.schemas.tools import GenerateImageInput
 
-    result = await _handle_generate_image(
-        GenerateImageInput(prompt="a coffee cup", num_images=2), tool_ctx
+    payload = GenerateImageInput(prompt="a coffee cup", num_images=2)
+    blocked = await _handle_generate_image(payload, tool_ctx)
+    assert blocked.status == ToolStatus.UNAVAILABLE
+    assert blocked.assets == []
+    assert blocked.unavailable_reason
+
+    tool_ctx.settings = tool_ctx.require_settings().model_copy(
+        update={"image_allow_mock_assets": True}
     )
+    tool_ctx.user_supplied["allow_mock_assets"] = True
+    result = await _handle_generate_image(payload, tool_ctx)
     assert result.status == ToolStatus.OK
     assert len(result.assets) == 2
     for asset in result.assets:

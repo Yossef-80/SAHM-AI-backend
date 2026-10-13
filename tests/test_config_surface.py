@@ -492,18 +492,30 @@ async def test_connector_get_reports_the_layer_that_answered(
     resp = await api_client.patch(
         "/api/v1/settings/connectors/meta",
         headers=headers,
-        json={"adAccountId": "act_from_workspace", "accessToken": META_TOKEN},
+        json={
+            "adAccountId": "act_from_workspace",
+            "pageId": "page_from_workspace",
+            "accessToken": META_TOKEN,
+        }, 
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["source"] == "workspace"
     assert _field(resp.json(), "ad_account_id")["value"] == "act_from_workspace"
     assert _field(resp.json(), "ad_account_id")["source"] == "workspace"
+    assert _field(resp.json(), "page_id")["value"] == "page_from_workspace"
+    assert _field(resp.json(), "page_id")["source"] == "workspace"
 
     after = (await api_client.get("/api/v1/settings/connectors", headers=headers)).json()
     assert after["overrideCount"] == 1
     meta = _connector(after, "meta")
-    assert meta["configured"] is True, "a real provider with a token is configured"
+    assert meta["configured"] is True, "a real provider with all required Meta fields is configured"
     _assert_no_secret(after)
+
+    status = await api_client.get("/api/v1/integrations/meta/status", headers=headers)
+    assert status.status_code == 200, status.text
+    assert status.json()["connected"] is True
+    assert status.json()["campaignReady"] is True
+    assert status.json()["pageConfigured"] is True
 
     # The workspace value wins over the env var.
     assert _field(meta, "ad_account_id")["value"] == "act_from_workspace"
@@ -964,3 +976,48 @@ def test_secrets_are_absent_from_the_log_redaction_list() -> None:
         assert scrubbed[key] == "***REDACTED***", key
     assert scrubbed["nested"][0]["access_token"] == "***REDACTED***"
     assert META_TOKEN not in str(scrubbed)
+
+async def test_image_connector_is_not_reported_configured_without_a_real_provider(
+    api_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The image connector must say "not configured" while it is on `mock`.
+
+    Regression: the `image` spec declared `placeholder_providers=("mock",)` but no
+    `provider_field`, and none of its fields were `required`. `.provider` therefore
+    read "" and `.required_fields` was empty, so `configured` came back True even
+    with no image provider at all. The creatives page keyed its "Create image"
+    button off that flag, enabled it, and `generate_image` rejected the request with
+    "Mock placeholder images are disabled by default" -- the button looked live and
+    always failed.
+    """
+    from app.config import get_settings
+
+    body = await _register(api_client, "image-conn@example.com")
+    headers = _auth(body["accessToken"])
+
+    # 1) Untouched install: provider defaults to `mock`, no key.
+    monkeypatch.setattr(get_settings(), "image_provider", "mock")
+    monkeypatch.setattr(get_settings(), "image_api_key", None)
+    unset = _connector(
+        (await api_client.get("/api/v1/settings/connectors", headers=headers)).json(), "image"
+    )
+    assert unset["configured"] is False, unset
+    assert unset["placeholder"] is True, unset
+    assert _field(unset, "provider")["value"] == "mock"
+
+    # 2) A real provider without its key is still not configured.
+    monkeypatch.setattr(get_settings(), "image_provider", "openai")
+    monkeypatch.setattr(get_settings(), "image_api_key", None)
+    keyless = _connector(
+        (await api_client.get("/api/v1/settings/connectors", headers=headers)).json(), "image"
+    )
+    assert keyless["configured"] is False, keyless
+    assert keyless["placeholder"] is False, keyless
+
+    # 3) Only a real provider *with* credentials enables the button.
+    monkeypatch.setattr(get_settings(), "image_api_key", "sk-test-key")
+    ready = _connector(
+        (await api_client.get("/api/v1/settings/connectors", headers=headers)).json(), "image"
+    )
+    assert ready["configured"] is True, ready
+    assert ready["placeholder"] is False, ready

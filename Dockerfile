@@ -76,6 +76,7 @@ RUN python -m venv /opt/venv \
       "pgvector>=0.2.5" \
       "langgraph>=0.2.60" \
       "httpx>=0.27" \
+      "Pillow>=10.0.0" \
       "cryptography>=42" \
       "python-multipart>=0.0.9" \
       "beautifulsoup4>=4.12" \
