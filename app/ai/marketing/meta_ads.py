@@ -39,6 +39,9 @@ from app.schemas.common import ApiModel
 META_AD_PLAN_ACTION = "create_meta_ad_plan"
 META_AD_PLAN_KIND = "meta_ad_plan_v1"
 META_AD_INSIGHT_KIND = "meta_ad_performance"
+# The wizard does not collect bid caps or ROAS floors, so use Meta's no-cap
+# strategy explicitly at both campaign and ad-set levels.
+META_DEFAULT_BID_STRATEGY = "LOWEST_COST_WITHOUT_CAP"
 
 # These are the six objectives exposed by the existing CampaignObjectiveSchema.
 OBJECTIVE_TO_META: dict[str, str] = {
@@ -765,11 +768,12 @@ async def execute_meta_ad_plan(
     """Create Campaign → Ad Set → AdCreative → Ad after the approved second phase.
 
     Every write is PAUSED. Progress with external IDs is saved into the existing
-    Recommendation JSON column after each successful Graph call. A partial or
-    uncertain prior attempt is never replayed automatically, preventing duplicate
-    object chains after a timeout. A prior ``failed_safe`` result with no
-    created IDs can be retried by an explicit user action; partial or
-    uncertain attempts remain blocked.
+    Recommendation JSON column after each successful Graph call. Uncertain partial
+    attempts remain blocked. The sole resumable partial is a confirmed HTTP 400
+    rejection while setting the strategy or creating the ad set, when the campaign
+    ID is known; after explicit review, the existing paused campaign is reused
+    rather than duplicated. A prior
+    ``failed_safe`` result with no created IDs can be retried by explicit user action.
     """
     rec_id = recommendation.id
     if recommendation.action_type != META_AD_PLAN_ACTION:
@@ -788,7 +792,35 @@ async def execute_meta_ad_plan(
         )
 
     prior = recommendation.execution_result if isinstance(recommendation.execution_result, dict) else {}
-    if prior.get("status") in {"in_progress", "partial", "unknown"} or prior.get("created_ids"):
+    campaign_id = recommendation.campaign_id
+    campaign = await db.get(Campaign, campaign_id) if campaign_id else None
+    if campaign is None:
+        return MetaAdPlanExecutionResult(
+            recommendation_id=rec_id,
+            detail="The local campaign for this plan was not found.",
+            unavailable_reason="The campaign record is missing; no Meta write was attempted.",
+        )
+
+    prior_ids = prior.get("created_ids")
+    resume_campaign_id: str | None = None
+    if (
+        prior.get("status") == "partial"
+        and prior.get("attempted_step") in {"campaign_bid_strategy", "ad_set"}
+        and prior.get("failure_status_code") == 400
+        and prior.get("retry_safe") is True
+        and prior.get("campaign_id") == campaign.id
+        and isinstance(prior_ids, dict)
+        and set(prior_ids) == {"campaign"}
+        and isinstance(prior_ids.get("campaign"), str)
+        and bool(prior_ids["campaign"])
+        and campaign.meta_campaign_id == prior_ids["campaign"]
+    ):
+        resume_campaign_id = prior_ids["campaign"]
+
+    if (
+        prior.get("status") in {"in_progress", "partial", "unknown"}
+        or prior.get("created_ids")
+    ) and not resume_campaign_id:
         return MetaAdPlanExecutionResult(
             recommendation_id=rec_id,
             detail="A partial/uncertain prior attempt exists; automatic replay was blocked.",
@@ -797,15 +829,6 @@ async def execute_meta_ad_plan(
                 "resolve the partial attempt before creating another plan."
             ),
             execution_result=prior,
-        )
-
-    campaign_id = recommendation.campaign_id
-    campaign = await db.get(Campaign, campaign_id) if campaign_id else None
-    if campaign is None:
-        return MetaAdPlanExecutionResult(
-            recommendation_id=rec_id,
-            detail="The local campaign for this plan was not found.",
-            unavailable_reason="The campaign record is missing; no Meta write was attempted.",
         )
 
     payload = recommendation.payload if isinstance(recommendation.payload, dict) else {}
@@ -906,9 +929,11 @@ async def execute_meta_ad_plan(
         "campaign_id": campaign.id,
         "objective": plan_model.objective,
         "meta_objective": objective,
-        "created_ids": {},
+        "bid_strategy": META_DEFAULT_BID_STRATEGY,
+        "created_ids": {"campaign": resume_campaign_id} if resume_campaign_id else {},
         "ads": [],
         "attempted_step": None,
+        "resumed_from_partial": bool(resume_campaign_id),
     }
 
     async def checkpoint(step: str) -> None:
@@ -924,29 +949,42 @@ async def execute_meta_ad_plan(
         await db.flush()
 
     try:
-        await checkpoint("campaign")
-        campaign_response = await graph_client.post(
-            f"{account_path}/campaigns",
-            {
-                "name": campaign.name,
-                "objective": objective,
-                "status": "PAUSED",
-                "special_ad_categories": list(plan_model.special_ad_categories or []),
-                # The budget is assigned at the ad-set level below. Make the
-                # sharing policy explicit and preserve that allocation.
-                "is_adset_budget_sharing_enabled": False,
-            },
-        )
-        meta_campaign_id = _graph_object_id(campaign_response)
-        await save_created_id("campaign", meta_campaign_id)
-        campaign.meta_campaign_id = meta_campaign_id
-        campaign.status = "paused"
-        await db.flush()
+        if resume_campaign_id:
+            # Reuse the already-recorded paused campaign; explicitly repair its
+            # strategy before retrying the rejected ad-set request.
+            meta_campaign_id = resume_campaign_id
+            campaign.status = "paused"
+            await checkpoint("campaign_bid_strategy")
+            await graph_client.post(
+                meta_campaign_id, {"bid_strategy": META_DEFAULT_BID_STRATEGY}
+            )
+            result["campaign_bid_strategy_updated"] = True
+        else:
+            await checkpoint("campaign")
+            campaign_response = await graph_client.post(
+                f"{account_path}/campaigns",
+                {
+                    "name": campaign.name,
+                    "objective": objective,
+                    "status": "PAUSED",
+                    "bid_strategy": META_DEFAULT_BID_STRATEGY,
+                    "special_ad_categories": list(plan_model.special_ad_categories or []),
+                    # The budget is assigned at the ad-set level below. Make the
+                    # sharing policy explicit and preserve that allocation.
+                    "is_adset_budget_sharing_enabled": False,
+                },
+            )
+            meta_campaign_id = _graph_object_id(campaign_response)
+            await save_created_id("campaign", meta_campaign_id)
+            campaign.meta_campaign_id = meta_campaign_id
+            campaign.status = "paused"
+            await db.flush()
 
         adset_body: dict[str, Any] = {
             "name": f"{campaign.name} — Ad Set",
             "campaign_id": meta_campaign_id,
             "daily_budget": daily_budget,
+            "bid_strategy": META_DEFAULT_BID_STRATEGY,
             "billing_event": plan_model.billing_event,
             "optimization_goal": plan_model.optimization_goal,
             "targeting": plan_model.targeting,

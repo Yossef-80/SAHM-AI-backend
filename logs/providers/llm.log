@@ -190,3 +190,6 @@
 2026-10-13 09:21:38 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=5
 2026-10-13 09:21:46 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=10954 input_tokens=4409 output_tokens=595 tool_calls=0
 2026-10-13 09:21:48 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=9287 input_tokens=4409 output_tokens=510 tool_calls=0
+2026-10-13 09:24:50 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 10:14:09 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 10:30:05 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'

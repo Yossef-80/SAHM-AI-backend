@@ -103,9 +103,16 @@ async def _create_plan(db: AsyncSession, objective: str = "sales") -> tuple[Camp
 class FakeGraph:
     """In-memory Meta Graph boundary; tests never make a network/API call."""
 
-    def __init__(self, *, fail_path: str | None = None, insight_rows: list[dict[str, Any]] | None = None):
+    def __init__(
+        self,
+        *,
+        fail_path: str | None = None,
+        fail_status_code: int = 400,
+        insight_rows: list[dict[str, Any]] | None = None,
+    ):
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.fail_path = fail_path
+        self.fail_status_code = fail_status_code
         self.insight_rows = insight_rows or []
         self.ids: dict[str, int] = {}
 
@@ -113,7 +120,9 @@ class FakeGraph:
         self.calls.append((path, payload))
         if path == self.fail_path:
             raise meta_ads.MetaGraphError(
-                "Meta rejected the request (Meta error 100).", retry_safe=True, status_code=400
+                "Meta rejected the request (Meta error 100).",
+                retry_safe=400 <= self.fail_status_code < 500,
+                status_code=self.fail_status_code,
             )
         if path.endswith("/adimages"):
             self.ids["image"] = self.ids.get("image", 0) + 1
@@ -356,12 +365,17 @@ async def test_two_phase_approval_creates_full_hierarchy_paused_and_maps_each_cr
     assert fake.calls[0][1]["objective"] == meta_ads.OBJECTIVE_TO_META[objective]
     assert fake.calls[0][1]["status"] == "PAUSED"
     assert fake.calls[0][1]["is_adset_budget_sharing_enabled"] is False
+    assert fake.calls[0][1]["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
     assert fake.calls[1][1]["status"] == "PAUSED"
+    assert fake.calls[1][1]["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
+    assert "bid_amount" not in fake.calls[1][1]
+    assert "bid_constraints" not in fake.calls[1][1]
     assert all(fake.calls[i][1]["status"] == "PAUSED" for i in (4, 7))
     assert fake.calls[1][1]["daily_budget"] == "25050"
 
     execution = recommendation.execution_result
     assert execution["status"] == "ok"
+    assert execution["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
     assert [entry["creative_id"] for entry in execution["ads"]] == ["cr_a", "cr_b"]
     assert [entry["creative_prompt"] for entry in execution["ads"]] == [
         "Prompt for final image A",
@@ -510,10 +524,10 @@ async def test_failed_safe_campaign_creation_can_retry_saved_plan(
     assert [path for path, _ in fake.calls].count("act_987/campaigns") == 2
 
 
-async def test_partial_meta_failure_is_recorded_and_never_replayed(
+async def test_rejected_adset_request_resumes_campaign_without_creating_a_duplicate(
     seeded_db: AsyncSession, test_settings: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _, recommendation = await _create_plan(seeded_db)
+    campaign, recommendation = await _create_plan(seeded_db)
     test_settings.meta_access_token = "offline-test-token"
     test_settings.meta_ad_account_id = "987"
     fake = FakeGraph(fail_path="act_987/adsets")
@@ -527,7 +541,55 @@ async def test_partial_meta_failure_is_recorded_and_never_replayed(
     )
     assert first.executed is False
     assert recommendation.status == "failed"
-    assert recommendation.execution_result["status"] == "partial"
+    partial = recommendation.execution_result
+    assert partial["status"] == "partial"
+    assert partial["attempted_step"] == "ad_set"
+    assert partial["retry_safe"] is True
+    assert partial["created_ids"] == {"campaign": "meta_campaign_1"}
+    call_count = len(fake.calls)
+
+    # Recovery still requires a fresh review and explicit confirmation.
+    review = await approvals.approve_recommendation(
+        seeded_db, recommendation.id, ApproveRecommendationRequest(confirm=False), settings=test_settings
+    )
+    assert review.requires_confirmation is True
+    assert len(fake.calls) == call_count
+    fake.fail_path = None
+    resumed = await approvals.approve_recommendation(
+        seeded_db, recommendation.id, ApproveRecommendationRequest(confirm=True), settings=test_settings
+    )
+
+    assert resumed.executed is True, resumed.message
+    assert recommendation.status == "executed"
+    assert campaign.meta_campaign_id == "meta_campaign_1"
+    assert recommendation.execution_result["resumed_from_partial"] is True
+    assert recommendation.execution_result["campaign_bid_strategy_updated"] is True
+    paths = [path for path, _ in fake.calls]
+    assert paths.count("act_987/campaigns") == 1
+    assert paths.count("meta_campaign_1") == 1
+    assert fake.calls[2] == ("meta_campaign_1", {"bid_strategy": "LOWEST_COST_WITHOUT_CAP"})
+    assert paths.count("act_987/adsets") == 2
+
+
+async def test_uncertain_partial_meta_failure_is_recorded_and_never_replayed(
+    seeded_db: AsyncSession, test_settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, recommendation = await _create_plan(seeded_db)
+    test_settings.meta_access_token = "offline-test-token"
+    test_settings.meta_ad_account_id = "987"
+    fake = FakeGraph(fail_path="act_987/adsets", fail_status_code=503)
+    monkeypatch.setattr(meta_ads, "HttpMetaGraphClient", lambda **kwargs: fake)
+
+    await approvals.approve_recommendation(
+        seeded_db, recommendation.id, ApproveRecommendationRequest(confirm=False), settings=test_settings
+    )
+    first = await approvals.approve_recommendation(
+        seeded_db, recommendation.id, ApproveRecommendationRequest(confirm=True), settings=test_settings
+    )
+    assert first.executed is False
+    assert recommendation.status == "failed"
+    assert recommendation.execution_result["status"] == "unknown"
+    assert recommendation.execution_result["retry_safe"] is False
     first_call_count = len(fake.calls)
 
     await approvals.approve_recommendation(

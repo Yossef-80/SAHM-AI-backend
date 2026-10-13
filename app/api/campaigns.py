@@ -8,8 +8,6 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import Settings
-
 from app.ai.marketing.meta_ads import (
     HttpMetaGraphClient,
     MetaAdPlanSettings,
@@ -18,18 +16,22 @@ from app.ai.marketing.meta_ads import (
     create_meta_ad_plan_draft,
     resolve_meta_connection,
 )
-from app.core.errors import ValidationFailed
-from app.core.campaigns.service import generate_campaign_strategy_draft
-from app.schemas.common import ApiModel
+from app.ai.marketing.meta_ads_mcp import MetaAdsMcpClient, MetaAdsMcpError
+from app.ai.marketing.meta_plan_assist import MetaPlanAssistError, assist_meta_ad_plan
 from app.api.deps import (
     AuthDep,
+    LLMDep,
     SessionDep,
     SettingsDep,
     WorkspaceDep,
     assert_owned,
     require_role,
 )
-from app.db.models import Campaign as CampaignRow, Creative, Insight, Recommendation
+from app.config import Settings
+from app.core.campaigns.service import generate_campaign_strategy_draft
+from app.core.errors import ValidationFailed
+from app.db.models import Campaign as CampaignRow
+from app.db.models import Creative, Insight, Recommendation
 from app.schemas.campaigns import (
     Campaign,
     CampaignCreateRequest,
@@ -38,7 +40,10 @@ from app.schemas.campaigns import (
     CampaignStrategyGenerationRequest,
     CampaignUpdateRequest,
     GeneratedCampaignStrategy,
+    MetaAdPlanAssistRequest,
+    MetaAdPlanAssistResponse,
 )
+from app.schemas.common import ApiModel
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -249,6 +254,42 @@ async def create_meta_ad_plan(
         status=recommendation.status,
         message="Plan saved locally. No Meta request has been made.",
     )
+
+
+@router.post("/meta-ad-plan/assist", response_model=MetaAdPlanAssistResponse)
+async def assist_meta_ad_plan_draft(
+    payload: MetaAdPlanAssistRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+    principal: AuthDep,
+    settings: SettingsDep,
+    llm: LLMDep,
+) -> MetaAdPlanAssistResponse:
+    """Use LLM + read-only Meta MCP to prepare editable wizard suggestions.
+
+    The MCP client is allowlisted to ``ads_get_field_context`` only. This route
+    does not write to the database or Meta; the existing Graph API approval
+    flow remains the only path that creates paused Meta entities.
+    """
+    await require_role(principal, settings, ws, minimum="member")
+    connection = await resolve_meta_connection(db, ws.business_id, settings)
+    if not connection.access_token:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Connect Meta before using the campaign assistant. Meta Ads MCP also "
+                "requires ads_mcp_management plus ads_read or ads_management. "
+                "Do not paste an access token into chat."
+            ),
+        )
+    try:
+        async with MetaAdsMcpClient(connection.access_token) as mcp:
+            return await assist_meta_ad_plan(llm=llm, mcp=mcp, request=payload)
+    except MetaAdsMcpError as exc:
+        status_code = 409 if exc.status_code in {401, 403} else 502
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except MetaPlanAssistError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/strategy", response_model=GeneratedCampaignStrategy)
