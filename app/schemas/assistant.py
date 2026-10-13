@@ -29,6 +29,11 @@ class MessageContext(ApiModel):
     business_id: str | None = None
     competitor_id: str | None = None
     competitor_name: str | None = None
+    #: Images uploaded with this turn (``POST /assistant/attachments``). They are
+    #: shown to the model as multimodal content for *this* turn only and are
+    #: never persisted into the conversation's sticky context -- re-attaching a
+    #: photo to every later turn would silently multiply the token bill.
+    attachment_ids: list[str] | None = Field(default=None, max_length=4)
 
 
 class AssistantAnswer(ApiModel):

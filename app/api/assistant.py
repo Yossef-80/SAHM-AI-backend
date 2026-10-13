@@ -7,6 +7,7 @@ import json
 
 from fastapi import APIRouter, BackgroundTasks, Response
 from fastapi.responses import StreamingResponse
+from pydantic import Field
 
 from app.ai.tools.ad_previews import AdPreviewNotFoundError, read_ad_preview
 from app.api.deps import (
@@ -18,7 +19,8 @@ from app.api.deps import (
     SettingsDep,
     WorkspaceDep,
 )
-from app.core.errors import NotFoundError
+from app.core.chat_attachments import store_chat_attachment
+from app.core.errors import NotFoundError, ValidationFailed
 from app.core.logging import get_logger
 from app.core.orchestrator.service import (
     get_conversation,
@@ -32,6 +34,7 @@ from app.schemas.assistant import (
     ConversationDetail,
     ConversationSummary,
 )
+from app.schemas.common import ApiModel
 
 logger = get_logger(__name__)
 
@@ -158,6 +161,44 @@ async def post_message(
         request_id=request_id,
     )
     return resp
+
+
+class ChatAttachmentRequest(ApiModel):
+    """One image the user attached to the message they are about to send."""
+
+    image_data: str = Field(min_length=16, max_length=12_000_000)
+    source_name: str | None = Field(default=None, max_length=160)
+
+
+class ChatAttachmentResponse(ApiModel):
+    id: str
+    name: str
+    mime: str
+    created_at: str | None = None
+
+
+@router.post("/attachments", response_model=ChatAttachmentResponse)
+async def upload_chat_attachment(
+    payload: ChatAttachmentRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+) -> ChatAttachmentResponse:
+    """Store a chat image and return the id to send with the message.
+
+    Deliberately *not* ``/creatives/analyze-reference``: attaching a photo to a
+    chat is not a request to run Layla's creative workflow, and the old behaviour
+    (analyse on upload, then switch the composer into creative mode) is exactly
+    what users complained about. Analysis stays available as an explicit action.
+    """
+    if not payload.image_data.strip().startswith("data:image/"):
+        raise ValidationFailed("attachment must be an inline image data URL")
+    stored = await store_chat_attachment(
+        db,
+        business_id=ws.business_id,
+        image_data=payload.image_data,
+        source_name=payload.source_name,
+    )
+    return ChatAttachmentResponse(**stored)
 
 
 @router.post("/message/stream")

@@ -110,6 +110,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     for message in verify_runtime_security(settings):
         _logger.warning("insecure_runtime_configuration", extra={"detail": message})
     register_all()
+    # Token accounting writer. Every LLM call anywhere in the process queues a
+    # usage delta; this task is what turns those deltas into ``usage_records``
+    # rows, on its own session, so the request transaction is never involved.
+    from app.core.ai_usage import start_usage_writer
+
+    start_usage_writer()
     if settings.environment == "prod":
         # Never issue DDL at boot in production: the schema is whatever the
         # last ``alembic upgrade head`` left, and three replicas racing
@@ -139,6 +145,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         },
     )
     yield
+    from app.core.ai_usage import stop_usage_writer
+
+    await stop_usage_writer()
     await close_clients()
     await dispose_engine()
     _logger.info("app_stopped")

@@ -420,6 +420,12 @@ async def handle_message(
         context.update({k: v for k, v in supplied_context.items() if v is not None})
     if request.persona_id:
         context["persona_id"] = request.persona_id
+    # Attachments live for exactly one turn. Pulled out *before* the context is
+    # persisted, otherwise the same photo would be re-sent to the model on every
+    # later turn of the conversation and quietly multiply the token bill.
+    turn_attachment_ids = [
+        str(item) for item in (context.pop("attachment_ids", None) or []) if str(item).strip()
+    ]
     # Assign a *copy*. A plain JSON column is not mutation-tracked, so handing the
     # row the working dict makes that same object the ORM's committed-state
     # baseline; every later in-place mutation silently mutates the baseline too,
@@ -554,6 +560,18 @@ async def handle_message(
             "style": style,
         }
 
+    # Images attached to *this* message. Loaded here (bytes never live in the
+    # conversation context) so the AI layer can show them to a vision-capable
+    # chat model without the creative-reference workflow being involved.
+    if turn_attachment_ids:
+        from app.core.chat_attachments import load_chat_attachments
+
+        attachments = await load_chat_attachments(
+            db, business_id=business.id, ids=turn_attachment_ids
+        )
+        if attachments:
+            ai_context["chat_attachments"] = attachments
+
     # Load Active Plans separately from BrandMemoryItem (PLANS ONLY)
     plan_item = await db.scalar(
         select(BrandMemoryItem.text)
@@ -584,26 +602,31 @@ async def handle_message(
 
     # LANGGRAPH UI BLOCKS OVERRIDE
     from app.ai.agents.orchestrator.brain import orchestrate
-    final_gui = await orchestrate(
-        routed_message, 
-        history, 
-        event_queue, 
-        user_context=user_context,
-        conversation_summary=conv_summary,
-        active_plans=active_plans,
-        business_id=business.id,
-        workspace_id=business.workspace_id or "",
-        conversation_id=conversation.id,
-        request_id=request_id,
-        db=db,
-        core_llm=llm,
-        fast_llm=fast_llm,
-        context=ai_context,
-        forced_agent=request.persona_id or context.get("persona_id"),
-        language=request.language,
-        ad_flow_selection=ad_flow_selection,
-        ad_tool_context_factory=_ad_tool_context_factory,
-    )
+    from app.core.ai_usage import usage_action
+
+    with usage_action(
+        "chat.turn", persona_id=str(request.persona_id or context.get("persona_id") or "") or None
+    ):
+        final_gui = await orchestrate(
+            routed_message,
+            history,
+            event_queue,
+            user_context=user_context,
+            conversation_summary=conv_summary,
+            active_plans=active_plans,
+            business_id=business.id,
+            workspace_id=business.workspace_id or "",
+            conversation_id=conversation.id,
+            request_id=request_id,
+            db=db,
+            core_llm=llm,
+            fast_llm=fast_llm,
+            context=ai_context,
+            forced_agent=request.persona_id or context.get("persona_id"),
+            language=request.language,
+            ad_flow_selection=ad_flow_selection,
+            ad_tool_context_factory=_ad_tool_context_factory,
+        )
     next_prompt_stage = getattr(final_gui, "creative_prompt_stage", None) if final_gui else None
     if final_gui and getattr(final_gui, "creative_prompt_workflow", False):
         context["workflow"] = "creative_prompt"

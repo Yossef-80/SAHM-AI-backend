@@ -394,3 +394,150 @@
 2026-10-12 00:23:53 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
 2026-10-12 00:23:54 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
 2026-10-12 00:23:54 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:07:25 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:07:25 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=4
+2026-10-13 13:07:27 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=1703 input_tokens=1539 output_tokens=56 tool_calls=1
+2026-10-13 13:07:27 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:07:27 | INFO    | provider.llm | llm_started | agent='nour' model='gemini-3.5-flash-lite' node='agent' messages=3
+2026-10-13 13:07:28 | INFO    | provider.llm | llm_finished | agent='nour' model='gemini-3.5-flash-lite' duration_ms=1201 input_tokens=3605 output_tokens=21 tool_calls=1
+2026-10-13 13:07:28 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:07:28 | INFO    | provider.llm | llm_started | agent='nour' model='gemini-3.5-flash-lite' node='agent' messages=5
+2026-10-13 13:07:30 | INFO    | provider.llm | llm_finished | agent='nour' model='gemini-3.5-flash-lite' duration_ms=1543 input_tokens=3695 output_tokens=19 tool_calls=1
+2026-10-13 13:07:30 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:07:30 | INFO    | provider.llm | llm_started | agent='nour' model='gemini-3.5-flash-lite' node='agent' messages=7
+2026-10-13 13:07:33 | INFO    | provider.llm | llm_finished | agent='nour' model='gemini-3.5-flash-lite' duration_ms=3790 input_tokens=3781 output_tokens=741 tool_calls=1
+2026-10-13 13:07:54 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:07:56 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:09:06 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:09:48 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:09:48 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=5
+2026-10-13 13:09:49 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=1130 input_tokens=4229 output_tokens=14 tool_calls=1
+2026-10-13 13:09:49 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:09:49 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=7
+2026-10-13 13:09:51 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=2013 input_tokens=4711 output_tokens=118 tool_calls=1
+2026-10-13 13:09:53 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:10:11 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:10:14 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:10:33 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:10:33 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=4
+2026-10-13 13:10:34 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=1538 input_tokens=3747 output_tokens=131 tool_calls=0
+2026-10-13 13:10:53 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:10:56 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:11:17 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:11:17 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=6
+2026-10-13 13:11:26 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=9625 input_tokens=3988 output_tokens=84 tool_calls=1
+2026-10-13 13:11:46 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:11:55 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:12:09 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:12:20 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:18:45 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:18:51 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:19:15 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:19:15 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:20:24 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:20:24 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:21:59 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:21:59 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=4
+2026-10-13 13:22:04 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=4914 input_tokens=1819 output_tokens=64 tool_calls=1
+2026-10-13 13:22:04 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:22:04 | INFO    | provider.llm | llm_started | agent='nour' model='gemini-3.5-flash-lite' node='agent' messages=3
+2026-10-13 13:22:09 | INFO    | provider.llm | llm_finished | agent='nour' model='gemini-3.5-flash-lite' duration_ms=5132 input_tokens=3885 output_tokens=29 tool_calls=1
+2026-10-13 13:22:09 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:22:09 | INFO    | provider.llm | llm_started | agent='nour' model='gemini-3.5-flash-lite' node='agent' messages=5
+2026-10-13 13:22:17 | INFO    | provider.llm | llm_finished | agent='nour' model='gemini-3.5-flash-lite' duration_ms=8087 input_tokens=3991 output_tokens=39 tool_calls=1
+2026-10-13 13:22:17 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:22:17 | INFO    | provider.llm | llm_started | agent='nour' model='gemini-3.5-flash-lite' node='agent' messages=7
+2026-10-13 13:22:26 | INFO    | provider.llm | llm_finished | agent='nour' model='gemini-3.5-flash-lite' duration_ms=9270 input_tokens=4112 output_tokens=1589 tool_calls=0
+2026-10-13 13:22:46 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 13:22:57 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:23:52 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:23:52 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=4
+2026-10-13 14:23:54 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=1303 input_tokens=1772 output_tokens=61 tool_calls=1
+2026-10-13 14:23:54 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:23:54 | INFO    | provider.llm | llm_started | agent='chat' model='gemini-3.5-flash-lite' node=None messages=4
+2026-10-13 14:23:56 | INFO    | provider.llm | llm_finished | agent='chat' model='gemini-3.5-flash-lite' duration_ms=1815 input_tokens=1364 output_tokens=218 tool_calls=0
+2026-10-13 14:23:56 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:23:56 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.5-flash-lite' node=None messages=2
+2026-10-13 14:23:57 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.5-flash-lite' duration_ms=1676 input_tokens=432 output_tokens=369 tool_calls=1
+2026-10-13 14:24:15 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:24:19 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:24:48 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:24:48 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=6
+2026-10-13 14:24:50 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=1458 input_tokens=2130 output_tokens=66 tool_calls=1
+2026-10-13 14:24:50 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:24:50 | INFO    | provider.llm | llm_started | agent='chat' model='gemini-3.5-flash-lite' node=None messages=6
+2026-10-13 14:24:51 | INFO    | provider.llm | llm_finished | agent='chat' model='gemini-3.5-flash-lite' duration_ms=1459 input_tokens=1722 output_tokens=169 tool_calls=0
+2026-10-13 14:24:51 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:24:51 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.5-flash-lite' node=None messages=2
+2026-10-13 14:24:53 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.5-flash-lite' duration_ms=1356 input_tokens=383 output_tokens=297 tool_calls=1
+2026-10-13 14:25:10 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:25:13 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:27:09 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:27:35 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:27:35 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=8
+2026-10-13 14:27:37 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=1403 input_tokens=2189 output_tokens=66 tool_calls=1
+2026-10-13 14:27:37 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:27:37 | INFO    | provider.llm | llm_started | agent='nour' model='gemini-3.5-flash-lite' node='agent' messages=7
+2026-10-13 14:27:42 | INFO    | provider.llm | llm_finished | agent='nour' model='gemini-3.5-flash-lite' duration_ms=5272 input_tokens=4255 output_tokens=1190 tool_calls=0
+2026-10-13 14:28:01 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:28:05 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:40:41 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:49:10 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:49:10 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=4
+2026-10-13 14:49:12 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=1609 input_tokens=1806 output_tokens=77 tool_calls=1
+2026-10-13 14:49:12 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:49:12 | INFO    | provider.llm | llm_started | agent='chat' model='gemini-3.5-flash-lite' node=None messages=4
+2026-10-13 14:49:14 | INFO    | provider.llm | llm_finished | agent='chat' model='gemini-3.5-flash-lite' duration_ms=2562 input_tokens=1398 output_tokens=352 tool_calls=0
+2026-10-13 14:49:14 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:49:14 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.5-flash-lite' node=None messages=2
+2026-10-13 14:49:16 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.5-flash-lite' duration_ms=2018 input_tokens=566 output_tokens=335 tool_calls=1
+2026-10-13 14:49:33 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:49:37 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:10 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:10 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=6
+2026-10-13 14:50:11 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=1505 input_tokens=2193 output_tokens=63 tool_calls=1
+2026-10-13 14:50:11 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:11 | INFO    | provider.llm | llm_started | agent='chat' model='gemini-3.5-flash-lite' node=None messages=6
+2026-10-13 14:50:13 | INFO    | provider.llm | llm_finished | agent='chat' model='gemini-3.5-flash-lite' duration_ms=1773 input_tokens=1785 output_tokens=221 tool_calls=0
+2026-10-13 14:50:13 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:13 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.5-flash-lite' node=None messages=2
+2026-10-13 14:50:14 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.5-flash-lite' duration_ms=1410 input_tokens=435 output_tokens=288 tool_calls=1
+2026-10-13 14:50:31 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:35 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:58 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:58 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.5-flash-lite' node=None messages=8
+2026-10-13 14:50:59 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.5-flash-lite' duration_ms=1345 input_tokens=2392 output_tokens=70 tool_calls=1
+2026-10-13 14:50:59 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:50:59 | INFO    | provider.llm | llm_started | agent='chat' model='gemini-3.5-flash-lite' node=None messages=8
+2026-10-13 14:51:01 | INFO    | provider.llm | llm_finished | agent='chat' model='gemini-3.5-flash-lite' duration_ms=1646 input_tokens=1984 output_tokens=141 tool_calls=0
+2026-10-13 14:51:01 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:51:01 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.5-flash-lite' node=None messages=2
+2026-10-13 14:51:03 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.5-flash-lite' duration_ms=1902 input_tokens=355 output_tokens=255 tool_calls=1
+2026-10-13 14:51:20 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:51:23 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:51:28 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:51:41 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:51:41 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=5
+2026-10-13 14:51:46 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=5125 input_tokens=5117 output_tokens=630 tool_calls=0
+2026-10-13 14:52:04 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:52:07 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:53:13 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:53:25 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:53:25 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=4
+2026-10-13 14:53:26 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=1026 input_tokens=3885 output_tokens=14 tool_calls=1
+2026-10-13 14:53:26 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:53:26 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=6
+2026-10-13 14:53:28 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.5-flash-lite' duration_ms=1582 input_tokens=4369 output_tokens=113 tool_calls=0
+2026-10-13 14:53:47 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:53:51 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 14:55:46 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 15:01:54 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 15:02:01 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 21:08:03 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 21:08:03 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 21:38:37 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 21:38:37 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.5-flash-lite' node='agent' messages=5
+2026-10-13 21:38:50 | ERROR   | provider.llm | llm_failed | agent='layla' model='gemini-3.5-flash-lite' duration_ms=12079 error="GoogleAPIError: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+2026-10-13 21:39:11 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 21:40:02 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
+2026-10-13 21:41:07 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.5-flash-lite' structured_method='function_calling'
