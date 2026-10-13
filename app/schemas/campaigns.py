@@ -61,3 +61,32 @@ class CampaignDetailResponse(ApiModel):
     creatives: list[dict[str, object]] = Field(default_factory=list)
     recommendations: list[dict[str, object]] = Field(default_factory=list)
     recent_insights: dict[str, object] | None = None
+
+
+class StrategyPhase(ApiModel):
+    name: str
+    durationDays: int
+    focus: str
+
+
+class StrategyKPI(ApiModel):
+    metric: str
+    target: float
+
+
+class CampaignStrategy(ApiModel):
+    summary: str
+    keyMessages: list[str] = Field(default_factory=list)
+    channels: list[str] = Field(default_factory=lambda: ["instagram", "facebook"])
+    placements: list[str] = Field(default_factory=lambda: ["feed", "stories", "reels"])
+    biddingStrategy: str = "lowest_cost"
+    phases: list[StrategyPhase] = Field(default_factory=list)
+    kpis: list[StrategyKPI] = Field(default_factory=list)
+
+
+class GenerateStrategyRequest(ApiModel):
+    objective: str
+    dailyBudget: float
+    audience: dict[str, object] = Field(default_factory=dict)
+    brief: str | None = None
+

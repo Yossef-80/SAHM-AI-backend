@@ -255,6 +255,16 @@ def configure_logging(
         root.removeHandler(existing)
 
     # 1. Console handler
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    if hasattr(sys.stderr, "reconfigure"):
+        try:
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.addFilter(ContextFilter())
     console_handler.setFormatter(JsonFormatter() if as_json else TraceTextFormatter())

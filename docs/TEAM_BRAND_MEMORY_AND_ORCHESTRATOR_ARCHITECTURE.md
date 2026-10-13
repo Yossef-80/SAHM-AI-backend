@@ -65,10 +65,11 @@ CREATE TABLE brand_memory_items (
 );
 ```
 
-### The 6 Core Memory `kind` Categories
+### The 7 Core Memory `kind` Categories
 
 | `kind` Enum | Originating Tool | Contents & Focus | Example Preserved Fact |
 | :--- | :--- | :--- | :--- |
+| `brand_identity` | `BrandIntelligenceAgent` / User Sync | Unified living Brand Identity JSON: palette, essence, audience, SWOT, offers, competitors, gaps. | *"Brand Identity: Nile Roasters Co (Specialty Coffee). Voice: Authentic & friendly. Primary: #2563EB. Competitors: AbuAuf, Bean There."* |
 | `competitor_note` | `analyze_competitor`, `analyze_competitor_creatives` | Competitor market share, price anchors, ad hooks, weaknesses, and counter-positioning. | *"Tie House: Egyptian apparel brand since 1995. Offers 3 shirts for 999 EGP. Vulnerable in video lifestyle storytelling."* |
 | `website_analysis` | `analyze_website` | Conversion rate friction, trust badges, UVPs, and landing page audit notes. | *"Brand UVP: Cold brew on subscription. Friction: Checkout requires 4 steps, lacks ApplePay/ValU."* |
 | `market_research` | `analyze_market`, `analyze_reviews`, `analyze_keywords` | Consumer sentiment scores, recurring customer complaints, keyword demand clusters, and macro trends. | *"High search demand for 'cold brew cairo'. 68% of reviews complain about slow delivery to New Cairo."* |
@@ -270,3 +271,24 @@ AI_LLM_TIMEOUT_SECONDS=180               # Timeout for heavy agent tasks
 OLLAMA_TIMEOUT_SECONDS=1000              # Timeout for local Colab/Ollama tunnels
 DAILY_TOKEN_BUDGET=100000                # Per-workspace daily token spend ceiling
 ```
+
+---
+
+## 10. Autonomous Brand Intelligence Agent & Continuous Identity Sync
+
+### Purpose & Problem Solved
+Traditional setups leave brand configuration as static form fields. If a user tells Nour in Arabic *"We sell specialty cold brew and our colors are gold and deep navy"* during a research session, legacy systems forget this context on the next turn.
+
+The **Brand Intelligence Agent** (`app/core/brand/identity_service.py`) acts as an autonomous background extractor and synchronizer:
+1. **Continuous Corpus Gathering:** Ingests up to 20 recent conversations, all memory facts, and LTM profile summaries without premature character slicing.
+2. **Token-Aware Rolling Memory Compression:**
+   - Evaluates accumulated tokens against `ai_settings.brand_memory_token_limit` (default 10,000 tokens).
+   - If total tokens are within budget, all chat turns and memory facts are preserved in full.
+   - If budget is exceeded, recent conversational turns are retained in full (~4,000 tokens), while older turns are compressed into rolling distilled memory (`_rolling_compress_older_chats` with target 3,000 tokens) and persisted to `Profile.user_context_summary`.
+3. **Strict Preference Priority Rule:**
+   - If the user explicitly requested or confirmed colors (e.g., *"أصفر وبرتقالي قوي"* / *"yellow and orange"*), the extractor strictly enforces the user's choice over default category palettes.
+4. **Competitor Mining & Deduplication:**
+   - Merges existing `BrandProfile.competitors`, memory item `competitor_note` records, and newly detected LLM mentions with case-insensitive deduplication via `_clean_competitor_name()`.
+5. **Orchestrator Proactive Action Cards:**
+   - Intent keywords in chat (e.g., *"الهوية البصرية"*, *"هوية البراند"*, *"brand identity"*, *"ألوان البراند"*) trigger an `ActionCardBlock` with action type `UPDATE_BRAND_PROFILE` directing the user straight to `/brand-identity`.
+

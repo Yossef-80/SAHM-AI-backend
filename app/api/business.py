@@ -22,15 +22,23 @@ from sqlalchemy import select
 
 from app.api.deps import (
     AuthDep,
+    LLMDep,
     SessionDep,
     SettingsDep,
     WorkspaceDep,
     require_role,
 )
+from app.core.brand.identity_service import (
+    get_brand_identity as get_identity_service,
+    sync_brand_identity_from_chats as sync_identity_service,
+    update_brand_identity as update_identity_service,
+)
 from app.core.errors import ValidationFailed
 from app.core.memory.store import BrandMemoryStore
 from app.db.models import BrandProfile as BrandProfileRow
 from app.schemas.business import (
+    BrandIdentityResponse,
+    BrandIdentityUpdateRequest,
     BrandProfile,
     BusinessCreateRequest,
     BusinessProfileResponse,
@@ -196,3 +204,33 @@ async def _profile_response(db, business_id: str) -> BusinessProfileResponse:
     return BusinessProfileResponse(
         business=schema, memory_item_count=count, learning_count=learning_count
     )
+
+
+@router.get("/brand-identity", response_model=BrandIdentityResponse)
+async def get_brand_identity(
+    ws: WorkspaceDep, db: SessionDep
+) -> BrandIdentityResponse:
+    """Retrieve the unified Brand Identity profile (colors, voice, SWOT, audience)."""
+    return await get_identity_service(db, ws.business_id)
+
+
+@router.post("/brand-identity/sync", response_model=BrandIdentityResponse)
+async def sync_brand_identity(
+    ws: WorkspaceDep, db: SessionDep, llm: LLMDep
+) -> BrandIdentityResponse:
+    """Synthesize and update the Brand Identity using insights from all chats and memory."""
+    return await sync_identity_service(db, ws.business_id, llm)
+
+
+@router.patch("/brand-identity", response_model=BrandIdentityResponse)
+async def update_brand_identity(
+    payload: BrandIdentityUpdateRequest,
+    principal: AuthDep,
+    settings: SettingsDep,
+    ws: WorkspaceDep,
+    db: SessionDep,
+) -> BrandIdentityResponse:
+    """Manually update specific fields of the Brand Identity."""
+    await require_role(principal, settings, ws, minimum=WRITE_PROFILE)
+    return await update_identity_service(db, ws.business_id, payload)
+

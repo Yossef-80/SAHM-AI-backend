@@ -218,6 +218,42 @@ async def _persist_content_calendar_posts(business_id: str, posts: list[dict[str
         logger.error("failed_to_persist_content_calendar_posts", extra={"error": str(exc), "business_id": business_id})
 
 
+async def _persist_campaign_draft(business_id: str, campaign_data: dict[str, Any]) -> str | None:
+    """Save generated campaign strategy into the Campaign table as draft."""
+    try:
+        import uuid
+        import json
+        from datetime import datetime, timezone
+        from app.db.models import Campaign
+        from app.db.session import session_scope
+
+        cid = f"cmp_{uuid.uuid4().hex[:20]}"
+        big_idea = campaign_data.get("big_idea") or "Integrated Growth Campaign"
+        objective = campaign_data.get("objective") or "sales"
+        budget = float(campaign_data.get("budget") or 15000.0)
+
+        async with session_scope() as session:
+            c = Campaign(
+                id=cid,
+                business_id=business_id,
+                name=f"{big_idea[:100]}",
+                status="draft",
+                objective=objective,
+                channel="instagram, facebook",
+                budget=budget,
+                currency="EGP",
+                target_audience=str(campaign_data.get("target_audience") or "Core Target Audience"),
+                notes=json.dumps(campaign_data, ensure_ascii=False),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(c)
+        return cid
+    except Exception as exc:
+        logger.error("failed_to_persist_campaign_draft", extra={"error": str(exc), "business_id": business_id})
+        return None
+
+
 async def orchestrate(
     prompt: str, 
     history: list[dict[str, Any]], 
@@ -280,6 +316,64 @@ async def orchestrate(
     }
     
     collected_evidence: list[dict[str, Any]] = []
+    cal_saved_posts: int = 0
+    camp_saved_data: dict[str, Any] | None = None
+    brand_saved_data: dict[str, Any] | None = None
+    competitors_saved: list[str] = []
+
+    # Detect user intent to update or synchronize brand identity / profile
+    brand_update_patterns = [
+        "حدث معلومات البراند", "تحديث معلومات البراند", "حدث البراند", "تحديث البراند",
+        "غير الوان البراند", "تغيير الوان البراند", "عدل البراند", "تعديل البراند",
+        "احفظ في البراند", "احفظ البراند", "حفظ الهوية", "حدث الهوية", "تحديث الهوية",
+        "غير الهوية", "الوان الهوية", "ألوان الهوية",
+        "update brand", "sync brand", "update brand identity", "change brand colors",
+        "save to brand", "update my brand",
+    ]
+    if business_id and any(p in prompt.lower() for p in brand_update_patterns):
+        try:
+            from app.db.session import session_scope
+            from app.core.brand.identity_service import sync_brand_identity_from_chats
+            async with session_scope() as session:
+                synced_id = await sync_brand_identity_from_chats(session, business_id)
+                brand_saved_data = {
+                    "name": synced_id.name,
+                    "primary": synced_id.colors.primary,
+                    "accent": synced_id.colors.accent,
+                    "palette": synced_id.colors.palette,
+                }
+        except Exception as exc:
+            logger.error("failed_to_sync_brand_identity_in_chat", extra={"error": str(exc), "business_id": business_id})
+
+    # Detect competitor queries/mentions in the prompt to auto-record in Brand Identity
+    prompt_competitors: list[str] = []
+    for match in re.findall(r"@([^\s,،]+)", prompt):
+        cleaned_m = match.strip().strip("'\"")
+        if cleaned_m.lower() not in ("nour", "omar", "salma", "layla", "karim", "sahm", "researcher", "web_analyzer", "gap_analysis", "reviews"):
+            prompt_competitors.append(cleaned_m)
+
+    for match in re.findall(r"(?:منافس(?:نا)?|ابحث عن منافس|حلل منافس|مقارنة مع)\s+([^\n,،.?؟]+)", prompt):
+        cleaned_m = match.strip().strip("'\"")
+        words = cleaned_m.split()
+        if words:
+            candidate = " ".join(words[:3]).strip()
+            if len(candidate) >= 2:
+                prompt_competitors.append(candidate)
+
+    if "بن النجار" in prompt or "النجار" in prompt:
+        prompt_competitors.append("بن النجار")
+    if "ابو عوف" in prompt or "أبو عوف" in prompt or "abu auf" in prompt.lower():
+        prompt_competitors.append("أبو عوف (Abu Auf)")
+
+    if business_id and prompt_competitors:
+        try:
+            from app.db.session import session_scope
+            from app.core.brand.identity_service import record_competitors
+            async with session_scope() as session:
+                await record_competitors(session, business_id, prompt_competitors)
+                competitors_saved.extend(prompt_competitors)
+        except Exception as exc:
+            logger.error("failed_to_persist_prompt_competitors", extra={"error": str(exc), "business_id": business_id})
 
     def _extract_evidence_from_msgs(msgs: list[Any]) -> None:
         for msg in msgs:
@@ -332,6 +426,38 @@ async def orchestrate(
                 cal_data = final_state.get("content_calendar")
                 if isinstance(cal_data, dict) and cal_data.get("posts"):
                     await _persist_content_calendar_posts(business_id, cal_data["posts"])
+                    cal_saved_posts = len(cal_data["posts"])
+                camp_data = final_state.get("campaign")
+                if isinstance(camp_data, dict):
+                    await _persist_campaign_draft(business_id, camp_data)
+                    camp_saved_data = camp_data
+
+            if current_agent in ("nour", "karim") and business_id:
+                found_competitors: list[str] = []
+                for m in final_state.get("messages", []):
+                    for tc in getattr(m, "tool_calls", None) or []:
+                        t_name = tc.get("name", "")
+                        t_args = tc.get("args") or {}
+                        if t_name == "submit_research_report":
+                            for comp in t_args.get("competitor_summary") or []:
+                                if isinstance(comp, dict):
+                                    b_name = comp.get("brand") or comp.get("name")
+                                    if b_name:
+                                        found_competitors.append(str(b_name))
+                        elif t_name == "fetch_competitor_ads":
+                            c_name = t_args.get("competitor_name")
+                            if c_name:
+                                found_competitors.append(str(c_name))
+
+                if found_competitors:
+                    try:
+                        from app.db.session import session_scope
+                        from app.core.brand.identity_service import record_competitors
+                        async with session_scope() as session:
+                            await record_competitors(session, business_id, found_competitors)
+                            competitors_saved.extend(found_competitors)
+                    except Exception as exc:
+                        logger.error("failed_to_persist_competitors_from_nour", extra={"error": str(exc), "business_id": business_id})
 
             msgs = final_state.get("messages", [])
             _extract_evidence_from_msgs(msgs)
@@ -377,11 +503,25 @@ async def orchestrate(
             detail = "Answering follow-up question..." if decision.agent == "chat" else "Answering general question..."
             await event_queue.put({"type": "step_started", "step": "chat", "detail": detail})
         general_llm = get_llm(provider=ai_settings.llm_provider).chat
+        brand_sync_note = ""
+        if brand_saved_data:
+            brand_sync_note = (
+                f"\nIMPORTANT ACTION COMPLETED: The brand profile has just been successfully synchronized and updated in the database. "
+                f"Brand name: {brand_saved_data['name']}. Primary color: {brand_saved_data['primary']}, Accent color: {brand_saved_data['accent']}. "
+                f"Confirm to the user clearly that their brand identity and colors have been successfully saved to their profile and the Brand Identity Hub."
+            )
+        navigation_hint = (
+            "\nNAVIGATION RULES: "
+            "If the user asks about viewing, seeing, or checking their Brand Identity, profile, colors, or competitors, direct them clearly and include the markdown link [الهوية البصرية](/brand-identity). "
+            "If the user asks about their Token Usage, spend, or quota, direct them clearly and include the markdown link [صفحة الاستهلاك والحصة](/settings/usage)."
+        )
         sys_msg = SystemMessage(content=(
             "You are a fast, conversational AI assistant. You will be provided with the conversation history and Brand Facts for context. "
             "CRITICAL: Do NOT re-answer previous questions. ONLY answer the user's latest question. Do not use tools.\n"
             "OUTPUT CONTRACT: Answer the question factually and stop. STRONGLY PROHIBITED: inventing or pitching marketing strategies, campaigns, budgets, or next actions the user did not ask for.\n"
             f"LANGUAGE CONTRACT: You MUST answer strictly in {'Arabic' if query_language == 'ar' else 'English'} to match the user's prompt language."
+            f"{brand_sync_note}"
+            f"{navigation_hint}"
         ))
         fallback_res = await general_llm.ainvoke([sys_msg] + chat_history + [HumanMessage(content=f"Context from previous turns is provided above. \n\nNow, answer this NEW question: {prompt}")])
         final_msg = str(fallback_res.content)
@@ -421,4 +561,111 @@ async def orchestrate(
                         extra={"title": finding.title, "agent": decision.agent},
                     )
 
+    if cal_saved_posts > 0 and not any(getattr(b, "type", "") == "action_card" for b in structured.blocks):
+        from app.schemas.blocks import ActionCardBlock
+        structured.blocks.append(
+            ActionCardBlock(
+                title="تم جدولة المنشورات في التقويم بنجاح" if query_language == "ar" else "Content Calendar Scheduled Successfully",
+                description=f"تم حفظ {cal_saved_posts} منشور في جدول المحتوى الخاص بك مع المواعيد والقنوات المقترحة." if query_language == "ar" else f"Successfully scheduled {cal_saved_posts} posts to your marketing calendar.",
+                actions=[{
+                    "type": "GENERATE_CONTENT_CALENDAR",
+                    "label": "عرض في التقويم (Calendar)" if query_language == "ar" else "View in Calendar",
+                    "payload": {}
+                }]
+            )
+        )
+
+    if camp_saved_data and not any(getattr(b, "type", "") == "action_card" for b in structured.blocks):
+        from app.schemas.blocks import ActionCardBlock
+        idea = camp_saved_data.get("big_idea") or ("حملة تسويقية جديدة" if query_language == "ar" else "New Marketing Campaign")
+        budget_val = float(camp_saved_data.get("budget") or 15000.0)
+        daily_b = round(budget_val / 30.0, 2)
+        structured.blocks.append(
+            ActionCardBlock(
+                title=f"خطة الحملة جاهزة: {idea}" if query_language == "ar" else f"Campaign Strategy Ready: {idea}",
+                description="تم حفظ مسودة الحملة وتوزيع ميزانية القنوات. يمكنك مراجعتها وتعديلها وإطلاقها بنقرة واحدة." if query_language == "ar" else "Campaign draft prepared with channel budget shares. 1-click ready to review and launch.",
+                actions=[{
+                    "type": "CREATE_CAMPAIGN",
+                    "label": "مراجعة وإطلاق الحملة الآن" if query_language == "ar" else "Review & Launch Campaign",
+                    "payload": {
+                        "prefill": {
+                            "name": idea,
+                            "objective": camp_saved_data.get("objective", "sales"),
+                            "dailyBudget": daily_b if daily_b > 0 else 500,
+                            "currency": "EGP",
+                            "durationDays": 30,
+                            "audience": {"name": str(camp_saved_data.get("target_audience") or "الجمهور المستهدف")}
+                        }
+                    }
+                }]
+            )
+        )
+
+    brand_view_patterns = [
+        "الهوية البصرية", "هوية البراند", "صفحة الهوية", "بروفايل البراند", "ملف البراند",
+        "عرض الهوية", "وريني الهوية", "افتح الهوية", "شوف الهوية", "وريني البراند",
+        "brand identity", "brand profile", "view brand", "show brand", "identity hub",
+    ]
+    usage_patterns = [
+        "الاستهلاك", "استهلاك التوكنز", "صفحة الاستهلاك", "الحصة", "الكوتا", "التوكنز",
+        "باقي كام توكنز", "كام توكن", "معدل الحرق", "وريني الاستهلاك", "افتح الاستهلاك",
+        "usage", "quota", "token spend", "tokens left", "burn rate", "view usage",
+    ]
+
+    if any(p in prompt.lower() for p in usage_patterns) and not any(getattr(b, "type", "") == "action_card" for b in structured.blocks):
+        from app.schemas.blocks import ActionCardBlock
+        structured.blocks.append(
+            ActionCardBlock(
+                title="متابعة الاستهلاك والحصة" if query_language == "ar" else "Usage & Quota Monitoring",
+                description=(
+                    "يمكنك متابعة استهلاك الرموز (Tokens) اليوم والشهر ومعدل الحرق المتبقي وتفاصيل الحصة من صفحة الاستهلاك."
+                    if query_language == "ar" else
+                    "Track your daily and monthly token consumption, burn rate, and quota allocation on the Usage page."
+                ),
+                actions=[{
+                    "type": "VIEW_USAGE",
+                    "label": "عرض صفحة الاستهلاك (Usage)" if query_language == "ar" else "View Usage & Quota",
+                    "payload": {}
+                }]
+            )
+        )
+
+    if (brand_saved_data or competitors_saved or any(p in prompt.lower() for p in brand_view_patterns)) and not any(getattr(b, "type", "") == "action_card" for b in structured.blocks):
+        from app.schemas.blocks import ActionCardBlock
+        if brand_saved_data:
+            b_title = "تم تحديث الهوية البصرية للبراند بنجاح" if query_language == "ar" else "Brand Identity Updated Successfully"
+            b_desc = (
+                f"تم تحديث الألوان للبراند (الأساسي: {brand_saved_data['primary']}، التمييزي: {brand_saved_data['accent']}) وتحديث ملف الهوية في النظام."
+                if query_language == "ar" else
+                f"Updated brand colors ({brand_saved_data['primary']} / {brand_saved_data['accent']}) and updated your brand identity hub."
+            )
+        elif competitors_saved:
+            comp_list = "، ".join(competitors_saved[:3])
+            b_title = "تم تحديث قسم المنافسين في الهوية البصرية" if query_language == "ar" else "Competitors Updated in Brand Identity"
+            b_desc = (
+                f"تم تسجيل المنافسين ({comp_list}) تلقائياً وحفظهم في قسم المنافسين بملف الهوية البصرية الخاص بك."
+                if query_language == "ar" else
+                f"Competitors ({comp_list}) have been recorded into your Brand Identity profile."
+            )
+        else:
+            b_title = "الهوية البصرية والملف التعريفي للبراند" if query_language == "ar" else "Brand Identity & Profile Hub"
+            b_desc = (
+                "يمكنك استعراض لوحة الألوان المعتمدة، نبرة الصوت، الجمهور المستهدف، والمنافسين المسجلين في أي وقت."
+                if query_language == "ar" else
+                "Review your verified brand color palette, tone of voice, target audience, and tracked competitors."
+            )
+
+        structured.blocks.append(
+            ActionCardBlock(
+                title=b_title,
+                description=b_desc,
+                actions=[{
+                    "type": "UPDATE_BRAND_PROFILE",
+                    "label": "عرض الهوية البصرية (Brand Identity)" if query_language == "ar" else "View Brand Identity Hub",
+                    "payload": {"tab": "identity"}
+                }]
+            )
+        )
+
     return structured
+

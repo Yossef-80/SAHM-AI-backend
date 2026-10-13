@@ -11,6 +11,7 @@
 | :--- | :--- | :--- | :--- |
 | **Autonomous Research Hub** | `/research` | Nour (نور) | 9 real-time tools, ground-truth entity validation, live web search, URL scraping, review extraction, competitor ad audit. |
 | **Multi-Agent Assistant Chat** | `/assistant`, `/assistant/[id]` | Orchestrator, Nour, Omar, Layla, Karim, Salma, Chat | Real-time SSE streaming, automatic intent routing, Generative UI Blocks (`text`, `findings`, `action_card`). |
+| **Brand Identity & Strategy Hub** | `/brand-identity` | Brand Intelligence Agent, Central Brain | Living brand profile: color palette tokens, essence (voice/tagline/archetype), target audience, SWOT analysis, tracked competitors, 1-click chat sync. |
 | **Content Calendar & Scheduler** | `/calendar` | Omar (عمر) | Automated multi-day post generation (concepts, hooks, captions, hashtags), channel/format filters, auto-saved to DB. |
 | **Paid Ad Campaigns Hub** | `/campaigns`, `/campaigns/[id]` | Omar, Salma | Multi-channel campaign structures (Meta, TikTok, Google), budget tracking, linked creatives and recommendations. |
 | **Creatives Studio** | `/creatives` | Layla (ليلى) | Direct-response ad copy, 3-second video hooks, commercial storyboards, reference image style extraction, image prompt generation. |
@@ -89,7 +90,56 @@ An interactive conversational interface where business owners collaborate with t
 
 ---
 
-## 4. Feature 3: Automated Content Calendar & Scheduler (`/calendar`)
+## 4. Feature 3: Unified Brand Identity & Strategy Hub (`/brand-identity`)
+
+### What It Does
+The Brand Identity & Strategy Hub provides a living, centralized source of truth for the brand's visual identity, strategic essence, audience definition, competitive landscape, and market opportunities. Instead of treating brand assets as static settings, SAHM's autonomous **Brand Intelligence Agent** dynamically synthesizes, updates, and synchronizes the brand identity across all conversations, research reports, and memory facts.
+
+### Key Capabilities & What It Offers:
+1. **Interactive Brand Visual Tokens & Palette:**
+   - Visual swatch cards for **Primary Color**, **Secondary Color**, and **Accent Color**.
+   - Curated 5-color palette tailored to the brand's industry and explicit user selections.
+   - 1-click **Copy Hex** utility with instant clipboard feedback.
+2. **Brand Essence & Strategic Positioning:**
+   - **Tagline / Slogan:** Punchy, high-recall slogan crafted for the brand's category.
+   - **Mission & Vision Statements:** Long-term brand purpose and operational goals.
+   - **Brand Voice & Personality:** Verified tone guidelines injected into every creative agent (e.g. Layla, Omar).
+   - **Tone Keywords:** Core emotional anchors (e.g. *"Authentic"*, *"Artisanal"*, *"Direct"*, *"Reliable"*).
+   - **Brand Archetype:** Strategic positioning archetype (e.g. *"The Craftsman & Explorer"*).
+3. **Verified Target Audience Profile:**
+   - **Executive Summary:** Core demographic and behavioral persona.
+   - **Demographics & Geography:** Age groups, metropolitan locations (Cairo, Alexandria, Giza), income brackets.
+   - **Customer Pain Points:** Exact frustrations customers experience with commercial alternatives.
+   - **Customer Goals & Motivations:** Desired outcomes driving purchasing decisions.
+4. **Living SWOT Analysis:**
+   - **Strengths:** Internal advantages, proprietary formulas, fresh fulfillment guarantees.
+   - **Weaknesses:** Early-stage retail distribution limits, supply chain challenges.
+   - **Opportunities:** Untapped subscription models, Arabic-first video storytelling, local partnerships.
+   - **Threats:** Currency fluctuation risks, price wars from mass commercial brands.
+5. **Key Product Offers & Tracked Competitors:**
+   - Direct inventory of flagship product lines, bundles, and promotions.
+   - Auto-curated and deduplicated list of competitors mined from user research and chat history.
+   - Identification of market gaps and whitespace opportunities to seize.
+6. **1-Click Sync from Chats & Research:**
+   - The user clicks **"Sync from Chats & Research"** to invoke `BrandIntelligenceAgent`.
+   - Analyzes recent conversational turns in full, applies token-aware rolling memory compression on older history, extracts new facts via LLM, and persists the updated profile to both the database and long-term memory.
+7. **Full In-Place Editing Modal:**
+   - Marketers can click **"Edit Profile"** to manually refine colors, tagline, tone of voice, audience traits, and competitor lists.
+   - Changes are saved immediately via `PATCH /api/v1/business/brand-identity` and reflected in all future agent executions.
+8. **Home Page Brand Identity Banner:**
+   - Prominently featured on the main dashboard (`/`) via `BrandIdentityBanner`, displaying real-time brand name, niche badge, slogan, color preview swatches, and a quick launch button to the Hub.
+9. **Orchestrator Proactive Action Card:**
+   - When users discuss brand colors, identity, or competitor positioning in chat, the Orchestrator emits an interactive `UPDATE_BRAND_PROFILE` Action Card providing 1-click navigation to the Hub.
+
+### Backend Architecture & Endpoints:
+- `GET /api/v1/business/brand-identity` — Retrieves the unified brand identity profile.
+- `POST /api/v1/business/brand-identity/sync` — Synthesizes and syncs identity from active chats and memory facts.
+- `PATCH /api/v1/business/brand-identity` — Granularly updates identity fields with immediate memory and database synchronization.
+- **Service Layer:** `app/core/brand/identity_service.py` (`BrandIntelligenceAgent`).
+
+---
+
+## 5. Feature 4: Automated Content Calendar & Scheduler (`/calendar`)
 
 ### What It Does
 A dynamic content scheduling dashboard that plans and organizes a brand's social media and marketing content across multiple platforms and dates.

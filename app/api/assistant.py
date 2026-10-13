@@ -98,6 +98,28 @@ async def _post_turn_memory_background(
             },
         )
 
+    # 3. Dedicated Brand & Dashboard Intelligence Agent (updates brand identity & profile in background on every chat)
+    try:
+        from app.core.brand.identity_service import brand_intelligence_agent
+        async with session_scope() as bg_db:
+            await brand_intelligence_agent.sync_brand_identity(bg_db, business_id)
+        logger.info(
+            "post_turn_brand_intelligence_synced",
+            extra={
+                "business_id": business_id,
+                "request_id": bg_req_id,
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "post_turn_brand_intelligence_failed",
+            extra={
+                "business_id": business_id,
+                "request_id": bg_req_id,
+                "error": str(exc),
+            },
+        )
+
 
 @router.post("/message", response_model=AssistantMessageResponse)
 async def post_message(

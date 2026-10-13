@@ -148,42 +148,28 @@ def _gate_campaign_action_cards(
             )
 
             if is_create_campaign:
-                if not has_campaign_intent:
+                if not has_campaign_intent and not user_confirmed:
                     _logger.warning(
                         "create_campaign_card_stripped",
                         extra={"reason": "missing_campaign_intent", "user_message": user_message[:80]}
                     )
                     continue
 
-                if not user_confirmed:
-                    _logger.warning(
-                        "create_campaign_card_stripped",
-                        extra={"reason": "unconfirmed_by_user", "user_message": user_message[:80]}
-                    )
-                    continue
+                # Ensure prefill has sane defaults so user can immediately launch or review
+                actions = block.get("actions") or []
+                for act in actions:
+                    if act.get("type") in ("CREATE_CAMPAIGN", "create_campaign"):
+                        act_payload = act.get("payload") or {}
+                        prefill = act_payload.get("prefill") or {}
+                        if not prefill.get("dailyBudget"):
+                            prefill["dailyBudget"] = business_budget or 500
+                        if not prefill.get("currency"):
+                            prefill["currency"] = "EGP"
+                        if not prefill.get("objective"):
+                            prefill["objective"] = "sales"
+                        act_payload["prefill"] = prefill
+                        act["payload"] = act_payload
 
-                if not all_fields_known:
-                    missing = []
-                    if not has_budget:
-                        missing.append("budget")
-                    if not has_objective:
-                        missing.append("objective")
-                    if not has_audience:
-                        missing.append("audience")
-                    _logger.warning(
-                        "create_campaign_card_replaced_with_question",
-                        extra={"reason": f"missing_fields: {','.join(missing)}"}
-                    )
-                    gated_blocks.append({
-                        "type": "question_with_options",
-                        "question": "To proceed with creating the campaign, please clarify the following missing details: " + ", ".join(missing),
-                        "options": [
-                            {"id": "opt_details", "label": "Provide missing campaign details", "payload": {"missing": missing}}
-                        ],
-                        "missing_info": missing,
-                        "allow_free_text": True,
-                    })
-                    continue
 
         gated_blocks.append(block)
 

@@ -174,6 +174,10 @@ All endpoints are hosted under `/api/v1/` and enforce CORS, rate limiting, and r
 | **Content** | `POST` | `/content/generate` | `GenerateContentCalendarRequest` (month, posts_per_week, channels) | `list[ContentItemOut]` |
 | **Content** | `PATCH` | `/content/{id}` | `UpdateContentItemRequest` (date, time, status, caption) | `ContentItemOut` |
 | **Content** | `DELETE`| `/content/{id}` | — | `{"status": "deleted"}` |
+| **Brand Identity**| `GET` | `/business/brand-identity` | — | `BrandIdentityResponse` (colors, essence, audience, SWOT, offers, competitors) |
+| **Brand Identity**| `POST` | `/business/brand-identity/sync` | `{}` | `BrandIdentityResponse` (synthesizes profile from all chats & memory) |
+| **Brand Identity**| `PATCH` | `/business/brand-identity` | `BrandIdentityUpdateRequest` | `BrandIdentityResponse` (updates colors, voice, audience, SWOT) |
+| **Campaigns**| `POST` | `/campaigns/generate-strategy` | `GenerateStrategyRequest` (objective, dailyBudget, brief) | `CampaignStrategy` (phases, kpis, channels, messaging) |
 | **Campaigns**| `POST` | `/campaigns` | `CampaignCreateRequest` (name, objective, channel, budget) | `Campaign` |
 | **Campaigns**| `GET` | `/campaigns` | — | `CampaignListResponse` |
 | **Campaigns**| `GET` | `/campaigns/{id}` | — | `CampaignDetailResponse` (creatives & recommendations) |

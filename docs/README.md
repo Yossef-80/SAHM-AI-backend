@@ -68,6 +68,7 @@ Choose the reading path that fits your current objective:
 - **The Connected Intelligence Flywheel:** Search connects to Strategy; Strategy connects to Creatives; Creatives connect to the Calendar; Analytics connect to Approvals. All powered by one shared Brand Memory.
 - **Real-Time Market Evidence:** Live web crawling, Google Maps reviews extraction via Playwright, Facebook Ad Library scraping via Apify, and Google Analytics 4 performance reporting.
 - **Ground-Truth Entity Resolver:** Auto-corrects brand typos (e.g. *"Tiee Hose"* ➔ *"Tie House"*) and rejects fake queries before running searches.
+- **Unified Brand Identity Hub:** Central living brand profile (`/brand-identity`) with color palette tokens, strategic essence (voice, tagline, archetype), target audience, SWOT analysis, and 1-click sync from chats.
 - **Automated Content Calendar:** Direct multi-day social media schedule generation saved automatically into PostgreSQL.
 - **Zero-Token-Bloat Memory:** Dual-layer storage (380-word reports for humans, ~100-token facts for AI prompts) reducing context window consumption by over 90%.
 - **Human-in-the-Loop Safety:** Two-phase approval workflow with before/after diffs and immutable audit logging before executing ad account changes.

@@ -126,6 +126,7 @@ class AISettings(BaseSettings):
 
     # ============================================================ MEMORY ====
     memory_session_max_tokens: int = Field(10000, validation_alias=_env("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"))
+    brand_memory_token_limit: int = Field(10000, validation_alias=_env("BRAND_MEMORY_TOKEN_LIMIT", "BRAND_IDENTITY_TOKEN_LIMIT", "MEMORY_BRAND_MAX_TOKENS"))
     memory_ltm_debounce_seconds: int = Field(180, validation_alias=_env("MEMORY_LTM_DEBOUNCE_SECONDS"))
     memory_item_max_tokens: int = Field(120, validation_alias=_env("MEMORY_ITEM_MAX_TOKENS"))
     memory_global_profile_max_tokens: int = Field(300, validation_alias=_env("MEMORY_GLOBAL_PROFILE_MAX_TOKENS"))

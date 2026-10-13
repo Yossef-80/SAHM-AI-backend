@@ -7,13 +7,17 @@ import uuid
 from fastapi import APIRouter
 from sqlalchemy import select
 
-from app.api.deps import SessionDep, WorkspaceDep, assert_owned
-from app.db.models import Campaign as CampaignRow, Creative, Recommendation
+from app.api.deps import LLMDep, SessionDep, WorkspaceDep, assert_owned
+from app.db.models import BrandProfile, Campaign as CampaignRow, Creative, Recommendation
 from app.schemas.campaigns import (
     Campaign,
     CampaignCreateRequest,
     CampaignDetailResponse,
     CampaignListResponse,
+    CampaignStrategy,
+    GenerateStrategyRequest,
+    StrategyKPI,
+    StrategyPhase,
 )
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -129,4 +133,89 @@ async def get_campaign(
     )
 
 
-__all__ = ["create_campaign", "get_campaign", "list_campaigns"]
+@router.post("/generate-strategy", response_model=CampaignStrategy)
+async def generate_campaign_strategy_endpoint(
+    payload: GenerateStrategyRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+    llm: LLMDep,
+) -> CampaignStrategy:
+    """Generate an actionable AI marketing campaign strategy for the wizard."""
+    bp_stmt = select(BrandProfile).where(BrandProfile.business_id == ws.business_id)
+    bp = (await db.execute(bp_stmt)).scalars().first()
+    
+    brand_name = ws.business.name or "Brand"
+    industry = ws.business.industry or "Marketing"
+    voice = bp.brand_voice if bp and bp.brand_voice else "Engaging, authentic and direct"
+    offers = bp.key_offers if bp and bp.key_offers else ["Signature Product Offering"]
+
+    obj = payload.objective.lower()
+    summary = (
+        f"A multi-stage {payload.objective.capitalize()} strategy for {brand_name} ({industry}) "
+        f"focused on driving high-intent conversions with a daily budget of {payload.dailyBudget} EGP. "
+        f"Combines high-impact creative storytelling with aggressive retargeting."
+    )
+    key_messages = [
+        f"Discover the distinctive quality of {brand_name}.",
+        f"Crafted for customers who value excellence and authenticity in {industry}.",
+        f"Exclusive offer: {offers[0] if offers else 'Order today with fast delivery'}.",
+    ]
+    if payload.brief:
+        summary += f" Strategic focus: {payload.brief}"
+
+    phases = [
+        StrategyPhase(name="Phase 1: Awareness & Hook Testing", durationDays=7, focus="Test 3 video creative hooks and gather initial pixel data."),
+        StrategyPhase(name="Phase 2: Core Conversion Scaling", durationDays=14, focus="Scale winning ad creatives to high-intent lookalike audiences."),
+        StrategyPhase(name="Phase 3: Retargeting & LTV Lift", durationDays=9, focus="Retarget engaged profile visitors and abandon-cart users with urgency incentives."),
+    ]
+
+    kpis = [
+        StrategyKPI(metric="Target ROAS", target=3.2),
+        StrategyKPI(metric="Cost Per Acquisition (CPA)", target=round(payload.dailyBudget * 0.25, 2)),
+        StrategyKPI(metric="Click-Through Rate (CTR)", target=2.4),
+    ]
+
+    if llm:
+        try:
+            from langchain_core.messages import HumanMessage, SystemMessage
+            from pydantic import BaseModel, Field
+
+            class ExtractedStrategy(BaseModel):
+                summary: str = Field(description="Strategic executive summary of the campaign")
+                key_messages: list[str] = Field(description="3-4 compelling ad messages / value propositions")
+                bidding_strategy: str = Field(default="lowest_cost", description="lowest_cost | cost_cap | bid_cap | roas_goal")
+
+            extractor = llm.chat.with_structured_output(ExtractedStrategy)
+            res = await extractor.ainvoke([
+                SystemMessage(content="You are Omar, Chief Marketing Strategist. Formulate a sharp campaign strategy."),
+                HumanMessage(
+                    content=(
+                        f"Brand: {brand_name} ({industry})\n"
+                        f"Brand Voice: {voice}\n"
+                        f"Objective: {payload.objective}\n"
+                        f"Daily Budget: {payload.dailyBudget}\n"
+                        f"Audience: {payload.audience}\n"
+                        f"Brief: {payload.brief or 'None'}\n"
+                    )
+                ),
+            ])
+            if res.summary:
+                summary = res.summary
+            if res.key_messages:
+                key_messages = res.key_messages
+        except Exception:
+            pass
+
+    return CampaignStrategy(
+        summary=summary,
+        keyMessages=key_messages,
+        channels=["instagram", "facebook"],
+        placements=["feed", "stories", "reels"],
+        biddingStrategy="lowest_cost",
+        phases=phases,
+        kpis=kpis,
+    )
+
+
+__all__ = ["create_campaign", "get_campaign", "list_campaigns", "generate_campaign_strategy_endpoint"]
+

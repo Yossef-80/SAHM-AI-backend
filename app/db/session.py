@@ -128,8 +128,8 @@ def _engine_kwargs(url: str, echo: bool) -> dict[str, Any]:
     if is_pooler_url(url):
         kwargs["connect_args"] = {
             "statement_cache_size": 0,
-            "command_timeout": 30.0,
-            "timeout": 10.0,
+            "command_timeout": 60.0,
+            "timeout": 20.0,
         }
         kwargs["pool_size"] = 15
         # The pooler already multiplexes; a local overflow pool on top of it just

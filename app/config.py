@@ -160,6 +160,11 @@ class Settings(BaseSettings):
         10000,
         validation_alias=AliasChoices("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"),
     )
+    # Token threshold for brand profile & intelligence extraction before rolling summarization
+    brand_memory_token_limit: int = Field(
+        10000,
+        validation_alias=AliasChoices("BRAND_MEMORY_TOKEN_LIMIT", "BRAND_IDENTITY_TOKEN_LIMIT", "MEMORY_BRAND_MAX_TOKENS"),
+    )
     # Inactivity delay in seconds before updating global profile LTM in background (180s = 3 min)
     memory_ltm_debounce_seconds: int = 180
     # Maximum tokens cap for distilled BrandMemoryItem.text

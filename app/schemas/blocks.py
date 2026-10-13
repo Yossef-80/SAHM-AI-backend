@@ -9,7 +9,7 @@ block instead of a 500.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 
@@ -95,13 +95,18 @@ class ActionCard(BaseBlock):
     """A clickable follow-up. Agents never call each other; the user clicks."""
 
     type: Literal[BlockKind.ACTION_CARD] = BlockKind.ACTION_CARD
-    action_type: str = Field(description="e.g. 'run_task', 'open_url', 'approve'")
-    label: str
+    action_type: str = Field(default="", description="e.g. 'run_task', 'open_url', 'approve'")
+    label: str = ""
+    title: str | None = None
     description: str | None = None
     target_persona: str | None = None
     task: str | None = None
     inputs: dict[str, object] = Field(default_factory=dict)
     payload: dict[str, object] = Field(default_factory=dict)
+    actions: list[dict[str, Any]] = Field(default_factory=list)
+
+
+ActionCardBlock = ActionCard
 
 
 # ----------------------------------------------------------- task progress ----
@@ -433,6 +438,7 @@ def blocks_to_plaintext(blocks: list[Any] | None) -> str:
 
 __all__ = [
     "ActionCard",
+    "ActionCardBlock",
     "AgentEventData",
     "BaseBlock",
     "Block",
@@ -456,4 +462,6 @@ __all__ = [
     "Tone",
     "Language",
 ]
+
+MessageWithBlocks.model_rebuild()
 

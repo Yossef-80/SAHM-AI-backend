@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from app.schemas.common import ApiModel
 
@@ -111,3 +111,73 @@ class BusinessProfileUpdateRequest(ApiModel):
     def provided(self) -> set[str]:
         """Field names the caller actually sent (exclude-unset)."""
         return set(self.model_fields_set)
+
+
+class ColorPalette(ApiModel):
+    primary: str = Field(default="#2563EB", description="Primary brand color hex")
+    secondary: str = Field(default="#1E293B", description="Secondary brand color hex")
+    accent: str = Field(default="#F59E0B", description="Accent highlight color hex")
+    background: str = Field(default="#F8FAFC", description="Base background hex")
+    text: str = Field(default="#0F172A", description="Base text color hex")
+    palette: list[str] = Field(default_factory=list, description="Curated 5-color palette")
+
+
+class SWOTAnalysis(ApiModel):
+    strengths: list[str] = Field(default_factory=list, description="Internal advantages and differentiators")
+    weaknesses: list[str] = Field(default_factory=list, description="Internal limitations or areas to improve")
+    opportunities: list[str] = Field(default_factory=list, description="Market opportunities, gaps to seize")
+    threats: list[str] = Field(default_factory=list, description="Competitive risks, market barriers")
+
+
+class IdentityEssence(ApiModel):
+    tagline: str | None = None
+    mission: str | None = None
+    vision: str | None = None
+    brand_voice: str | None = None
+    tone_keywords: list[str] = Field(default_factory=list)
+    archetype: str | None = None
+
+
+class TargetAudienceProfile(ApiModel):
+    summary: str | None = None
+    demographics: str | None = None
+    psychographics: str | None = None
+    pain_points: list[str] = Field(default_factory=list)
+    core_segments: list[str] = Field(default_factory=list)
+
+
+class BrandIdentityResponse(ApiModel):
+    business_id: str
+    name: str = Field(validation_alias=AliasChoices("name", "brand_name", "brandName"))
+    industry: str | None = None
+    website_url: str | None = None
+    country: str | None = None
+    language: str = "en"
+    currency: str | None = "EGP"
+    monthly_budget: float | None = None
+    colors: ColorPalette = Field(default_factory=ColorPalette, validation_alias=AliasChoices("colors", "palette"))
+    essence: IdentityEssence = Field(default_factory=IdentityEssence)
+    audience: TargetAudienceProfile = Field(default_factory=TargetAudienceProfile, validation_alias=AliasChoices("audience", "target_audience", "targetAudience"))
+    swot: SWOTAnalysis = Field(default_factory=SWOTAnalysis)
+    key_offers: list[str] = Field(default_factory=list, validation_alias=AliasChoices("key_offers", "keyOffers"))
+    competitors: list[str] = Field(default_factory=list)
+    market_gaps: list[str] = Field(default_factory=list, validation_alias=AliasChoices("market_gaps", "marketGaps"))
+    last_synced_at: datetime | None = Field(default=None, validation_alias=AliasChoices("last_synced_at", "lastSyncedAt", "synced_at", "syncedAt"))
+    sources_count: int = Field(default=0, validation_alias=AliasChoices("sources_count", "sourcesCount"))
+
+
+class BrandIdentityUpdateRequest(ApiModel):
+    name: str | None = Field(default=None, validation_alias=AliasChoices("name", "brand_name", "brandName"))
+    industry: str | None = None
+    website_url: str | None = None
+    currency: str | None = None
+    monthly_budget: float | None = None
+    colors: ColorPalette | None = Field(default=None, validation_alias=AliasChoices("colors", "palette"))
+    essence: IdentityEssence | None = None
+    audience: TargetAudienceProfile | None = Field(default=None, validation_alias=AliasChoices("audience", "target_audience", "targetAudience"))
+    swot: SWOTAnalysis | None = None
+    key_offers: list[str] | None = Field(default=None, validation_alias=AliasChoices("key_offers", "keyOffers"))
+    competitors: list[str] | None = None
+    market_gaps: list[str] | None = Field(default=None, validation_alias=AliasChoices("market_gaps", "marketGaps"))
+
+
