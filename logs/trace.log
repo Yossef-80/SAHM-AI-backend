@@ -342009,3 +342009,2826 @@ RuntimeError: Apify connection error
 2026-10-13 21:41:47.261 | INFO    | app.ai.memory.compressor | [req=req_fdf953b939c94b2e | biz=biz_a6b794f3ecea43e683df] | ltm_profile_unchanged_noop
     * business_id: biz_a6b794f3ecea43e683df
 2026-10-13 22:14:33.658 | INFO    | app.main                 | [req=-] | app_stopped
+2026-10-13 22:22:34.289 | WARNING | app.main                 | [req=-] | insecure_runtime_configuration
+    * detail: TOKEN_ENCRYPTION_KEY is unset: falling back to the published dev key. Stored tokens are only as private as this repository.
+2026-10-13 22:22:34.289 | INFO    | app.core.tools.registry  | [req=-] | tools_registered
+    * count: 16
+    * tools: web_search,analyze_website,get_social_profile,get_reviews,get_keywords,get_competitor_ads,brand_report,full_analysis,route_file_to_tool,get_brand_context,save_learning,get_campaign_insights,get_breakdowns,analyze_reference_creative,generate_image,create_recommendation
+2026-10-13 22:22:34.362 | INFO    | app.db.session           | [req=-] | db_engine_created
+    * dialect: postgresql
+2026-10-13 22:22:37.041 | INFO    | app.db.session           | [req=-] | db_schema_created
+    * dialect: postgresql
+2026-10-13 22:22:37.041 | INFO    | app.main                 | [req=-] | schema_creation_performed
+    * reason: dev
+    * schema_source: create_all
+2026-10-13 22:22:37.041 | INFO    | app.main                 | [req=-] | app_started
+    * environment: dev
+    * llm_provider_fast: gemini
+    * llm_provider_strong: gemini
+    * database: postgresql+asyncpg
+    * require_auth: False
+2026-10-13 22:24:44.742 | INFO    | app.main                 | [req=req_e67258a668064e6b] | [ROUTING - INCOMING] OPTIONS /api/v1/auth/me
+    * method: OPTIONS
+    * path: /api/v1/auth/me
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.745 | INFO    | app.main                 | [req=req_e67258a668064e6b] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/auth/me (2ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/auth/me
+    * status: 200
+    * duration_ms: 2
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.748 | INFO    | app.main                 | [req=req_5c50fa5d6da848d1] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/conversations
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.750 | INFO    | app.main                 | [req=req_e553705ffd674e98] | [ROUTING - INCOMING] OPTIONS /api/v1/campaigns
+    * method: OPTIONS
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.753 | INFO    | app.main                 | [req=req_77f90093c2824a89] | [ROUTING - INCOMING] OPTIONS /api/v1/creatives
+    * method: OPTIONS
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.754 | INFO    | app.main                 | [req=req_229514a0a4ae4768] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.754 | INFO    | app.main                 | [req=req_5c50fa5d6da848d1] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/conversations (5ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 5
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.756 | INFO    | app.main                 | [req=req_ee20ce80e4e44897] | [ROUTING - INCOMING] OPTIONS /api/v1/creatives/references
+    * method: OPTIONS
+    * path: /api/v1/creatives/references
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.758 | INFO    | app.main                 | [req=req_e553705ffd674e98] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/campaigns (7ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 7
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.760 | INFO    | app.main                 | [req=req_528367ee1150443f] | [ROUTING - INCOMING] OPTIONS /api/v1/memory/items
+    * method: OPTIONS
+    * path: /api/v1/memory/items
+    * query:
+      {
+        "kind": "competitor_note"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.761 | INFO    | app.main                 | [req=req_77f90093c2824a89] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/creatives (7ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 7
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.762 | INFO    | app.main                 | [req=req_229514a0a4ae4768] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2 (7ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2
+    * status: 200
+    * duration_ms: 7
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.764 | INFO    | app.main                 | [req=req_ee20ce80e4e44897] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/creatives/references (7ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/creatives/references
+    * status: 200
+    * duration_ms: 7
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.765 | INFO    | app.main                 | [req=req_8708c425af27400e] | [ROUTING - INCOMING] OPTIONS /api/v1/personas
+    * method: OPTIONS
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.766 | INFO    | app.main                 | [req=req_528367ee1150443f] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/memory/items (5ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/memory/items
+    * status: 200
+    * duration_ms: 5
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.767 | INFO    | app.main                 | [req=req_76900a49c10042f5] | [ROUTING - INCOMING] GET /api/v1/auth/me
+    * method: GET
+    * path: /api/v1/auth/me
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.772 | INFO    | app.main                 | [req=req_84b1648d10a443ab] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.773 | INFO    | app.main                 | [req=req_ff5c2b9475e14718] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.774 | INFO    | app.main                 | [req=req_8708c425af27400e] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/personas (8ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 8
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:44.788 | INFO    | app.main                 | [req=req_e9f16a64619b4a5f] | [ROUTING - INCOMING] GET /api/v1/creatives
+    * method: GET
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.796 | INFO    | app.main                 | [req=req_3ef0475eb70d4c4d] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:44.804 | INFO    | app.main                 | [req=req_e1a140d483e64bd8] | [ROUTING - INCOMING] GET /api/v1/creatives/references
+    * method: GET
+    * path: /api/v1/creatives/references
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:49.171 | WARNING | app.db.trace             | [req=req_3ef0475eb70d4c4d] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1503ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1503
+    * rowcount: 12
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:24:49.568 | WARNING | app.db.trace             | [req=req_e1a140d483e64bd8] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1852ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1852
+    * rowcount: 12
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:24:49.752 | WARNING | app.db.trace             | [req=req_76900a49c10042f5] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 2105ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 2105
+    * rowcount: 12
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:24:50.050 | WARNING | app.db.trace             | [req=req_e9f16a64619b4a5f] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 2240ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 2240
+    * rowcount: 12
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:24:50.143 | WARNING | app.db.trace             | [req=req_84b1648d10a443ab] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 2340ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 2340
+    * rowcount: 12
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:24:50.266 | INFO    | app.main                 | [req=req_76900a49c10042f5] | [ROUTING - OUTGOING] 200 GET /api/v1/auth/me (5498ms, DB: 4702ms/8q)
+    * method: GET
+    * path: /api/v1/auth/me
+    * status: 200
+    * duration_ms: 5498
+    * db_queries: 8
+    * db_time_ms: 4702
+2026-10-13 22:24:50.268 | INFO    | app.main                 | [req=req_42175124cc1249db] | [ROUTING - INCOMING] GET /api/v1/memory/items
+    * method: GET
+    * path: /api/v1/memory/items
+    * query:
+      {
+        "kind": "competitor_note"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:50.416 | WARNING | app.db.trace             | [req=req_ff5c2b9475e14718] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 2393ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 2393
+    * rowcount: 12
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:24:50.579 | INFO    | app.main                 | [req=req_e1a140d483e64bd8] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives/references (5773ms, DB: 4301ms/8q)
+    * method: GET
+    * path: /api/v1/creatives/references
+    * status: 200
+    * duration_ms: 5773
+    * db_queries: 8
+    * db_time_ms: 4301
+2026-10-13 22:24:50.581 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:50.692 | INFO    | app.main                 | [req=req_3ef0475eb70d4c4d] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2 (5895ms, DB: 4464ms/9q)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_5f3a089be8bd4c9b8ad2
+    * status: 200
+    * duration_ms: 5895
+    * db_queries: 9
+    * db_time_ms: 4464
+2026-10-13 22:24:50.755 | INFO    | app.main                 | [req=req_84b1648d10a443ab] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (5982ms, DB: 4457ms/8q)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 5982
+    * db_queries: 8
+    * db_time_ms: 4457
+2026-10-13 22:24:50.756 | INFO    | app.main                 | [req=req_e9f16a64619b4a5f] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives (5967ms, DB: 4408ms/8q)
+    * method: GET
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 5967
+    * db_queries: 8
+    * db_time_ms: 4408
+2026-10-13 22:24:51.048 | INFO    | app.main                 | [req=req_ff5c2b9475e14718] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (6274ms, DB: 4677ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 6274
+    * db_queries: 8
+    * db_time_ms: 4677
+2026-10-13 22:24:53.581 | INFO    | app.main                 | [req=req_42175124cc1249db] | [ROUTING - OUTGOING] 200 GET /api/v1/memory/items (3311ms, DB: 2101ms/9q)
+    * method: GET
+    * path: /api/v1/memory/items
+    * status: 200
+    * duration_ms: 3311
+    * db_queries: 9
+    * db_time_ms: 2101
+2026-10-13 22:24:53.981 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (3398ms, DB: 2243ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 3398
+    * db_queries: 12
+    * db_time_ms: 2243
+2026-10-13 22:24:54.995 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:55.124 | INFO    | app.main                 | [req=req_b3536b25587943b8] | [ROUTING - INCOMING] OPTIONS /api/v1/business/brand-identity
+    * method: OPTIONS
+    * path: /api/v1/business/brand-identity
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:55.127 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:55.129 | INFO    | app.main                 | [req=req_b3536b25587943b8] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/business/brand-identity (3ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/business/brand-identity
+    * status: 200
+    * duration_ms: 3
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:24:55.132 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/business/brand-identity
+    * method: GET
+    * path: /api/v1/business/brand-identity
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:57.889 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:24:58.044 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:24:58.265 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/business/brand-identity (3132ms, DB: 2072ms/9q)
+    * method: GET
+    * path: /api/v1/business/brand-identity
+    * status: 200
+    * duration_ms: 3132
+    * db_queries: 9
+    * db_time_ms: 2072
+2026-10-13 22:24:58.286 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (3156ms, DB: 2101ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 3156
+    * db_queries: 8
+    * db_time_ms: 2101
+2026-10-13 22:24:58.288 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:24:58.885 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1320ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1320
+    * rowcount: 12
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:24:59.161 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:24:59.915 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (4919ms, DB: 3873ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 4919
+    * db_queries: 12
+    * db_time_ms: 3873
+2026-10-13 22:25:00.938 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:01.057 | INFO    | app.main                 | [req=req_b35019db19be48e4] | [ROUTING - INCOMING] OPTIONS /api/v1/research/items
+    * method: OPTIONS
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:01.060 | INFO    | app.main                 | [req=req_b35019db19be48e4] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/research/items (1ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 1
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:25:01.062 | INFO    | app.main                 | [req=req_5db21d5c90324522] | [ROUTING - INCOMING] GET /api/v1/research/items
+    * method: GET
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:01.171 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (2882ms, DB: 1832ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 2882
+    * db_queries: 8
+    * db_time_ms: 1832
+2026-10-13 22:25:03.586 | INFO    | app.api.deps             | [req=req_5db21d5c90324522] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:04.116 | INFO    | app.main                 | [req=req_5db21d5c90324522] | [ROUTING - OUTGOING] 200 GET /api/v1/research/items (3053ms, DB: 2053ms/8q)
+    * method: GET
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 3053
+    * db_queries: 8
+    * db_time_ms: 2053
+2026-10-13 22:25:04.120 | INFO    | app.main                 | [req=req_df864a973a7f47d6] | [ROUTING - INCOMING] GET /api/v1/research/items
+    * method: GET
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:06.773 | INFO    | app.api.deps             | [req=req_df864a973a7f47d6] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:07.250 | INFO    | app.main                 | [req=req_df864a973a7f47d6] | [ROUTING - OUTGOING] 200 GET /api/v1/research/items (3129ms, DB: 2061ms/8q)
+    * method: GET
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 3129
+    * db_queries: 8
+    * db_time_ms: 2061
+2026-10-13 22:25:27.080 | INFO    | app.main                 | [req=req_7d492c451e834d17] | [ROUTING - INCOMING] OPTIONS /api/v1/research/run
+    * method: OPTIONS
+    * path: /api/v1/research/run
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:27.081 | INFO    | app.main                 | [req=req_7d492c451e834d17] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/research/run (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/research/run
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:25:27.084 | INFO    | app.main                 | [req=req_42d73912fda8450d] | [ROUTING - INCOMING] POST /api/v1/research/run
+    * method: POST
+    * path: /api/v1/research/run
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body:
+      {
+        "tool": "analyze_website",
+        "query": "https://elhabashycoffee.com",
+        "language": "ar"
+      }
+2026-10-13 22:25:29.704 | INFO    | app.api.deps             | [req=req_42d73912fda8450d] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:31.617 | INFO    | httpx                    | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | HTTP Request: GET https://elhabashycoffee.com/ "HTTP/1.1 200 OK"
+2026-10-13 22:25:31.803 | INFO    | google_genai.models      | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:25:31.804 | WARNING | google_genai.models      | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | Direct use of automatic function calling (AFC) in Models.generate_content is not recommended. Instead, we recommend to use AFC in Chat.send_message. Similarly, direct use of AFC in Models.generate_content_stream is not recommended. Instead, we recommend to use AFC in Chat.send_message_stream.
+2026-10-13 22:25:35.973 | INFO    | httpx                    | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:25:36.000 | INFO    | google_genai.models      | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:25:36.767 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:25:36.872 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_fd2fed6e34c24fdd97857c7e', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'research.analyze_website', 'gemini-3.5-flash-lite', 23388, 764, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:25:38.502 | INFO    | httpx                    | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:25:38.767 | INFO    | google_genai.models      | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:25:39.452 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:25:39.562 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_e1d2013e720146cead809add', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'research.analyze_website.distill', 'gemini-3.5-flash-lite', 942, 465, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:25:41.668 | INFO    | httpx                    | [req=req_42d73912fda8450d | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:25:42.358 | INFO    | app.main                 | [req=req_42d73912fda8450d] | [ROUTING - OUTGOING] 200 POST /api/v1/research/run (15273ms, DB: 2653ms/11q)
+    * method: POST
+    * path: /api/v1/research/run
+    * status: 200
+    * duration_ms: 15273
+    * db_queries: 11
+    * db_time_ms: 2653
+2026-10-13 22:25:42.363 | INFO    | app.main                 | [req=req_b651565884dc4e90] | [ROUTING - INCOMING] GET /api/v1/research/items
+    * method: GET
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:42.448 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:25:42.553 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_ec51f566801b461da95f88b2', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'research.ltm_integration', 'gemini-3.5-flash-lite', 1449, 995, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:25:45.006 | INFO    | app.api.deps             | [req=req_b651565884dc4e90] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:45.400 | INFO    | app.main                 | [req=req_b651565884dc4e90] | [ROUTING - OUTGOING] 200 GET /api/v1/research/items (3036ms, DB: 2017ms/8q)
+    * method: GET
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 3036
+    * db_queries: 8
+    * db_time_ms: 2017
+2026-10-13 22:25:54.704 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:54.707 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:54.708 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/creatives
+    * method: GET
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:54.710 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/creatives/references
+    * method: GET
+    * path: /api/v1/creatives/references
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:54.712 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/memory/items
+    * method: GET
+    * path: /api/v1/memory/items
+    * query:
+      {
+        "kind": "competitor_note"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:54.713 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:57.713 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1094ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1094
+    * rowcount: 13
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:25:57.987 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1348ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1348
+    * rowcount: 13
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:25:57.989 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:58.082 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1340ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1340
+    * rowcount: 13
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:25:58.143 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:58.174 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1400ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1400
+    * rowcount: 13
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:25:58.264 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1495ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1495
+    * rowcount: 13
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:25:58.266 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:58.267 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:58.296 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:58.383 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (3676ms, DB: 2630ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 3676
+    * db_queries: 8
+    * db_time_ms: 2630
+2026-10-13 22:25:58.385 | INFO    | app.main                 | [req=req_7da0c4c5c84b484d] | [ROUTING - INCOMING] GET /api/v1/research/items
+    * method: GET
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:25:58.449 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:25:58.530 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives (3821ms, DB: 2689ms/8q)
+    * method: GET
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 3821
+    * db_queries: 8
+    * db_time_ms: 2689
+2026-10-13 22:25:58.605 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives/references (3894ms, DB: 2766ms/8q)
+    * method: GET
+    * path: /api/v1/creatives/references
+    * status: 200
+    * duration_ms: 3894
+    * db_queries: 8
+    * db_time_ms: 2766
+2026-10-13 22:25:58.657 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (3952ms, DB: 2886ms/8q)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 3952
+    * db_queries: 8
+    * db_time_ms: 2886
+2026-10-13 22:25:58.681 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/memory/items (3968ms, DB: 2917ms/9q)
+    * method: GET
+    * path: /api/v1/memory/items
+    * status: 200
+    * duration_ms: 3968
+    * db_queries: 9
+    * db_time_ms: 2917
+2026-10-13 22:25:59.252 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (4537ms, DB: 3405ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 4537
+    * db_queries: 12
+    * db_time_ms: 3405
+2026-10-13 22:26:00.268 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:00.804 | INFO    | app.api.deps             | [req=req_7da0c4c5c84b484d] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:01.252 | INFO    | app.main                 | [req=req_7da0c4c5c84b484d] | [ROUTING - OUTGOING] 200 GET /api/v1/research/items (2866ms, DB: 1778ms/8q)
+    * method: GET
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 2866
+    * db_queries: 8
+    * db_time_ms: 1778
+2026-10-13 22:26:01.255 | INFO    | app.main                 | [req=req_8284635f2c4448b3] | [ROUTING - INCOMING] GET /api/v1/research/items
+    * method: GET
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:02.966 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:03.786 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (3517ms, DB: 2369ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 3517
+    * db_queries: 12
+    * db_time_ms: 2369
+2026-10-13 22:26:04.476 | INFO    | app.api.deps             | [req=req_8284635f2c4448b3] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:04.928 | INFO    | app.main                 | [req=req_8284635f2c4448b3] | [ROUTING - OUTGOING] 200 GET /api/v1/research/items (3672ms, DB: 2588ms/8q)
+    * method: GET
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 3672
+    * db_queries: 8
+    * db_time_ms: 2588
+2026-10-13 22:26:09.302 | INFO    | app.main                 | [req=req_3a8ab8ec1dad4ccd] | [ROUTING - INCOMING] OPTIONS /api/v1/business/profile
+    * method: OPTIONS
+    * path: /api/v1/business/profile
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:09.302 | INFO    | app.main                 | [req=req_3a8ab8ec1dad4ccd] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/business/profile (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/business/profile
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:26:09.304 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/business/profile
+    * method: GET
+    * path: /api/v1/business/profile
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:09.306 | INFO    | app.main                 | [req=req_f52e126cc1544077] | [ROUTING - INCOMING] OPTIONS /api/v1/settings/connectors
+    * method: OPTIONS
+    * path: /api/v1/settings/connectors
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:09.307 | INFO    | app.main                 | [req=req_f52e126cc1544077] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/settings/connectors (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/settings/connectors
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:26:09.308 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/settings/connectors
+    * method: GET
+    * path: /api/v1/settings/connectors
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:11.984 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:12.085 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:12.463 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/settings/connectors (3154ms, DB: 2064ms/9q)
+    * method: GET
+    * path: /api/v1/settings/connectors
+    * status: 200
+    * duration_ms: 3154
+    * db_queries: 9
+    * db_time_ms: 2064
+2026-10-13 22:26:12.697 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/business/profile (3393ms, DB: 2357ms/10q)
+    * method: GET
+    * path: /api/v1/business/profile
+    * status: 200
+    * duration_ms: 3393
+    * db_queries: 10
+    * db_time_ms: 2357
+2026-10-13 22:26:31.667 | INFO    | app.main                 | [req=req_a4e79be248544cbe] | [ROUTING - INCOMING] OPTIONS /api/v1/creatives/analyze-reference
+    * method: OPTIONS
+    * path: /api/v1/creatives/analyze-reference
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:31.667 | INFO    | app.main                 | [req=req_a4e79be248544cbe] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/creatives/analyze-reference (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/creatives/analyze-reference
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:26:31.672 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] POST /api/v1/creatives/analyze-reference
+    * method: POST
+    * path: /api/v1/creatives/analyze-reference
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:34.787 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:34.964 | INFO    | app.ai.marketing.reference_vision | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | Reference image downscaled for VLM: 1920x1080 -> 1333x750 pixels (budget=1000000)
+2026-10-13 22:26:34.969 | WARNING | langchain_google_genai._function_utils | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | Key '$defs' is not supported in schema, ignoring
+2026-10-13 22:26:38.827 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:26:38.834 | INFO    | app.core.memory.embeddings | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | embedding_provider_built
+    * provider: mock
+    * dim: 64
+2026-10-13 22:26:39.086 | INFO    | app.core.memory.store    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | memory_written
+    * kind: reference_analysis
+    * business_id: biz_a6b794f3ecea43e683df
+    * chars: 252
+2026-10-13 22:26:39.207 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 POST /api/v1/creatives/analyze-reference (7534ms, DB: 2016ms/8q)
+    * method: POST
+    * path: /api/v1/creatives/analyze-reference
+    * status: 200
+    * duration_ms: 7534
+    * db_queries: 8
+    * db_time_ms: 2016
+2026-10-13 22:26:39.216 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/creatives/references
+    * method: GET
+    * path: /api/v1/creatives/references
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:39.627 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:26:39.744 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_8866a93be48049d7b4e84dc1', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'creative.reference', 'gemini-3.5-flash-lite', 1529, 378, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:26:41.827 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:42.087 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives/references (2870ms, DB: 1831ms/8q)
+    * method: GET
+    * path: /api/v1/creatives/references
+    * status: 200
+    * duration_ms: 2870
+    * db_queries: 8
+    * db_time_ms: 1831
+2026-10-13 22:26:48.200 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:48.204 | INFO    | app.main                 | [req=req_b1315efe2cac49cc] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/message/stream
+    * method: OPTIONS
+    * path: /api/v1/assistant/message/stream
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:48.205 | INFO    | app.main                 | [req=req_b1315efe2cac49cc] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/message/stream (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/assistant/message/stream
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:26:48.208 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] POST /api/v1/assistant/message/stream
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body:
+      {
+        "message": "ليلى، أريد إعداد برومبت قوي لتوليد صورة. ابدئي بقائمة واحدة مجمّعة للتفاصيل الناقصة. إذا أرفقت مرجعًا، اعرضي تحليل الصورة وما تقترحين الحفاظ عليه أو تغييره، ثم انتظري موافقتي قبل كتابة البرومبت النهائي. لا تولّدي أي وسائط.",
+        "language": "ar",
+        "personaId": "layla",
+        "context": {
+          "referenceAnalysisId": "mem_9c9a42f3e25349679e4bcd03",
+          "workflow": "creative_prompt",
+          "promptType": "image",
+          "creativeMode": "prompt"
+        }
+      }
+2026-10-13 22:26:51.009 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:51.056 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:51.253 | INFO    | app.core.llm.router      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | llm_client_built
+    * tier: strong
+    * provider: gemini
+    * model: gemini-3.5-flash-lite
+    * base_url_configured: False
+    * extra_header_names:
+      []
+2026-10-13 22:26:51.254 | INFO    | app.core.llm.router      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | llm_client_built
+    * tier: fast
+    * provider: gemini
+    * model: gemini-3.5-flash-lite
+    * base_url_configured: False
+    * extra_header_names:
+      []
+2026-10-13 22:26:51.256 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 POST /api/v1/assistant/message/stream (3047ms, DB: 2021ms/8q)
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * status: 200
+    * duration_ms: 3047
+    * db_queries: 8
+    * db_time_ms: 2021
+2026-10-13 22:26:51.804 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (3602ms, DB: 2577ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 3602
+    * db_queries: 12
+    * db_time_ms: 2577
+2026-10-13 22:26:52.818 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:26:56.338 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:26:56.965 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:26:57.066 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (4247ms, DB: 2922ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 4247
+    * db_queries: 12
+    * db_time_ms: 2922
+2026-10-13 22:26:57.758 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:26:57.869 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_805b9a8877ce429ebdadfff8', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, 'layla', None, 'chat.turn', 'gemini-3.5-flash-lite', 5000, 732, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:27:12.020 | INFO    | app.api.assistant        | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | post_turn_memory_background_started
+    * business_id: biz_a6b794f3ecea43e683df
+    * conversation_id: conv_a6d717aa01404925bb5d
+    * request_id: bg_mem_req_07422f72467f4f2e
+2026-10-13 22:27:12.038 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:12.135 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:12.140 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/creatives
+    * method: GET
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:12.144 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/memory/items
+    * method: GET
+    * path: /api/v1/memory/items
+    * query:
+      {
+        "kind": "competitor_note"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:12.145 | INFO    | app.main                 | [req=req_4397961111804e73] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:12.146 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:12.147 | INFO    | app.main                 | [req=req_4397961111804e73] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d (1ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * status: 200
+    * duration_ms: 1
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:27:12.148 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:15.039 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:27:15.236 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1113ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1113
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:27:15.553 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:27:15.697 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:27:15.711 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1433ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1433
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:27:15.827 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1523ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1523
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:27:15.949 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1644ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1644
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:27:16.033 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (3994ms, DB: 2975ms/8q)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 3994
+    * db_queries: 8
+    * db_time_ms: 2975
+2026-10-13 22:27:16.124 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:27:16.127 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:27:16.134 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:27:16.227 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives (4086ms, DB: 2978ms/8q)
+    * method: GET
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 4086
+    * db_queries: 8
+    * db_time_ms: 2978
+2026-10-13 22:27:16.273 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (4137ms, DB: 2917ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 4137
+    * db_queries: 8
+    * db_time_ms: 2917
+2026-10-13 22:27:16.275 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1554ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1554
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:27:16.696 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (4549ms, DB: 3438ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 4549
+    * db_queries: 12
+    * db_time_ms: 3438
+2026-10-13 22:27:16.717 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/memory/items (4573ms, DB: 3349ms/9q)
+    * method: GET
+    * path: /api/v1/memory/items
+    * status: 200
+    * duration_ms: 4573
+    * db_queries: 9
+    * db_time_ms: 3349
+2026-10-13 22:27:17.086 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d (4937ms, DB: 3715ms/9q)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * status: 200
+    * duration_ms: 4937
+    * db_queries: 9
+    * db_time_ms: 3715
+2026-10-13 22:27:17.714 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:27:18.753 | INFO    | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:27:18.753 | WARNING | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | Direct use of automatic function calling (AFC) in AsyncModels.generate_content is not recommended. Instead, we recommend to use AFC in AsyncChat.send_message. Similarly, direct use of AFC in AsyncModels.generate_content_stream is not recommended. Instead, we recommend to use AFC in AsyncChat.send_message_stream.
+2026-10-13 22:27:20.487 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:27:21.244 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (3528ms, DB: 2406ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 3528
+    * db_queries: 12
+    * db_time_ms: 2406
+2026-10-13 22:27:21.773 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:27:22.059 | INFO    | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:27:22.724 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:27:22.836 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_7e456035c7444ac5a27f2734', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'chat', 'gemini-3.5-flash-lite', 8555, 825, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:27:26.396 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:27:27.156 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:27:27.282 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_236848a7a0db4afcbace37c0', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'chat', 'gemini-3.5-flash-lite', 8163, 1073, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:27:29.391 | INFO    | app.api.assistant        | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | post_turn_brand_intelligence_synced
+    * business_id: biz_a6b794f3ecea43e683df
+    * request_id: bg_mem_req_07422f72467f4f2e
+2026-10-13 22:28:35.361 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] POST /api/v1/assistant/message/stream
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body:
+      {
+        "conversationId": "conv_a6d717aa01404925bb5d",
+        "message": "حللي الصورة ديه وانا عايز اعمل دمج بينها وبين الاوتبوت الي لسا مطلعهولي علشان احط البني ادم ده مع الخلفيه الي انت لسا محللها",
+        "language": "ar",
+        "personaId": "layla",
+        "context": {
+          "referenceAnalysisId": "mem_9c9a42f3e25349679e4bcd03",
+          "workflow": "creative_prompt",
+          "promptType": "image",
+          "creativeMode": "design"
+        }
+      }
+2026-10-13 22:28:38.600 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:28:38.848 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 POST /api/v1/assistant/message/stream (3486ms, DB: 1986ms/8q)
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * status: 200
+    * duration_ms: 3486
+    * db_queries: 8
+    * db_time_ms: 1986
+2026-10-13 22:28:43.125 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:28:44.607 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:28:44.726 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_34c66af37b794a72bcbedf53', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, 'layla', None, 'chat.turn', 'gemini-3.5-flash-lite', 5110, 14, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:28:47.877 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:28:48.648 | INFO    | app.ai.agents.orchestrator.brain | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | creative_prompt_fact_updates_accepted
+    * received: 1
+    * accepted_fields:
+      [
+        "subject"
+      ]
+2026-10-13 22:28:48.708 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:28:48.829 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_cf17b179df61409a839bd184', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, 'layla', None, 'chat.turn', 'gemini-3.5-flash-lite', 5635, 1256, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:29:03.665 | INFO    | app.api.assistant        | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | post_turn_memory_background_started
+    * business_id: biz_a6b794f3ecea43e683df
+    * conversation_id: conv_a6d717aa01404925bb5d
+    * request_id: bg_mem_req_07422f72467f4f2e
+2026-10-13 22:29:03.669 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:29:06.559 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:29:07.091 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d (3421ms, DB: 2337ms/9q)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * status: 200
+    * duration_ms: 3421
+    * db_queries: 9
+    * db_time_ms: 2337
+2026-10-13 22:29:07.097 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:29:09.039 | INFO    | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:29:10.348 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:29:10.575 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (3477ms, DB: 2004ms/8q)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 3477
+    * db_queries: 8
+    * db_time_ms: 2004
+2026-10-13 22:29:12.433 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:29:12.607 | INFO    | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:29:13.320 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:29:13.426 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_44c966ca944245a6a1365406', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'chat', 'gemini-3.5-flash-lite', 8871, 836, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:29:18.090 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:29:18.870 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:29:18.980 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_54b977a71f2649169e680ba4', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'chat', 'gemini-3.5-flash-lite', 8394, 1025, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:29:21.011 | INFO    | app.api.assistant        | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | post_turn_brand_intelligence_synced
+    * business_id: biz_a6b794f3ecea43e683df
+    * request_id: bg_mem_req_07422f72467f4f2e
+2026-10-13 22:29:23.949 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] POST /api/v1/assistant/message/stream
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body:
+      {
+        "conversationId": "conv_a6d717aa01404925bb5d",
+        "message": "موافق، اكتب البرومبت",
+        "language": "ar",
+        "personaId": "layla",
+        "answer": {
+          "messageId": "msg_8f3e7fc7e962410c90d5",
+          "optionIds": [
+            "approve_prompt_plan"
+          ]
+        },
+        "context": {
+          "referenceAnalysisId": "mem_9c9a42f3e25349679e4bcd03",
+          "workflow": "creative_prompt",
+          "promptType": "image",
+          "creativeMode": "design"
+        }
+      }
+2026-10-13 22:29:26.498 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:29:26.499 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 POST /api/v1/assistant/message/stream (2549ms, DB: 1545ms/7q)
+    * method: POST
+    * path: /api/v1/assistant/message/stream
+    * status: 200
+    * duration_ms: 2549
+    * db_queries: 7
+    * db_time_ms: 1545
+2026-10-13 22:29:30.853 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:29:31.768 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:29:31.889 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_4bf95740619544e19ee8d027', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, 'layla', None, 'chat.turn', 'gemini-3.5-flash-lite', 5413, 576, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:29:46.768 | INFO    | app.api.assistant        | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | post_turn_memory_background_started
+    * business_id: biz_a6b794f3ecea43e683df
+    * conversation_id: conv_a6d717aa01404925bb5d
+    * request_id: bg_mem_req_07422f72467f4f2e
+2026-10-13 22:29:46.773 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:29:55.084 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 4477ms (op: UPDATE)
+    * operation: UPDATE
+    * duration_ms: 4477
+    * rowcount: 1
+    * statement: UPDATE sessions SET last_used_at=$1::TIMESTAMP WITH TIME ZONE WHERE sessions.id = $2::VARCHAR
+2026-10-13 22:29:57.212 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 4747ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 4747
+    * rowcount: 1
+    * statement:
+      SELECT users.id, users.email, users.password_hash, users.full_name, users.is_active, users.last_login_at, users.created_at, users.updated_at 
+      FROM users 
+      WHERE users.id = $1::VARCHAR
+2026-10-13 22:29:59.021 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1808ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1808
+    * rowcount: 1
+    * statement:
+      SELECT memberships.id, memberships.user_id, memberships.workspace_id, memberships.business_id, memberships.role, memberships.created_at 
+      FROM memberships 
+      WHERE memberships.user_id = $1::VARCHAR ORDER BY memberships.created_at, memberships.id
+2026-10-13 22:30:00.835 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1282ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1282
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:30:00.981 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:30:01.685 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d (14911ms, DB: 14124ms/10q)
+    * method: GET
+    * path: /api/v1/assistant/conversations/conv_a6d717aa01404925bb5d
+    * status: 200
+    * duration_ms: 14911
+    * db_queries: 10
+    * db_time_ms: 14124
+2026-10-13 22:30:01.691 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:30:03.255 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1124ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1124
+    * rowcount: 1
+    * statement:
+      SELECT profiles.id, profiles.supabase_user_id, profiles.business_id, profiles.role, profiles.user_context_summary, profiles.created_at, profiles.updated_at 
+      FROM profiles 
+      WHERE profiles.business_id = $1::VARCHAR 
+       LIMIT $2::INTEGER
+2026-10-13 22:30:05.458 | INFO    | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:30:06.190 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:30:06.364 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (4672ms, DB: 1971ms/8q)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 4672
+    * db_queries: 8
+    * db_time_ms: 1971
+2026-10-13 22:30:08.973 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:30:09.270 | INFO    | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:30:09.856 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:30:09.967 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_fa4476f0623647d3ae51111f', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'chat', 'gemini-3.5-flash-lite', 8880, 950, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:30:14.388 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:30:15.224 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:30:15.333 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_96516c8d44e2409c92ec0bbc', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'chat', 'gemini-3.5-flash-lite', 8732, 1167, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:30:17.981 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1740ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1740
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.id, brand_memory_items.business_id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE $1::VARCHAR = brand_memory_items.bu
+2026-10-13 22:30:18.362 | INFO    | app.api.assistant        | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | post_turn_brand_intelligence_synced
+    * business_id: biz_a6b794f3ecea43e683df
+    * request_id: bg_mem_req_07422f72467f4f2e
+2026-10-13 22:30:36.494 | INFO    | app.main                 | [req=req_ef907ce10de24e2c] | [ROUTING - INCOMING] OPTIONS /api/v1/usage
+    * method: OPTIONS
+    * path: /api/v1/usage
+    * query:
+      {
+        "period": "today"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:30:36.495 | INFO    | app.main                 | [req=req_ef907ce10de24e2c] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/usage (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/usage
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:30:36.496 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/usage
+    * method: GET
+    * path: /api/v1/usage
+    * query:
+      {
+        "period": "today"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:30:39.127 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:30:40.519 | ERROR   | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - ERROR] SQL execution failed: column usage_records.action does not exist
+    * statement:
+      SELECT coalesce(usage_records.action, $1::VARCHAR) AS coalesce_1, coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) AS coalesce_3 
+      FROM usage_records 
+      WHERE usage_records.workspace_id = $3::VARCHAR AND usage_records.created_at >= $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(usage_records.action, $1::VARCHAR) ORDER BY coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) DESC 
+       LIMIT $5::INTEGER
+    * error: column usage_records.action does not exist
+2026-10-13 22:30:40.650 | ERROR   | app.main                 | [req=req_07422f72467f4f2e] | unhandled_error
+    * path: /api/v1/usage
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 581, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        operation, self._invalidate_schema_cache_asof
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 819, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        operation, name=self._prepared_statement_name_func()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 638, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 657, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 443, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "asyncpg/protocol/protocol.pyx", line 165, in prepare
+asyncpg.exceptions.UndefinedColumnError: column usage_records.action does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 1192, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 656, in execute
+    await_(self._prepare_and_execute(operation, parameters))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 167, in await_
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 205, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 618, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 568, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 847, in _handle_exception
+    super()._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 412, in _handle_exception
+    self._handle_exception_no_connection(self.dbapi, error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 840, in _handle_exception_no_connection
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: column usage_records.action does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\telemetry\_asgi.py", line 151, in __call__
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 197, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\main.py", line 232, in add_request_id
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 173, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 149, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\security_headers.py", line 83, in __call__
+    await self.app(scope, receive, send_wrapper)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\ratelimit.py", line 337, in __call__
+    await self.app(scope, receive, send_wrapper)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 91, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 149, in simple_response
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\routing.py", line 676, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 2786, in app
+    await route.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1817, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 2869, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1843, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1308, in handle
+    await effective_context.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 165, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 151, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 727, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 360, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\api\usage.py", line 124, in get_usage
+    actions = await usage_breakdown(
+              ^^^^^^^^^^^^^^^^^^^^^^
+        db, ws.workspace_id, since=start, column=UsageRecord.action
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\usage.py", line 167, in usage_breakdown
+    await db.execute(
+    ...<5 lines>...
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 651, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 210, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2473, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2363, in _execute_internal
+    compile_state_cls.orm_execute_statement(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<4 lines>...
+        conn,
+        ^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\context.py", line 316, in orm_execute_statement
+    result = conn.execute(
+        statement, params or {}, execution_options=execution_options
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1448, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 533, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1668, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<9 lines>...
+        param_dict=param_dict,
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1822, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1962, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2332, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 1192, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 656, in execute
+    await_(self._prepare_and_execute(operation, parameters))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 167, in await_
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 205, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 618, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 568, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 847, in _handle_exception
+    super()._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 412, in _handle_exception
+    self._handle_exception_no_connection(self.dbapi, error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 840, in _handle_exception_no_connection
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column usage_records.action does not exist
+[SQL: SELECT coalesce(usage_records.action, $1::VARCHAR) AS coalesce_1, coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) AS coalesce_3 
+FROM usage_records 
+WHERE usage_records.workspace_id = $3::VARCHAR AND usage_records.created_at >= $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(usage_records.action, $1::VARCHAR) ORDER BY coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) DESC 
+ LIMIT $5::INTEGER]
+[parameters: ('unknown', 0, 'ws_5582f4b23c204441b465', datetime.datetime(2026, 10, 13, 0, 0, tzinfo=datetime.timezone.utc), 20)]
+(Background on this error at: https://sqlalche.me/e/21/f405)
+2026-10-13 22:30:42.927 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/usage
+    * method: GET
+    * path: /api/v1/usage
+    * query:
+      {
+        "period": "today"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:30:45.611 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:30:46.968 | ERROR   | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - ERROR] SQL execution failed: column usage_records.action does not exist
+    * statement:
+      SELECT coalesce(usage_records.action, $1::VARCHAR) AS coalesce_1, coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) AS coalesce_3 
+      FROM usage_records 
+      WHERE usage_records.workspace_id = $3::VARCHAR AND usage_records.created_at >= $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(usage_records.action, $1::VARCHAR) ORDER BY coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) DESC 
+       LIMIT $5::INTEGER
+    * error: column usage_records.action does not exist
+2026-10-13 22:30:47.074 | ERROR   | app.main                 | [req=req_07422f72467f4f2e] | unhandled_error
+    * path: /api/v1/usage
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 581, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        operation, self._invalidate_schema_cache_asof
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 819, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        operation, name=self._prepared_statement_name_func()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 638, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 657, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 443, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "asyncpg/protocol/protocol.pyx", line 165, in prepare
+asyncpg.exceptions.UndefinedColumnError: column usage_records.action does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 1192, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 656, in execute
+    await_(self._prepare_and_execute(operation, parameters))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 167, in await_
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 205, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 618, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 568, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 847, in _handle_exception
+    super()._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 412, in _handle_exception
+    self._handle_exception_no_connection(self.dbapi, error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 840, in _handle_exception_no_connection
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: column usage_records.action does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\telemetry\_asgi.py", line 151, in __call__
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 197, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\main.py", line 232, in add_request_id
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 173, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 149, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\security_headers.py", line 83, in __call__
+    await self.app(scope, receive, send_wrapper)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\ratelimit.py", line 337, in __call__
+    await self.app(scope, receive, send_wrapper)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 91, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 149, in simple_response
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\routing.py", line 676, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 2786, in app
+    await route.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1817, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 2869, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1843, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1308, in handle
+    await effective_context.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 165, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 151, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 727, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 360, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\api\usage.py", line 124, in get_usage
+    actions = await usage_breakdown(
+              ^^^^^^^^^^^^^^^^^^^^^^
+        db, ws.workspace_id, since=start, column=UsageRecord.action
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\usage.py", line 167, in usage_breakdown
+    await db.execute(
+    ...<5 lines>...
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 651, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 210, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2473, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2363, in _execute_internal
+    compile_state_cls.orm_execute_statement(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<4 lines>...
+        conn,
+        ^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\context.py", line 316, in orm_execute_statement
+    result = conn.execute(
+        statement, params or {}, execution_options=execution_options
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1448, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 533, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1668, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<9 lines>...
+        param_dict=param_dict,
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1822, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1962, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2332, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 1192, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 656, in execute
+    await_(self._prepare_and_execute(operation, parameters))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 167, in await_
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 205, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 618, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 568, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 847, in _handle_exception
+    super()._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 412, in _handle_exception
+    self._handle_exception_no_connection(self.dbapi, error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 840, in _handle_exception_no_connection
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column usage_records.action does not exist
+[SQL: SELECT coalesce(usage_records.action, $1::VARCHAR) AS coalesce_1, coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) AS coalesce_3 
+FROM usage_records 
+WHERE usage_records.workspace_id = $3::VARCHAR AND usage_records.created_at >= $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(usage_records.action, $1::VARCHAR) ORDER BY coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) DESC 
+ LIMIT $5::INTEGER]
+[parameters: ('unknown', 0, 'ws_5582f4b23c204441b465', datetime.datetime(2026, 10, 13, 0, 0, tzinfo=datetime.timezone.utc), 20)]
+(Background on this error at: https://sqlalche.me/e/21/f405)
+2026-10-13 22:30:48.227 | INFO    | app.main                 | [req=req_2bb190c004694562] | [ROUTING - INCOMING] OPTIONS /api/v1/usage
+    * method: OPTIONS
+    * path: /api/v1/usage
+    * query:
+      {
+        "period": "month"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:30:48.228 | INFO    | app.main                 | [req=req_2bb190c004694562] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/usage (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/usage
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:30:48.229 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/usage
+    * method: GET
+    * path: /api/v1/usage
+    * query:
+      {
+        "period": "month"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:30:50.795 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:30:52.075 | ERROR   | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - ERROR] SQL execution failed: column usage_records.action does not exist
+    * statement:
+      SELECT coalesce(usage_records.action, $1::VARCHAR) AS coalesce_1, coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) AS coalesce_3 
+      FROM usage_records 
+      WHERE usage_records.workspace_id = $3::VARCHAR AND usage_records.created_at >= $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(usage_records.action, $1::VARCHAR) ORDER BY coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) DESC 
+       LIMIT $5::INTEGER
+    * error: column usage_records.action does not exist
+2026-10-13 22:30:52.209 | ERROR   | app.main                 | [req=req_07422f72467f4f2e] | unhandled_error
+    * path: /api/v1/usage
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 581, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        operation, self._invalidate_schema_cache_asof
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 819, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        operation, name=self._prepared_statement_name_func()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 638, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 657, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\asyncpg\connection.py", line 443, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "asyncpg/protocol/protocol.pyx", line 165, in prepare
+asyncpg.exceptions.UndefinedColumnError: column usage_records.action does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 1192, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 656, in execute
+    await_(self._prepare_and_execute(operation, parameters))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 167, in await_
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 205, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 618, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 568, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 847, in _handle_exception
+    super()._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 412, in _handle_exception
+    self._handle_exception_no_connection(self.dbapi, error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 840, in _handle_exception_no_connection
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: column usage_records.action does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\telemetry\_asgi.py", line 151, in __call__
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 197, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\main.py", line 232, in add_request_id
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 173, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\base.py", line 149, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\security_headers.py", line 83, in __call__
+    await self.app(scope, receive, send_wrapper)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\ratelimit.py", line 337, in __call__
+    await self.app(scope, receive, send_wrapper)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 91, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 149, in simple_response
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\routing.py", line 676, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 2786, in app
+    await route.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1817, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 2869, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1843, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 1308, in handle
+    await effective_context.app(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 165, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 151, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 727, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\fastapi\routing.py", line 360, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\api\usage.py", line 124, in get_usage
+    actions = await usage_breakdown(
+              ^^^^^^^^^^^^^^^^^^^^^^
+        db, ws.workspace_id, since=start, column=UsageRecord.action
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\app\core\usage.py", line 167, in usage_breakdown
+    await db.execute(
+    ...<5 lines>...
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 651, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 210, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2473, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2363, in _execute_internal
+    compile_state_cls.orm_execute_statement(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<4 lines>...
+        conn,
+        ^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\orm\context.py", line 316, in orm_execute_statement
+    result = conn.execute(
+        statement, params or {}, execution_options=execution_options
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1448, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 533, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1668, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<9 lines>...
+        param_dict=param_dict,
+    )
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1822, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1962, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2332, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 1192, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 656, in execute
+    await_(self._prepare_and_execute(operation, parameters))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 167, in await_
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\util\concurrency.py", line 205, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 618, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 568, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 847, in _handle_exception
+    super()._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 412, in _handle_exception
+    self._handle_exception_no_connection(self.dbapi, error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "D:\NTI-Final-Project\SAHM-AI-backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 840, in _handle_exception_no_connection
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column usage_records.action does not exist
+[SQL: SELECT coalesce(usage_records.action, $1::VARCHAR) AS coalesce_1, coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) AS coalesce_3 
+FROM usage_records 
+WHERE usage_records.workspace_id = $3::VARCHAR AND usage_records.created_at >= $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(usage_records.action, $1::VARCHAR) ORDER BY coalesce(sum(usage_records.tokens_in + usage_records.tokens_out), $2::INTEGER) DESC 
+ LIMIT $5::INTEGER]
+[parameters: ('unknown', 0, 'ws_5582f4b23c204441b465', datetime.datetime(2026, 10, 1, 0, 0, tzinfo=datetime.timezone.utc), 20)]
+(Background on this error at: https://sqlalche.me/e/21/f405)
+2026-10-13 22:31:50.727 | INFO    | app.ai.memory.compressor | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | ltm_debounce_triggered
+    * business_id: biz_a6b794f3ecea43e683df
+2026-10-13 22:31:54.596 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1471ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1471
+    * rowcount: 1
+    * statement:
+      SELECT max(messages.created_at) AS max_1 
+      FROM messages JOIN conversations ON messages.conversation_id = conversations.id 
+      WHERE conversations.business_id = $1::VARCHAR
+2026-10-13 22:31:56.903 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1769ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1769
+    * rowcount: 3
+    * statement:
+      SELECT conversations.id 
+      FROM conversations 
+      WHERE conversations.business_id = $1::VARCHAR ORDER BY conversations.updated_at DESC 
+       LIMIT $2::INTEGER
+2026-10-13 22:31:58.012 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1105ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1105
+    * rowcount: 10
+    * statement:
+      SELECT messages.id, messages.conversation_id, messages.role, messages.content, messages.blocks, messages.task_id, messages.persona_id, messages.created_at 
+      FROM messages 
+      WHERE messages.conversation_id IN ($2::VARCHAR, $3::VARCHAR, $4::VARCHAR) ORDER BY messages.created_at DESC 
+       LIMIT $1::INTEGER
+2026-10-13 22:31:58.055 | INFO    | google_genai.models      | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | AFC is enabled with max remote calls: 10.
+2026-10-13 22:32:01.071 | INFO    | httpx                    | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-13 22:32:02.292 | INFO    | app.ai.memory.compressor | [req=req_07422f72467f4f2e | biz=biz_a6b794f3ecea43e683df] | ltm_profile_updated
+    * business_id: biz_a6b794f3ecea43e683df
+    * facts_tokens: 678
+    * plans_tokens: 96
+2026-10-13 22:32:02.929 | ERROR   | app.db.trace             | [req=-] | [DATABASE - ERROR] SQL execution failed: column "action" of relation "usage_records" does not exist
+    * statement: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at
+    * error: column "action" of relation "usage_records" does not exist
+2026-10-13 22:32:03.167 | WARNING | app.core.ai_usage        | [req=-] | usage_meter_flush_failed
+    * error:
+      (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) column "action" of relation "usage_records" does not exist
+      [SQL: INSERT INTO usage_records (id, business_id, workspace_id, task_id, persona_id, tier, action, model, tokens_in, tokens_out, estimated) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR, $7::VARCHAR, $8::VARCHAR, $9::INTEGER, $10::INTEGER, $11::BOOLEAN) RETURNING usage_records.created_at]
+      [parameters: ('ur_9250ea7f82284e9fbd985177', 'biz_a6b794f3ecea43e683df', 'ws_5582f4b23c204441b465', None, None, None, 'chat', 'gemini-3.5-flash-lite', 1989, 778, False)]
+      (Background on this error at: https://sqlalche.me/e/21/f405)
+    * dropped: 1
+2026-10-13 22:41:54.594 | INFO    | app.main                 | [req=req_fee8067250ab415c] | [ROUTING - INCOMING] OPTIONS /api/v1/personas
+    * method: OPTIONS
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:54.600 | INFO    | app.main                 | [req=req_fee8067250ab415c] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/personas (3ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 3
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:41:54.605 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:57.280 | INFO    | app.main                 | [req=req_3efe2a1557624d62] | [ROUTING - INCOMING] OPTIONS /api/v1/campaigns
+    * method: OPTIONS
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:57.280 | INFO    | app.main                 | [req=req_3efe2a1557624d62] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/campaigns (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:41:57.282 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:57.308 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:41:58.054 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (3448ms, DB: 2706ms/13q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 3448
+    * db_queries: 13
+    * db_time_ms: 2706
+2026-10-13 22:41:58.156 | INFO    | app.main                 | [req=req_59b48dc39bc0419b] | [ROUTING - INCOMING] OPTIONS /api/v1/creatives/references
+    * method: OPTIONS
+    * path: /api/v1/creatives/references
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:58.157 | INFO    | app.main                 | [req=req_59b48dc39bc0419b] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/creatives/references (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/creatives/references
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:41:58.159 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/creatives/references
+    * method: GET
+    * path: /api/v1/creatives/references
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:58.162 | INFO    | app.main                 | [req=req_e0623046cf1f4b55] | [ROUTING - INCOMING] OPTIONS /api/v1/business/profile
+    * method: OPTIONS
+    * path: /api/v1/business/profile
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:58.218 | INFO    | app.main                 | [req=req_61a4d386aecd4e6a] | [ROUTING - INCOMING] OPTIONS /api/v1/creatives
+    * method: OPTIONS
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:58.220 | INFO    | app.main                 | [req=req_e0623046cf1f4b55] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/business/profile (56ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/business/profile
+    * status: 200
+    * duration_ms: 56
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:41:58.221 | INFO    | app.main                 | [req=req_61a4d386aecd4e6a] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/creatives (2ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 2
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:41:58.222 | INFO    | app.main                 | [req=req_5d559b17582541fa] | [ROUTING - INCOMING] OPTIONS /api/v1/settings/connectors
+    * method: OPTIONS
+    * path: /api/v1/settings/connectors
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:58.224 | INFO    | app.main                 | [req=req_5d559b17582541fa] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/settings/connectors (1ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/settings/connectors
+    * status: 200
+    * duration_ms: 1
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:41:58.225 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/business/profile
+    * method: GET
+    * path: /api/v1/business/profile
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:58.226 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/creatives
+    * method: GET
+    * path: /api/v1/creatives
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:58.230 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/settings/connectors
+    * method: GET
+    * path: /api/v1/settings/connectors
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:41:59.919 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:00.057 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (2774ms, DB: 1680ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 2774
+    * db_queries: 8
+    * db_time_ms: 1680
+2026-10-13 22:42:00.059 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:01.451 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:01.721 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1482ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1482
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:42:01.761 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1396ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1396
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:42:01.898 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:01.899 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:02.059 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives (3832ms, DB: 2606ms/8q)
+    * method: GET
+    * path: /api/v1/creatives
+    * status: 200
+    * duration_ms: 3832
+    * db_queries: 8
+    * db_time_ms: 2606
+2026-10-13 22:42:02.060 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/creatives/references (3900ms, DB: 2717ms/8q)
+    * method: GET
+    * path: /api/v1/creatives/references
+    * status: 200
+    * duration_ms: 3900
+    * db_queries: 8
+    * db_time_ms: 2717
+2026-10-13 22:42:02.288 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/business/profile (4062ms, DB: 2952ms/10q)
+    * method: GET
+    * path: /api/v1/business/profile
+    * status: 200
+    * duration_ms: 4062
+    * db_queries: 10
+    * db_time_ms: 2952
+2026-10-13 22:42:02.317 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 2020ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 2020
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:42:02.452 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:02.848 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/settings/connectors (4617ms, DB: 3468ms/9q)
+    * method: GET
+    * path: /api/v1/settings/connectors
+    * status: 200
+    * duration_ms: 4617
+    * db_queries: 9
+    * db_time_ms: 3468
+2026-10-13 22:42:03.789 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:03.916 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (3856ms, DB: 2308ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 3856
+    * db_queries: 8
+    * db_time_ms: 2308
+2026-10-13 22:42:15.085 | INFO    | app.main                 | [req=req_2b69cffaaad54d70] | [ROUTING - INCOMING] OPTIONS /api/v1/research/items
+    * method: OPTIONS
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:15.086 | INFO    | app.main                 | [req=req_2b69cffaaad54d70] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/research/items (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:42:15.088 | INFO    | app.main                 | [req=req_65d5d26510264fea] | [ROUTING - INCOMING] GET /api/v1/research/items
+    * method: GET
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:16.376 | INFO    | app.main                 | [req=req_18badfbad0e441f7] | [ROUTING - INCOMING] OPTIONS /api/v1/assistant/conversations
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:16.377 | INFO    | app.main                 | [req=req_18badfbad0e441f7] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/assistant/conversations (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:42:16.379 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/assistant/conversations
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:16.382 | INFO    | app.main                 | [req=req_f67d98f0d7f64247] | [ROUTING - INCOMING] OPTIONS /api/v1/memory/items
+    * method: OPTIONS
+    * path: /api/v1/memory/items
+    * query:
+      {
+        "kind": "competitor_note"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:16.383 | INFO    | app.main                 | [req=req_f67d98f0d7f64247] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/memory/items (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/memory/items
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:42:16.384 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/personas
+    * method: GET
+    * path: /api/v1/personas
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:16.385 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/memory/items
+    * method: GET
+    * path: /api/v1/memory/items
+    * query:
+      {
+        "kind": "competitor_note"
+      }
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:18.134 | INFO    | app.main                 | [req=req_eb596aa58feb47c4] | [ROUTING - INCOMING] OPTIONS /api/v1/business/brand-identity
+    * method: OPTIONS
+    * path: /api/v1/business/brand-identity
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:18.135 | INFO    | app.main                 | [req=req_eb596aa58feb47c4] | [ROUTING - OUTGOING] 200 OPTIONS /api/v1/business/brand-identity (0ms, DB: 0ms/0q)
+    * method: OPTIONS
+    * path: /api/v1/business/brand-identity
+    * status: 200
+    * duration_ms: 0
+    * db_queries: 0
+    * db_time_ms: 0
+2026-10-13 22:42:18.137 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/business/brand-identity
+    * method: GET
+    * path: /api/v1/business/brand-identity
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:18.139 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - INCOMING] GET /api/v1/campaigns
+    * method: GET
+    * path: /api/v1/campaigns
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:18.549 | WARNING | app.db.trace             | [req=req_65d5d26510264fea] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1636ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1636
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:42:18.733 | INFO    | app.api.deps             | [req=req_65d5d26510264fea] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:19.341 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:19.528 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:19.532 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/assistant/conversations (3152ms, DB: 2077ms/8q)
+    * method: GET
+    * path: /api/v1/assistant/conversations
+    * status: 200
+    * duration_ms: 3152
+    * db_queries: 8
+    * db_time_ms: 2077
+2026-10-13 22:42:19.653 | WARNING | app.db.trace             | [req=req_07422f72467f4f2e] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1353ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1353
+    * rowcount: 14
+    * statement:
+      SELECT brand_memory_items.business_id, brand_memory_items.id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id IN (
+2026-10-13 22:42:19.813 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:20.009 | WARNING | app.db.trace             | [req=req_65d5d26510264fea | biz=biz_a6b794f3ecea43e683df] | [DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: 1274ms (op: SELECT)
+    * operation: SELECT
+    * duration_ms: 1274
+    * rowcount: 9
+    * statement:
+      SELECT brand_memory_items.id, brand_memory_items.business_id, brand_memory_items.kind, brand_memory_items.text, brand_memory_items.embedding, brand_memory_items.metadata, brand_memory_items.campaign_id, brand_memory_items.created_at 
+      FROM brand_memory_items 
+      WHERE brand_memory_items.business_id = $1
+2026-10-13 22:42:20.012 | INFO    | app.main                 | [req=req_65d5d26510264fea] | [ROUTING - OUTGOING] 200 GET /api/v1/research/items (4923ms, DB: 3912ms/8q)
+    * method: GET
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 4923
+    * db_queries: 8
+    * db_time_ms: 3912
+2026-10-13 22:42:20.014 | INFO    | app.main                 | [req=req_3693a1c66bc24b9d] | [ROUTING - INCOMING] GET /api/v1/research/items
+    * method: GET
+    * path: /api/v1/research/items
+    * query:
+      {}
+    * client: 127.0.0.1
+    * body: None
+2026-10-13 22:42:20.153 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/memory/items (3767ms, DB: 2687ms/9q)
+    * method: GET
+    * path: /api/v1/memory/items
+    * status: 200
+    * duration_ms: 3767
+    * db_queries: 9
+    * db_time_ms: 2687
+2026-10-13 22:42:20.448 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/personas (4064ms, DB: 2983ms/12q)
+    * method: GET
+    * path: /api/v1/personas
+    * status: 200
+    * duration_ms: 4064
+    * db_queries: 12
+    * db_time_ms: 2983
+2026-10-13 22:42:21.459 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:21.544 | INFO    | app.api.deps             | [req=req_07422f72467f4f2e] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:21.734 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/business/brand-identity (3596ms, DB: 2310ms/9q)
+    * method: GET
+    * path: /api/v1/business/brand-identity
+    * status: 200
+    * duration_ms: 3596
+    * db_queries: 9
+    * db_time_ms: 2310
+2026-10-13 22:42:21.794 | INFO    | app.main                 | [req=req_07422f72467f4f2e] | [ROUTING - OUTGOING] 200 GET /api/v1/campaigns (3654ms, DB: 2337ms/8q)
+    * method: GET
+    * path: /api/v1/campaigns
+    * status: 200
+    * duration_ms: 3654
+    * db_queries: 8
+    * db_time_ms: 2337
+2026-10-13 22:42:22.917 | INFO    | app.api.deps             | [req=req_3693a1c66bc24b9d] | workspace_resolved_from_membership
+    * user_id: usr_96c8982fb329481b9c93c016
+    * requested_workspace: biz_a6b794f3ecea43e683df
+    * granted_role: owner
+2026-10-13 22:42:23.414 | INFO    | app.main                 | [req=req_3693a1c66bc24b9d] | [ROUTING - OUTGOING] 200 GET /api/v1/research/items (3399ms, DB: 1990ms/8q)
+    * method: GET
+    * path: /api/v1/research/items
+    * status: 200
+    * duration_ms: 3399
+    * db_queries: 8
+    * db_time_ms: 1990

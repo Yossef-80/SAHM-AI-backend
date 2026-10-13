@@ -205,3 +205,4 @@
 2026-10-13 13:20:36 | INFO    | provider.search | tavily_ok | query='"Abu Auf" campaign commercial ad creative video hook commercial Egypt' results=5 depth='basic'
 2026-10-13 13:20:38 | INFO    | provider.search | tavily_ok | query='"Abu Auf" facebook ads instagram reels ad copy offers discount Egypt' results=3 depth='basic'
 2026-10-13 21:08:03 | INFO    | provider.search | search_provider_built | provider='tavily'
+2026-10-13 22:25:30 | INFO    | provider.search | search_provider_built | provider='tavily'
