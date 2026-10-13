@@ -129,6 +129,9 @@ class BlockKind(str, Enum):
     CONTEXT_USED = "context_used"
     QUESTION_WITH_OPTIONS = "question_with_options"
     ERROR = "error"
+    AD_STYLE_ANALYSIS = "ad_style_analysis"
+    AD_PROMPT = "ad_prompt"
+    IMAGE_PREVIEW = "image_preview"
 
 
 class IntentKind(str, Enum):

@@ -5,10 +5,20 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Response
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import FastLLMDep, LLMDep, RequestIdDep, SessionDep, WorkspaceDep
+from app.ai.tools.ad_previews import AdPreviewNotFoundError, read_ad_preview
+from app.api.deps import (
+    CurrentUserDep,
+    FastLLMDep,
+    LLMDep,
+    RequestIdDep,
+    SessionDep,
+    SettingsDep,
+    WorkspaceDep,
+)
+from app.core.errors import NotFoundError
 from app.core.logging import get_logger
 from app.core.orchestrator.service import (
     get_conversation,
@@ -231,4 +241,36 @@ async def get_conversation_detail(
     return await get_conversation(db, conversation_id, business_id=ws.business_id)
 
 
-__all__ = ["get_conversation_detail", "get_conversations", "post_message", "post_message_stream"]
+@router.get("/ad-previews/{preview_id}")
+async def get_ad_preview(
+    preview_id: str,
+    ws: WorkspaceDep,
+    settings: SettingsDep,
+    _user: CurrentUserDep,
+) -> Response:
+    """Return stored image bytes for an ad preview within the workspace scope."""
+    try:
+        data, mime = read_ad_preview(
+            upload_dir=settings.upload_dir,
+            business_id=ws.business_id,
+            preview_id=preview_id,
+        )
+    except AdPreviewNotFoundError as exc:
+        raise NotFoundError("ad preview not found") from exc
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={
+            "Cache-Control": "private, max-age=60",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+__all__ = [
+    "get_ad_preview",
+    "get_conversation_detail",
+    "get_conversations",
+    "post_message",
+    "post_message_stream",
+]

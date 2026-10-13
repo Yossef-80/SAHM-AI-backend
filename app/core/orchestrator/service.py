@@ -22,7 +22,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.security import redact_sensitive_data
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, ValidationFailed
 from app.core.logging import get_logger
 from app.core.orchestrator.blocks import compose_blocks, task_progress_block, validate_blocks
 from app.db.models import (
@@ -194,6 +194,8 @@ async def get_or_create_conversation(
     if conversation_id:
         existing = await db.get(Conversation, conversation_id)
         if existing is not None:
+            if existing.business_id != business_id:
+                raise NotFoundError(f"conversation '{conversation_id}' not found")
             return existing
         raise NotFoundError(f"conversation '{conversation_id}' not found")
     conversation = Conversation(
@@ -205,6 +207,36 @@ async def get_or_create_conversation(
     db.add(conversation)
     await db.flush()
     return conversation
+
+
+async def _resolve_answer_selection(
+    db: AsyncSession,
+    *,
+    conversation_id: str,
+    answer: AssistantAnswer,
+) -> dict[str, Any]:
+    msg = await db.get(Message, answer.message_id)
+    if msg is None or msg.conversation_id != conversation_id:
+        raise ValidationFailed("Invalid answer message.")
+    blocks = msg.blocks or []
+    question_block = next(
+        (b for b in blocks if isinstance(b, dict) and b.get("type") == "question_with_options"),
+        None,
+    )
+    if not question_block:
+        raise ValidationFailed("No options block found in answered message.")
+
+    answered_ids = set(question_block.get("answeredOptionIds") or [])
+    for opt_id in answer.option_ids:
+        if opt_id in answered_ids:
+            raise ValidationFailed("Option has already been answered.")
+
+    options = question_block.get("options") or []
+    chosen = next((opt for opt in options if opt.get("id") in answer.option_ids), None)
+    if not chosen:
+        raise ValidationFailed("Selected option not found in question.")
+
+    return chosen.get("payload") or {}
 
 
 async def list_conversations(db: AsyncSession, business_id: str) -> list[ConversationSummary]:
@@ -357,13 +389,17 @@ async def handle_message(
         b_key = business.id
         now_ts = _now().timestamp()
         cached = _IN_FLIGHT_NEW_CONVERSATIONS.get(b_key)
+        conversation = None
         if cached and cached[0] == request.message and (now_ts - cached[2] < 2.5):
-            _logger.info(
-                "duplicate_new_conversation_deduplicated",
-                extra={"business_id": business.id, "reused_conversation_id": cached[1]},
-            )
-            conversation = await get_or_create_conversation(db, cached[1], business.id)
-        else:
+            try:
+                conversation = await get_or_create_conversation(db, cached[1], business.id)
+                _logger.info(
+                    "duplicate_new_conversation_deduplicated",
+                    extra={"business_id": business.id, "reused_conversation_id": cached[1]},
+                )
+            except NotFoundError:
+                conversation = None
+        if conversation is None:
             conversation = await get_or_create_conversation(db, None, business.id)
             _IN_FLIGHT_NEW_CONVERSATIONS[b_key] = (request.message, conversation.id, now_ts)
     else:
@@ -404,41 +440,18 @@ async def handle_message(
     ).scalars().all()
 
     validated_prompt_answer: dict[str, Any] | None = None
+    ad_flow_selection: dict[str, Any] | None = None
     if request.answer:
-        latest_assistant = next(
-            (row for row in reversed(msg_rows) if row.role == "assistant"),
-            None,
+        selected_payload = await _resolve_answer_selection(
+            db, conversation_id=conversation.id, answer=request.answer
         )
-        has_question = latest_assistant is not None and any(
-            isinstance(block, dict) and block.get("type") == "question_with_options"
-            for block in (latest_assistant.blocks or [])
-        )
-        if (
-            latest_assistant is not None
-            and has_question
-            and str(latest_assistant.id) == request.answer.message_id
-        ):
-            valid_options: set[str] = set()
-            for block in latest_assistant.blocks or []:
-                if not isinstance(block, dict) or block.get("type") != "question_with_options":
-                    continue
-                valid_options.update(
-                    str(option.get("id"))
-                    for option in (block.get("options") or [])
-                    if isinstance(option, dict) and option.get("id")
-                )
-            selected = [option for option in request.answer.option_ids if option in valid_options]
-            if selected:
-                updated_blocks = [dict(item) if isinstance(item, dict) else item for item in latest_assistant.blocks]
-                for updated in updated_blocks:
-                    if isinstance(updated, dict) and updated.get("type") == "question_with_options":
-                        updated["answeredOptionIds"] = selected
-                latest_assistant.blocks = updated_blocks
-                if context.get("workflow") == "creative_prompt":
-                    validated_prompt_answer = {
-                        "message_id": str(latest_assistant.id),
-                        "option_ids": selected,
-                    }
+        if isinstance(selected_payload, dict) and selected_payload.get("kind") == "meta_ad_preview":
+            ad_flow_selection = selected_payload
+        if context.get("workflow") == "creative_prompt":
+            validated_prompt_answer = {
+                "message_id": str(request.answer.message_id),
+                "option_ids": list(request.answer.option_ids),
+            }
 
     # Manage session memory with configurable token threshold:
     # Below threshold: passes raw past questions and answers like a normal chat agent.
@@ -552,6 +565,23 @@ async def handle_message(
     )
     active_plans = plan_item if plan_item else None
 
+    def _ad_tool_context_factory():
+        from app.core.tools.base import ToolContext
+        return ToolContext(
+            workspace_id=business.workspace_id or "",
+            business_id=business.id,
+            db=db,
+            llm=llm,
+            fast_llm=fast_llm or llm,
+            request_id=request_id or "ai-chat",
+            conversation_id=conversation.id,
+            persona_id="researcher",
+            campaign_id=(str(context.get("campaign_id") or "") or None) if context else None,
+            creative_id=(str(context.get("creative_id") or "") or None) if context else None,
+            insight_id=(str(context.get("insight_id") or "") or None) if context else None,
+            user_supplied=dict(context or {}),
+        )
+
     # LANGGRAPH UI BLOCKS OVERRIDE
     from app.ai.agents.orchestrator.brain import orchestrate
     final_gui = await orchestrate(
@@ -571,6 +601,8 @@ async def handle_message(
         context=ai_context,
         forced_agent=request.persona_id or context.get("persona_id"),
         language=request.language,
+        ad_flow_selection=ad_flow_selection,
+        ad_tool_context_factory=_ad_tool_context_factory,
     )
     next_prompt_stage = getattr(final_gui, "creative_prompt_stage", None) if final_gui else None
     if final_gui and getattr(final_gui, "creative_prompt_workflow", False):
@@ -664,6 +696,14 @@ async def handle_message(
     # Return the same durable IDs the conversation endpoint will return.
     user_message = _message_schema(user_row)
     assistant_message = _message_schema(assistant_row)
+    if request.answer is not None:
+        ans_msg = await db.get(Message, request.answer.message_id)
+        if ans_msg and ans_msg.blocks:
+            up_blocks = [dict(b) if isinstance(b, dict) else b for b in ans_msg.blocks]
+            for ub in up_blocks:
+                if isinstance(ub, dict) and ub.get("type") == "question_with_options":
+                    ub["answeredOptionIds"] = list(request.answer.option_ids)
+            ans_msg.blocks = up_blocks
     await db.commit()
 
     if not defer_post_memory:

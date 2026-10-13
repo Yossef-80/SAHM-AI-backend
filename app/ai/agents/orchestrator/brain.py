@@ -31,9 +31,40 @@ from app.ai.providers.llm import get_llm
 from app.ai.security import redact_sensitive_data
 from app.ai.settings import get_ai_settings
 from app.core.logging import get_logger
-from app.schemas.blocks import MessageWithBlocks, QuestionWithOptionsBlock, TextBlock
+from app.schemas.blocks import (
+    AdPromptBlock,
+    ImagePreviewBlock,
+    MessageWithBlocks,
+    QuestionWithOptionsBlock,
+    TextBlock,
+)
+from app.ai.agents.nour.meta_ads import (
+    analyze_meta_competitor_ads,
+    analyze_selected_competitor_ad,
+    draft_ad_prompt,
+    generate_ad_image_draft,
+)
 
 _logger = get_logger(__name__)
+
+
+def _requests_image_generation(prompt: str) -> bool:
+    low = (prompt or "").lower()
+    if any(p in low for p in ("prompt", "how do i", "how to")):
+        return False
+    return any(
+        p in low
+        for p in (
+            "generate an image",
+            "create an image",
+            "draw an image",
+            "make an image",
+            "توليد صورة",
+            "أنشئ صورة",
+            "صمم صورة",
+            "اعمل صورة",
+        )
+    )
 
 
 class OrchestratorResult(MessageWithBlocks):
@@ -2102,8 +2133,46 @@ async def orchestrate(
     forced_agent: str | None = None,
     active_plans: str | None = None,
     language: str | None = None,
-) -> OrchestratorResult | None:
+    ad_flow_selection: dict[str, Any] | None = None,
+    ad_tool_context_factory: Any | None = None,
+    ad_style_context: dict[str, Any] | None = None,
+    ad_prompt_context: dict[str, Any] | None = None,
+) -> Any:
     """Route a turn; optionally run Omar -> Layla for strategy-led ad creative."""
+
+    if ad_flow_selection is not None:
+        return await analyze_selected_competitor_ad(
+            ad_flow_selection,
+            tool_context_factory=ad_tool_context_factory,
+            event_queue=event_queue,
+        )
+
+    if ad_prompt_context is not None and _requests_image_generation(prompt):
+        return await generate_ad_image_draft(
+            prompt,
+            style_context=ad_style_context,
+            prompt_context=ad_prompt_context,
+            tool_context_factory=ad_tool_context_factory,
+            event_queue=event_queue,
+        )
+
+    if ad_style_context is not None:
+        return await draft_ad_prompt(
+            prompt,
+            ad_style_context,
+            user_context=user_context,
+            event_queue=event_queue,
+        )
+
+    from app.ai.agents.nour.meta_ads import is_meta_competitor_ads_request, resolve_meta_ads_prompt
+    if forced_agent is None and is_meta_competitor_ads_request(prompt, history):
+        resolved_prompt = resolve_meta_ads_prompt(prompt, history)
+        return await analyze_meta_competitor_ads(
+            resolved_prompt,
+            tool_context_factory=ad_tool_context_factory,
+            event_queue=event_queue,
+            user_context=user_context,
+        )
 
     prompt = str(redact_sensitive_data(prompt))
     history = redact_sensitive_data(history)
@@ -2304,20 +2373,33 @@ async def orchestrate(
                 workflow="single",
             )
         else:
-            router = get_llm(provider=ai_settings.llm_provider).structured(RoutingDecision)
-            decision = await router.ainvoke(
-                [
-                    SystemMessage(content=ROUTING_PROMPT),
-                    *chat_history,
-                    HumanMessage(
-                        content=(
-                            "Route this newest user request and choose the workflow:\n"
-                            + prompt
-                        )
-                    ),
-                ],
-                config={"callbacks": [AILoggingCallback(agent="orchestrator")]},
+            llm_inst = get_llm(provider=ai_settings.llm_provider)
+            router = (
+                llm_inst.structured(RoutingDecision)
+                if hasattr(llm_inst, "structured")
+                else llm_inst.chat.with_structured_output(RoutingDecision)
             )
+            messages = [
+                SystemMessage(content=ROUTING_PROMPT),
+                *chat_history,
+                HumanMessage(
+                    content=(
+                        "Route this newest user request and choose the workflow:\n"
+                        + prompt
+                    )
+                ),
+            ]
+            try:
+                decision = await router.ainvoke(
+                    messages,
+                    config={"callbacks": [AILoggingCallback(agent="orchestrator")]},
+                )
+            except TypeError:
+                decision = await router.ainvoke(messages)
+        if _requests_image_generation(prompt):
+            decision.agent = "layla"
+            decision.workflow = "single"
+            decision.reason = "Explicit image generation requested inside Sahm."
     except Exception as exc:
         print(f"[ORCHESTRATOR] Routing failed; using chat fallback ({type(exc).__name__}).")
         if creative_prompt_workflow:
@@ -2365,6 +2447,8 @@ async def orchestrate(
             "business_id": business_id or "default",
             "agent": agent_name,
         }
+        if agent_name == "layla" and _requests_image_generation(prompt):
+            configurable["allow_image_generation"] = True
         saved_profile = context.get("business_profile_context")
         if isinstance(saved_profile, dict):
             configurable["business_profile_context"] = saved_profile
@@ -2425,6 +2509,7 @@ async def orchestrate(
     ) if decision.agent in graphs else None
 
     final_msg = ""
+    image_blocks: list[Any] = []
     strategy_creative_flow = (
         decision.workflow == "omar_then_layla"
         and decision.agent in {"omar", "layla"}
@@ -2539,6 +2624,33 @@ async def orchestrate(
             # get_brand_context) instead of the final structured report.
             submit_tool = _SUBMIT_TOOL_BY_AGENT[decision.agent]
             output = agent_output(final_state, submit_tool)
+            if decision.agent == "layla":
+                for msg in final_state.get("messages", []):
+                    if getattr(msg, "name", None) == "generate_image_draft_tool" or getattr(msg, "tool_call_id", None) == "gen-1":
+                        try:
+                            data = json.loads(msg.content) if isinstance(msg.content, str) else msg.content
+                            if isinstance(data, dict) and data.get("status") == "ok" and "asset" in data:
+                                asset = data["asset"]
+                                p_text = asset.get("prompt") or ""
+                                image_blocks.append(AdPromptBlock(prompt=p_text))
+                                if asset.get("provider") == "mock":
+                                    image_blocks.append(
+                                        TextBlock(
+                                            text="تنبيه: الإعداد الحالي يستخدم مزود mock، لذا المعاينة التالية تجريبية وليست صورة من نموذج فعلي."
+                                        )
+                                    )
+                                image_blocks.append(
+                                    ImagePreviewBlock(
+                                        title="معاينة مسودة الصورة",
+                                        url=asset.get("url") or "",
+                                        alt="مسودة صورة إعلانية مولّدة",
+                                        prompt=p_text,
+                                        provider=asset.get("provider"),
+                                        model=asset.get("model"),
+                                    )
+                                )
+                        except Exception:
+                            pass
             if decision.agent == "omar" and business_id:
                 cal_data = final_state.get("content_calendar")
                 if isinstance(cal_data, dict) and cal_data.get("posts"):
@@ -2612,19 +2724,23 @@ async def orchestrate(
                     "Answer only the user's latest question. Do not use tools."
                 )
             )
-            fallback_res = await general_llm.ainvoke(
-                [
-                    sys_msg,
-                    *chat_history,
-                    HumanMessage(
-                        content=(
-                            "Context from previous turns is provided above. Answer only this "
-                            f"new question:\n{prompt}"
-                        )
-                    ),
-                ],
-                config={"callbacks": [AILoggingCallback(agent="chat")]},
-            )
+            chat_msgs = [
+                sys_msg,
+                *chat_history,
+                HumanMessage(
+                    content=(
+                        "Context from previous turns is provided above. Answer only this "
+                        f"new question:\n{prompt}"
+                    )
+                ),
+            ]
+            try:
+                fallback_res = await general_llm.ainvoke(
+                    chat_msgs,
+                    config={"callbacks": [AILoggingCallback(agent="chat")]},
+                )
+            except TypeError:
+                fallback_res = await general_llm.ainvoke(chat_msgs)
             final_msg = _message_text(fallback_res.content)
         except Exception as exc:
             print(f"[ORCHESTRATOR] Chat provider unavailable ({type(exc).__name__}).")
@@ -2645,8 +2761,9 @@ async def orchestrate(
 
     final_msg = final_msg.strip() or "I do not have enough information to complete this request yet."
     if final_persona_id is not None:
+        base_blocks = [TextBlock(text=str(redact_sensitive_data(final_msg)))]
         return OrchestratorResult(
-            blocks=[TextBlock(text=str(redact_sensitive_data(final_msg)))],
+            blocks=[*image_blocks, *base_blocks],
             persona_id=final_persona_id,
             creative_prompt_stage=(
                 str(context.get("creative_prompt_stage") or "collecting_details")
@@ -2665,25 +2782,34 @@ async def orchestrate(
             creative_prompt_unresolved_fields=context.get("creative_prompt_unresolved_fields"),
         )
     try:
-        block_llm = get_llm(provider=ai_settings.llm_provider).structured(MessageWithBlocks)
-        formatted = await block_llm.ainvoke(
-            [
-                SystemMessage(
-                    content=(
-                        "Convert the following text into structured React UI Blocks. "
-                        "CRITICAL RULE FOR THE 'type' FIELD: For paragraphs, use exactly "
-                        "'text' (NOT 'TextBlock'); for lists/bullet points, use exactly "
-                        "'findings' (NOT 'FindingsBlock'). Strictly follow the block schema. "
-                        "Use the same language as the user-facing result. Organize substantive answers with task-appropriate headings, concise findings, evidence/source distinctions, assumptions, and next steps where useful; do not add empty sections or padding. Preserve material facts and uncertainty, never invent evidence, and do not omit either Omar's strategy or Layla's creative section when both appear. For image/video prompts preserve technical visual/cinematic detail and separate the copy-ready prompt from caveats or settings."
-                    )
-                ),
-                HumanMessage(content=final_msg),
-            ],
-            config={"callbacks": [AILoggingCallback(agent="formatting")]},
+        llm_block_inst = get_llm(provider=ai_settings.llm_provider)
+        block_llm = (
+            llm_block_inst.structured(MessageWithBlocks)
+            if hasattr(llm_block_inst, "structured")
+            else llm_block_inst.chat.with_structured_output(MessageWithBlocks)
         )
+        format_msgs = [
+            SystemMessage(
+                content=(
+                    "Convert the following text into structured React UI Blocks. "
+                    "CRITICAL RULE FOR THE 'type' FIELD: For paragraphs, use exactly "
+                    "'text' (NOT 'TextBlock'); for lists/bullet points, use exactly "
+                    "'findings' (NOT 'FindingsBlock'). Strictly follow the block schema. "
+                    "Use the same language as the user-facing result. Organize substantive answers with task-appropriate headings, concise findings, evidence/source distinctions, assumptions, and next steps where useful; do not add empty sections or padding. Preserve material facts and uncertainty, never invent evidence, and do not omit either Omar's strategy or Layla's creative section when both appear. For image/video prompts preserve technical visual/cinematic detail and separate the copy-ready prompt from caveats or settings."
+                )
+            ),
+            HumanMessage(content=final_msg),
+        ]
+        try:
+            formatted = await block_llm.ainvoke(
+                format_msgs,
+                config={"callbacks": [AILoggingCallback(agent="formatting")]},
+            )
+        except TypeError:
+            formatted = await block_llm.ainvoke(format_msgs)
         safe_blocks = redact_sensitive_data(formatted.blocks)
         return OrchestratorResult(
-            blocks=safe_blocks,
+            blocks=[*image_blocks, *safe_blocks],
             persona_id=final_persona_id,
             creative_prompt_stage=(
                 str(context.get("creative_prompt_stage") or "collecting_details")
@@ -2707,7 +2833,7 @@ async def orchestrate(
             f"({type(exc).__name__})."
         )
         return OrchestratorResult(
-            blocks=[TextBlock(text=str(redact_sensitive_data(final_msg)))],
+            blocks=[*image_blocks, TextBlock(text=str(redact_sensitive_data(final_msg)))],
             persona_id=final_persona_id,
             creative_prompt_stage=(
                 str(context.get("creative_prompt_stage") or "collecting_details")

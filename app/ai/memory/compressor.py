@@ -21,10 +21,11 @@ logger = get_logger(__name__)
 
 def _message_to_text(msg: Any) -> str:
     """Canonical text representation of a message row or history dict."""
-    if hasattr(msg, "blocks") and msg.blocks:
-        return blocks_to_plaintext(msg.blocks)
-    if isinstance(msg, dict) and msg.get("blocks"):
-        return blocks_to_plaintext(msg["blocks"])
+    blocks = getattr(msg, "blocks", None) if hasattr(msg, "blocks") else (msg.get("blocks") if isinstance(msg, dict) else None)
+    if blocks:
+        txt = blocks_to_plaintext(blocks)
+        if txt.strip():
+            return txt
     content = getattr(msg, "content", None) if hasattr(msg, "content") else (msg.get("content") if isinstance(msg, dict) else None)
     return str(content or "")
 
@@ -625,8 +626,8 @@ async def manage_session_memory_with_token_cap(
     except Exception:
         retain_count = 2
 
-    valid_msgs = [m for m in messages if m.role in ("user", "assistant") and _message_to_text(m).strip()]
-    safe_content = {id(m): str(redact_sensitive_data(_message_to_text(m))) for m in valid_msgs}
+    valid_msgs = [m for m in messages if m.role in ("user", "assistant") and (getattr(m, "content", None) or _message_to_text(m)).strip()]
+    safe_content = {id(m): str(redact_sensitive_data(getattr(m, "content", None) or _message_to_text(m))) for m in valid_msgs}
     
     # Calculate measured tokens using real tokenizer
     total_tokens = sum(count_tokens(safe_content[id(m)]) for m in valid_msgs)
@@ -656,36 +657,17 @@ async def manage_session_memory_with_token_cap(
     conv_ctx = dict(getattr(conversation, "context", None) or {})
     last_summary_tokens = conv_ctx.get("summary_token_watermark")
 
-    if conversation.summary:
-        if last_summary_tokens is not None and last_summary_tokens > 0:
-            growth = (total_tokens - last_summary_tokens) / last_summary_tokens
-            if growth < 0.25:
-                logger.info(
-                    "session_memory_growth_gated",
-                    extra={
-                        "conversation_id": conversation.id,
-                        "growth": round(growth, 3),
-                        "total_tokens": total_tokens,
-                        "last_summary_tokens": last_summary_tokens,
-                    },
-                )
-                compact_history = [
-                    {
-                        "role": m.role,
-                        "content": safe_content[id(m)],
-                        "persona_id": m.persona_id,
-                        "blocks": redact_sensitive_data(m.blocks or []),
-                    }
-                    for m in recent_msgs
-                ]
-                return compact_history, conversation.summary
-        else:
-            # Existing summary without watermark recorded: record current tokens and reuse summary
-            conversation.context = {**conv_ctx, "summary_token_watermark": total_tokens}
-            await db.flush()
+    if conversation.summary and last_summary_tokens is not None and last_summary_tokens > 0:
+        growth = (total_tokens - last_summary_tokens) / last_summary_tokens
+        if growth < 0.25:
             logger.info(
-                "session_memory_watermark_initialized",
-                extra={"conversation_id": conversation.id, "total_tokens": total_tokens},
+                "session_memory_growth_gated",
+                extra={
+                    "conversation_id": conversation.id,
+                    "growth": round(growth, 3),
+                    "total_tokens": total_tokens,
+                    "last_summary_tokens": last_summary_tokens,
+                },
             )
             compact_history = [
                 {
@@ -743,10 +725,9 @@ async def manage_session_memory_with_token_cap(
         new_summary = new_summary[: max_tokens * 4]
         # Update the database
         conversation.summary = new_summary
-        conversation.context = {
-            **(conversation.context or {}),
-            "summary_token_watermark": total_tokens,
-        }
+        conv_ctx = dict(getattr(conversation, "context", None) or {})
+        conv_ctx["summary_token_watermark"] = total_tokens
+        conversation.context = conv_ctx
         await db.flush()
         logger.info(
             "conversation_summary_updated",

@@ -16,6 +16,7 @@ Every module in this folder exposes the same 2-item contract:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import Runnable
@@ -59,13 +60,20 @@ def get_llm(
     model: str | None = None,
     temperature: float | None = None,
     settings: AISettings | None = None,
+    base_url: str | None = None,
 ) -> LLMHandle:
     """Build the chat model selected by the enum (``AI_LLM_PROVIDER`` by default)."""
     cfg = settings or get_ai_settings()
     choice = provider or cfg.llm_provider
+    if base_url is not None and choice != LLMProvider.OLLAMA:
+        raise ProviderNotConfiguredError("Endpoint overrides are supported only for the Ollama provider.")
     module = load_provider_module(_PROVIDER_MODULES, choice, "llm")
 
-    chat = module.build_chat_model(cfg, model=model or cfg.llm_model, temperature=temperature)
+    build_kwargs: dict[str, Any] = {"model": model or cfg.llm_model, "temperature": temperature}
+    if base_url is not None:
+        build_kwargs["base_url"] = base_url
+
+    chat = module.build_chat_model(cfg, **build_kwargs)
     method = cfg.structured_output_method or module.DEFAULT_STRUCTURED_METHOD
     model_name = str(getattr(chat, "model", None) or getattr(chat, "model_name", None) or choice)
 

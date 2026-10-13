@@ -711,7 +711,7 @@ def _compose_image_prompt(
     for key, label in mapping:
         value = style.get(key)
         if isinstance(value, list) and value:
-            parts.append(f"- {label}: {value}")
+            parts.append(f"- {label}: {', '.join(str(v) for v in value)}")
         elif isinstance(value, str) and value:
             parts.append(f"- {label}: {value}")
     if isinstance(style.get("brand_elements"), list) and style["brand_elements"]:

@@ -164,6 +164,52 @@ class ErrorBlock(BaseBlock):
     unavailable_sources: list[str] = Field(default_factory=list)
 
 
+# --------------------------------------------------- ad style analysis ----
+
+
+class AdStyleSpec(ApiModel):
+    palette: list[str] = Field(default_factory=list)
+    composition: str = ""
+    typography: str = ""
+    tone: str = ""
+    layout_pattern: str = ""
+    color_mood: str = ""
+    text_density: str = ""
+    summary: str = ""
+
+
+class AdStyleAnalysisBlock(BaseBlock):
+    type: Literal[BlockKind.AD_STYLE_ANALYSIS] = BlockKind.AD_STYLE_ANALYSIS
+    source_ad_id: str | None = None
+    source_name: str | None = None
+    source_url: str | None = None
+    analysis: AdStyleSpec | None = None
+
+
+# ---------------------------------------------------------- ad prompt ----
+
+
+class AdPromptBlock(BaseBlock):
+    type: Literal[BlockKind.AD_PROMPT] = BlockKind.AD_PROMPT
+    title: str = "Ad Prompt"
+    prompt: str = ""
+    source_ad_id: str | None = None
+    source_name: str | None = None
+
+
+# ------------------------------------------------------- image preview ----
+
+
+class ImagePreviewBlock(BaseBlock):
+    type: Literal[BlockKind.IMAGE_PREVIEW] = BlockKind.IMAGE_PREVIEW
+    title: str = "Image Preview"
+    url: str = ""
+    alt: str = ""
+    prompt: str | None = None
+    provider: str | None = None
+    model: str | None = None
+
+
 # ------------------------------------------------------- streaming events ----
 
 
@@ -218,6 +264,9 @@ Block = Annotated[
         Annotated[ContextUsedBlock, Tag(BlockKind.CONTEXT_USED.value)],
         Annotated[QuestionWithOptionsBlock, Tag(BlockKind.QUESTION_WITH_OPTIONS.value)],
         Annotated[ErrorBlock, Tag(BlockKind.ERROR.value)],
+        Annotated[AdStyleAnalysisBlock, Tag(BlockKind.AD_STYLE_ANALYSIS.value)],
+        Annotated[AdPromptBlock, Tag(BlockKind.AD_PROMPT.value)],
+        Annotated[ImagePreviewBlock, Tag(BlockKind.IMAGE_PREVIEW.value)],
     ],
     Discriminator(_block_discriminator),
 ]
@@ -439,6 +488,9 @@ def blocks_to_plaintext(blocks: list[Any] | None) -> str:
 __all__ = [
     "ActionCard",
     "ActionCardBlock",
+    "AdPromptBlock",
+    "AdStyleAnalysisBlock",
+    "AdStyleSpec",
     "AgentEventData",
     "BaseBlock",
     "Block",
@@ -450,6 +502,7 @@ __all__ = [
     "ErrorBlock",
     "Finding",
     "FindingsBlock",
+    "ImagePreviewBlock",
     "Message",
     "MessageWithBlocks",
     "MetricBlock",

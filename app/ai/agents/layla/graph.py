@@ -14,6 +14,7 @@ from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
 from app.ai.tools import get_brand_context_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
+from app.ai.tools.image_generation import generate_image_draft_tool
 
 
 @tool(args_schema=CreativeBrief)
@@ -26,6 +27,7 @@ LAYLA_TOOLS = [
     *persist_ai_tools([get_brand_context_tool]),
     *get_core_tools_for_agent("layla"),
     submit_creative_brief,
+    generate_image_draft_tool,
 ]
 
 LAYLA_PROMPT = """You are Layla, Sahm's advertising creative agent. Respond in the user's language.
@@ -90,11 +92,19 @@ def call_model(state: LaylaState, config: RunnableConfig) -> dict:
         and "[CREATIVE_PROMPT_WORKFLOW]" in str(message.content)
         for message in messages
     )
-    available_tools = (
-        [tool for tool in LAYLA_TOOLS if tool.name not in {"generate_image", "analyze_reference_creative"}]
-        if prompt_only_workflow
-        else LAYLA_TOOLS
+    configurable = (config.get("configurable") if isinstance(config, dict) else getattr(config, "configurable", None)) or {}
+    allow_image = configurable.get("allow_image_generation", False)
+    already_attempted_image = any(
+        getattr(m, "name", None) == "generate_image_draft_tool"
+        for m in messages
     )
+    should_allow_image = allow_image and not already_attempted_image
+
+    available_tools = [
+        tool for tool in LAYLA_TOOLS
+        if not (prompt_only_workflow and tool.name in {"generate_image", "generate_image_draft_tool", "analyze_reference_creative"})
+        and not (tool.name == "generate_image_draft_tool" and not should_allow_image)
+    ]
     response = llm_handle.chat.bind_tools(available_tools).invoke(messages, config)
     return {"messages": [response]}
 

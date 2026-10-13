@@ -30,22 +30,30 @@ _NGROK_HEADERS = {"ngrok-skip-browser-warning": "true", "User-Agent": "sahm-ai/1
 
 
 def build_chat_model(
-    settings: AISettings, *, model: str | None = None, temperature: float | None = None
+    settings: AISettings,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    base_url: str | None = None,
 ) -> BaseChatModel:
     try:
         from langchain_ollama import ChatOllama
     except ImportError as exc:  # pragma: no cover - installed by default
         raise ProviderNotInstalledError("ollama", "langchain-ollama") from exc
 
-    if not settings.ollama_base_url:
+    resolved_base_url = (base_url.rstrip("/") if base_url else None) or (
+        settings.ollama_base_url.rstrip("/") if getattr(settings, "ollama_base_url", None) else None
+    )
+
+    if not resolved_base_url:
         raise ProviderNotConfiguredError(
-            "AI_LLM_PROVIDER=ollama but OLLAMA_BASE_URL is empty. Start your Ollama "
+            "AI_LLM_PROVIDER=ollama but Ollama needs OLLAMA_BASE_URL. Start your Ollama "
             "server / Colab ngrok tunnel and paste its URL into .env."
         )
 
     kwargs: dict[str, Any] = {
         "model": model or settings.ollama_model,
-        "base_url": settings.ollama_base_url,
+        "base_url": resolved_base_url,
         "temperature": settings.llm_temperature if temperature is None else temperature,
         "num_ctx": settings.ollama_num_ctx,
         "num_predict": settings.llm_max_tokens,
