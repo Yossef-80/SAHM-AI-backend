@@ -85,15 +85,8 @@ def render_output(value: Any) -> str:
         value = value.model_dump(mode="json", exclude_none=True)
     if isinstance(value, Mapping):
         return json.dumps(dict(value), ensure_ascii=False, indent=2, default=str)
-    if isinstance(value, list):
-        parts: list[str] = []
-        for item in value:
-            if isinstance(item, Mapping) and "text" in item:
-                parts.append(str(item["text"]))
-            else:
-                parts.append(str(item))
-        return "\n".join(parts)
-    return str(value or "")
+    from app.ai.text_utils import extract_clean_text
+    return extract_clean_text(value)
 
 
 def agent_output(state: Mapping[str, Any], submit_tool_name: str) -> Any:
@@ -107,5 +100,7 @@ def agent_output(state: Mapping[str, Any], submit_tool_name: str) -> Any:
         return args
     if messages:
         last_message = messages[-1]
-        return _field(last_message, "content", "")
+        raw_content = _field(last_message, "content", "")
+        from app.ai.text_utils import extract_clean_text
+        return extract_clean_text(raw_content)
     return ""

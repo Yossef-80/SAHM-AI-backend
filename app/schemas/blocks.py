@@ -39,6 +39,14 @@ class TextBlock(BaseBlock):
     type: Literal[BlockKind.TEXT] = BlockKind.TEXT
     text: str = Field(min_length=1)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _sanitize_text(cls, data: Any) -> Any:
+        from app.ai.text_utils import extract_clean_text
+        if isinstance(data, dict) and "text" in data:
+            data["text"] = extract_clean_text(data["text"])
+        return data
+
 
 # --------------------------------------------------------------- findings ----
 

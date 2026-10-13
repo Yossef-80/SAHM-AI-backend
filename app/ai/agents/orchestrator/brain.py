@@ -152,15 +152,8 @@ def _contains_arabic(value: str) -> bool:
 
 
 def _message_text(value: Any) -> str:
-    if isinstance(value, list):
-        parts: list[str] = []
-        for item in value:
-            if isinstance(item, dict) and "text" in item:
-                parts.append(str(item["text"]))
-            else:
-                parts.append(str(item))
-        return "\n".join(parts)
-    return str(value or "")
+    from app.ai.text_utils import extract_clean_text
+    return extract_clean_text(value)
 
 
 def _agent_input(chat_history: list[Any], content: str) -> dict[str, list[Any]]:
@@ -2759,9 +2752,11 @@ async def orchestrate(
             }
         )
 
-    final_msg = final_msg.strip() or "I do not have enough information to complete this request yet."
+    from app.ai.text_utils import extract_clean_text
+
+    final_msg = extract_clean_text(final_msg).strip() or "I do not have enough information to complete this request yet."
     if final_persona_id is not None:
-        base_blocks = [TextBlock(text=str(redact_sensitive_data(final_msg)))]
+        base_blocks = [TextBlock(text=extract_clean_text(str(redact_sensitive_data(final_msg))))]
         return OrchestratorResult(
             blocks=[*image_blocks, *base_blocks],
             persona_id=final_persona_id,
@@ -2833,7 +2828,7 @@ async def orchestrate(
             f"({type(exc).__name__})."
         )
         return OrchestratorResult(
-            blocks=[*image_blocks, TextBlock(text=str(redact_sensitive_data(final_msg)))],
+            blocks=[*image_blocks, TextBlock(text=extract_clean_text(str(redact_sensitive_data(final_msg))))],
             persona_id=final_persona_id,
             creative_prompt_stage=(
                 str(context.get("creative_prompt_stage") or "collecting_details")

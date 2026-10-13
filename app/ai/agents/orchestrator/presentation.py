@@ -628,9 +628,8 @@ def format_agent_report(agent: str, output: Any, *, arabic: bool) -> str:
     """Render one specialist's structured output as readable Markdown, not JSON."""
     data = _mapping(output)
     if data is None:
-        if isinstance(output, str):
-            return output.strip()
-        return str(output or "")
+        from app.ai.text_utils import extract_clean_text
+        return extract_clean_text(output).strip()
     if agent == "nour":
         return _format_research(data, arabic)
     if agent == "omar":
