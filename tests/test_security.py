@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import logging
+import socket
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,21 @@ from app.core.security import (
     validate_upload,
 )
 from app.config import Settings
+
+
+@pytest.fixture(autouse=True)
+def _offline_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Use deterministic DNS answers; security tests must not touch the network."""
+
+    def fake_getaddrinfo(host, port=None, *args, **kwargs):
+        hostname = str(host).lower().rstrip(".")
+        if hostname == "example.com":
+            return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", 0))]
+        if hostname == "localhost" or hostname.endswith(".localhost"):
+            return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("127.0.0.1", 0))]
+        raise socket.gaierror("external DNS disabled in security tests")
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
 
 
 # ------------------------------------------------------------------ SSRF guard --

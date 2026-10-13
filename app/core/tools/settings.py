@@ -152,7 +152,17 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
                 db_column="meta_ad_account_id",
                 env=("META_AD_ACCOUNT_ID",),
                 max_length=120,
+                required=True,
                 description="The act_<id> this workspace manages.",
+            ),
+            FieldSpec(
+                key="page_id",
+                label="Facebook Page ID",
+                db_column="meta_page_id",
+                env=("META_PAGE_ID",),
+                max_length=120,
+                required=True,
+                description="The Page that will publish the approved ads for this workspace.",
             ),
             FieldSpec(
                 key="access_token",
@@ -174,9 +184,9 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
             ),
         ),
         notes=(
-            "Used by get_campaign_insights, get_breakdowns and the two protected "
-            "write tools. An Integration row (POST /integrations/meta) takes "
-            "priority for reads when one exists; this row is the fallback."
+            "Admin-managed only. The token is used for Meta reads and approved ad-plan writes; "
+            "the ad account ID and Facebook Page ID are required for campaign creation. "
+            "No self-service OAuth flow is provided here."
         ),
     ),
     "google_places": ConnectorSpec(
@@ -241,6 +251,12 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
     "image": ConnectorSpec(
         name="image",
         label="Image generation",
+        # Without provider_field the connector could not tell `mock` from a real
+        # provider: `.provider` read "" and `.required_fields` was empty, so
+        # `configured` came back True for a workspace that had no image provider
+        # at all. The UI then enabled "Create image" and generate_image rejected
+        # it with "Mock placeholder images are disabled by default".
+        provider_field="provider",
         fields=(
             FieldSpec(
                 key="provider",
@@ -256,6 +272,7 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
                 db_column="image_api_key_enc",
                 env=("IMAGE_API_KEY",),
                 secret=True,
+                required=True,
                 max_length=200,
                 description="Required unless the provider is 'mock'.",
             ),
@@ -521,6 +538,10 @@ class ConnectorSettings:
     @property
     def meta_ad_account_id(self) -> str | None:
         return self.value("meta", "ad_account_id")
+
+    @property
+    def meta_page_id(self) -> str | None:
+        return self.value("meta", "page_id")
 
     @property
     def meta_graph_base_url(self) -> str | None:

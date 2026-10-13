@@ -187,7 +187,7 @@ def resolve_url(template: str, settings: Settings) -> str:
     )
 
 
-#: Tool name -> the service it reaches. ``ALL_TOOLS`` (13) plus the two protected
+#: Tool name -> the service it reaches. ``ALL_TOOLS`` (16) plus the two protected
 #: tools, which no agent may call but which still talk to Meta.
 CONNECTORS: dict[str, Connector] = {
     # ---------------------------------------------------------- research ------
@@ -216,6 +216,31 @@ CONNECTORS: dict[str, Connector] = {
         notes=(
             "Fetches a URL supplied by the caller. SSRF-guarded by "
             "app/core/security.py; there is no fixed host."
+        ),
+    ),
+    "brand_report": Connector(
+        provider="composite_research",
+        url_template=None,
+        notes=(
+            "Legacy brand_mcp wrapper that may consult several dynamic public sources "
+            "and optional Apify actors; there is no single fixed endpoint. The evidence-first "
+            "app.ai.tools.brand_research path is separately exercised with offline fixtures."
+        ),
+    ),
+    "full_analysis": Connector(
+        provider="local_analysis",
+        url_template=None,
+        notes=(
+            "Runs analysis over previously collected brand_mcp data; optional NLP "
+            "dependencies are local and there is no fixed endpoint."
+        ),
+    ),
+    "route_file_to_tool": Connector(
+        provider="local_file_router",
+        url_template=None,
+        notes=(
+            "Legacy MCP file-routing wrapper. Only use uploaded/supplied files; do not "
+            "pass arbitrary server paths. The app.ai file router accepts supplied content."
         ),
     ),
     "get_social_profile": Connector(

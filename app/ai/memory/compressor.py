@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Profile, Conversation, Message
 from app.db.session import session_scope
 from app.ai.providers.llm import get_llm
+from app.ai.security import redact_sensitive_data
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -45,10 +46,28 @@ def compress_history_messages(history: list[dict[str, Any]], max_chars: int = 90
     return compact_history
 
 
+def _deterministic_summary(text: str, max_chars: int) -> str:
+    """Bound the older transcript without inventing or losing all context."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    bullets = [line for line in lines if line.lstrip().startswith(("-", "*", "•", "1.", "2.", "3."))]
+    selected = bullets[:20] if bullets else lines[-12:]
+    summary = "Earlier conversation (locally compacted; no model summary available):\n" + "\n".join(selected)
+    return summary[:max(1, max_chars)]
+
+
 class IntelligentMemoryCompressor:
-    def __init__(self):
-        # Default fast LLM for background compression
-        self.fast_llm = get_llm().chat
+    def __init__(self, fast_llm=None):
+        # Do not construct a provider during module import/startup. The model
+        # is resolved only if a real compression is requested.
+        self._fast_llm = fast_llm
+
+    @property
+    def fast_llm(self):
+        if self._fast_llm is None:
+            self._fast_llm = get_llm().chat
+        return self._fast_llm
 
     async def update_global_profile(self, business_id: str) -> str | None:
         """
@@ -60,18 +79,9 @@ class IntelligentMemoryCompressor:
             stmt = select(Profile).where(Profile.business_id == business_id).limit(1)
             profile = await db.scalar(stmt)
             if not profile:
-                import uuid
-                profile = Profile(
-                    id=uuid.uuid4(),
-                    supabase_user_id=uuid.uuid4(),
-                    business_id=business_id,
-                    role="owner",
-                    user_context_summary=""
-                )
-                db.add(profile)
-                await db.flush()
+                return None
 
-            old_summary = profile.user_context_summary or "No previous summary recorded."
+            old_summary = str(redact_sensitive_data(profile.user_context_summary or "No previous summary recorded."))
 
             # 2. Fetch recent messages for this business across conversations
             conv_stmt = (
@@ -95,7 +105,7 @@ class IntelligentMemoryCompressor:
                 return None
 
             recent_chat_lines = [
-                f"{r.role.upper()}: {r.content[:400]}"
+                f"{r.role.upper()}: {str(redact_sensitive_data(r.content[:400]))}"
                 for r in reversed(recent_rows)
                 if r.content
             ]
@@ -134,13 +144,17 @@ class IntelligentMemoryCompressor:
                 else:
                     new_summary = str(response.content).strip()
 
+                # Scrub model output too: a distiller must never persist credentials.
+                new_summary = str(redact_sensitive_data(new_summary))
+                new_summary = new_summary[: max_profile_tokens * 4]
+
                 # 4. Save to DB
                 profile.user_context_summary = new_summary
                 await db.commit()
                 logger.info("ltm_profile_updated", extra={"business_id": business_id, "summary_len": len(new_summary)})
                 return new_summary
             except Exception as e:
-                logger.error("ltm_update_failed", extra={"business_id": business_id, "error": str(e)})
+                logger.error("ltm_update_failed", extra={"business_id": business_id, "error_type": type(e).__name__})
                 return None
 
 
@@ -219,9 +233,10 @@ async def manage_session_memory_with_token_cap(
         retain_count = 2
 
     valid_msgs = [m for m in messages if m.role in ("user", "assistant") and m.content]
+    safe_content = {id(m): str(redact_sensitive_data(m.content or "")) for m in valid_msgs}
     
     # Calculate approximate tokens (~3.5 chars per token across English/Arabic)
-    total_chars = sum(len(m.content or "") for m in valid_msgs)
+    total_chars = sum(len(safe_content[id(m)]) for m in valid_msgs)
     approx_tokens = int(total_chars / 3.5)
 
     # 1. Normal mode: below max_tokens
@@ -229,13 +244,13 @@ async def manage_session_memory_with_token_cap(
         history = [
             {
                 "role": m.role,
-                "content": m.content or "",
+                "content": safe_content[id(m)],
                 "persona_id": m.persona_id,
-                "blocks": m.blocks or [],
+                "blocks": redact_sensitive_data(m.blocks or []),
             }
             for m in valid_msgs
         ]
-        return history, conversation.summary
+        return history, str(redact_sensitive_data(conversation.summary or "")) or None
 
     # 2. Threshold exceeded: summarize older turns and keep only the latest turns
     logger.info(
@@ -251,10 +266,9 @@ async def manage_session_memory_with_token_cap(
         older_msgs = valid_msgs[:-1]
         recent_msgs = valid_msgs[-1:]
 
-    older_text = "\n".join([f"{m.role.upper()}: {m.content}" for m in older_msgs])
-    current_summary = conversation.summary or "No previous summary."
+    older_text = "\n".join([f"{m.role.upper()}: {safe_content[id(m)]}" for m in older_msgs])
+    current_summary = str(redact_sensitive_data(conversation.summary or "No previous summary."))
 
-    fast_llm = get_llm().chat
     sys_prompt = SystemMessage(content=(
         "You are an expert conversation memory assistant.\n"
         "Summarize the past conversation history between the user and the AI assistant into a compact, "
@@ -271,6 +285,7 @@ async def manage_session_memory_with_token_cap(
     ))
 
     try:
+        fast_llm = get_llm().chat
         response = await fast_llm.ainvoke([sys_prompt, usr_prompt])
         if isinstance(response.content, list):
             new_summary = "\n".join([
@@ -280,21 +295,27 @@ async def manage_session_memory_with_token_cap(
         else:
             new_summary = str(response.content).strip()
 
+        # Scrub model output before saving or reusing it.
+        new_summary = str(redact_sensitive_data(new_summary))
+        new_summary = new_summary[: max_tokens * 4]
         # Update the database
         conversation.summary = new_summary
         await db.flush()
         logger.info("conversation_summary_updated", extra={"conversation_id": conversation.id, "len": len(new_summary)})
     except Exception as e:
-        logger.error("conversation_summary_failed", extra={"conversation_id": conversation.id, "error": str(e)})
-        new_summary = conversation.summary
+        logger.error("conversation_summary_failed", extra={"conversation_id": conversation.id, "error_type": type(e).__name__})
+        new_summary = _deterministic_summary(older_text, max_tokens * 4)
+        new_summary = str(redact_sensitive_data(new_summary))
+        conversation.summary = new_summary
+        await db.flush()
 
     # Return only recent turns + the summary
     compact_history = [
         {
             "role": m.role,
-            "content": m.content or "",
+            "content": safe_content[id(m)],
             "persona_id": m.persona_id,
-            "blocks": m.blocks or [],
+            "blocks": redact_sensitive_data(m.blocks or []),
         }
         for m in recent_msgs
     ]

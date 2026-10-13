@@ -95,6 +95,7 @@ class ConnectorUpdateRequest(ApiModel):
     app_id: str | None = Field(default=None, max_length=120)
     app_secret: SecretStr | None = None
     ad_account_id: str | None = Field(default=None, max_length=120)
+    page_id: str | None = Field(default=None, max_length=120)
     access_token: SecretStr | None = None
     # -- google places / image (base URL override) --
     base_url: str | None = Field(default=None, max_length=MAX_VALUE)

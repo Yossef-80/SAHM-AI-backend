@@ -1,9 +1,12 @@
-"""Protected tools: the ONLY code that writes to Meta.
+"""Protected Meta write bridge.
 
 ``apply_change`` and ``publish_campaign`` have ``side_effect="external_write"``.
 They are deliberately NOT registered in the agent tool registry -- the registry
-refuses external-write tools outright -- and they are importable from exactly
-one place: ``app/core/approvals/service.py``.
+refuses external-write tools outright -- and are importable from exactly one
+place: ``app/core/approvals/service.py``. The new multi-object Meta plan also
+enters through ``execute_meta_ad_plan_protected`` from that same approval service;
+its marketing logic lives in ``app/ai/marketing/meta_ads.py`` and receives no
+``ToolContext``.
 
 If you are reading this because you want to call one of these from an agent:
 don't. Have the agent create a recommendation with ``create_recommendation``,
@@ -197,6 +200,42 @@ async def _handle_apply_change(payload: ApplyChangeInput, ctx: ToolContext) -> A
 # ------------------------------------------------- publish_campaign handler --
 
 
+async def execute_meta_ad_plan_protected(
+    db: Any,
+    recommendation: Recommendation,
+    *,
+    confirmed_by: str,
+    settings: Any,
+) -> Any:
+    """Narrow protected bridge to the new ``app.ai`` Meta Ads workflow.
+
+    Unlike legacy ``Tool`` handlers, this bridge needs no ``ToolContext``. It is
+    callable only from approvals/service.py and performs its own final checks so
+    the assistant/tool registry can never reach Meta writes.
+    """
+    if recommendation.action_type != "create_meta_ad_plan":
+        raise ApprovalRequired("this protected bridge only accepts a Meta ad plan")
+    if recommendation.status != "approved":
+        raise ApprovalRequired("the Meta ad plan must be approved before execution")
+    if not confirmed_by or confirmed_by == "system":
+        raise ApprovalRequired("an explicit confirming actor is required before writing to Meta")
+
+    from app.db.models import Campaign
+
+    campaign = await db.get(Campaign, recommendation.campaign_id) if recommendation.campaign_id else None
+    if campaign is None or campaign.business_id != recommendation.workspace_id:
+        raise ApprovalRequired("the Meta plan campaign is missing or no longer belongs to its workspace")
+
+    from app.ai.marketing.meta_ads import execute_meta_ad_plan
+
+    return await execute_meta_ad_plan(
+        db,
+        recommendation,
+        actor=confirmed_by,
+        settings=settings,
+    )
+
+
 async def _handle_publish_campaign(
     payload: PublishCampaignInput, ctx: ToolContext
 ) -> PublishCampaignOutput:
@@ -293,4 +332,5 @@ __all__ = [
     "PublishCampaignOutput",
     "apply_change",
     "publish_campaign",
+    "execute_meta_ad_plan_protected",
 ]

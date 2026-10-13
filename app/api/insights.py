@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from app.api.deps import SessionDep, WorkspaceDep, assert_owned
+from app.api.deps import SessionDep, SettingsDep, WorkspaceDep, assert_owned
+from app.ai.marketing.meta_ads import AdLevelInsightsResponse, pull_ad_level_insights
 from app.core.tools.meta_read import _handle_get_campaign_insights  # noqa: F401  (see note)
 from app.db.models import Campaign, Insight
 from app.schemas.insights import CampaignInsightsResponse, InsightRecord, InsightsPayload
@@ -87,4 +88,45 @@ async def get_campaign_insights(
     )
 
 
-__all__ = ["get_campaign_insights"]
+@router.get(
+    "/campaigns/{campaign_id}/ads/insights",
+    response_model=AdLevelInsightsResponse,
+)
+async def get_campaign_ad_insights(
+    campaign_id: str,
+    ws: WorkspaceDep,
+    db: SessionDep,
+    settings: SettingsDep,
+    date_start: date | None = Query(default=None),
+    date_end: date | None = Query(default=None),
+) -> AdLevelInsightsResponse:
+    """Fetch and persist real ``level=ad`` rows, keyed to exact local creatives.
+
+    The Meta Ad ID is the join key. Unmapped Meta rows are returned without a
+    prompt/image; they are never attached to a creative by name, order, or visual
+    similarity.
+    """
+    campaign = assert_owned(
+        await db.scalar(
+            select(Campaign).where(
+                Campaign.id == campaign_id,
+                Campaign.business_id == ws.business_id,
+            )
+        ),
+        ws,
+        entity=f"campaign '{campaign_id}'",
+    )
+    end = date_end or date.today()
+    start = date_start or (end - timedelta(days=29))
+    response = await pull_ad_level_insights(
+        db,
+        campaign,
+        settings=settings,
+        date_start=start,
+        date_end=end,
+    )
+    await db.commit()
+    return response
+
+
+__all__ = ["get_campaign_insights", "get_campaign_ad_insights"]

@@ -1,26 +1,42 @@
+"""Gemini chat-model provider for the general AI layer.
+
+The separate VLM integration remains isolated; this adapter only follows the
+existing ``AI_LLM_PROVIDER=gemini`` selection for LangGraph text/structured calls.
+"""
+
+from __future__ import annotations
+
 from langchain_core.language_models import BaseChatModel
-from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import SecretStr
 
 from app.ai.enums import StructuredOutputMethod
+from app.ai.errors import ProviderNotConfiguredError, ProviderNotInstalledError
 from app.ai.settings import AISettings
 
 DEFAULT_STRUCTURED_METHOD = StructuredOutputMethod.FUNCTION_CALLING
 
-def build_chat_model(settings: AISettings, *, model: str | None, temperature: float | None) -> BaseChatModel:
-    # We grab gemini_api_key from settings or rely on GOOGLE_API_KEY env var natively.
-    # Note: ensure settings has gemini_api_key if you want to pass it explicitly.
-    api_key = getattr(settings, "gemini_api_key", None)
-    
-    kwargs = {}
-    if api_key:
-        kwargs["api_key"] = SecretStr(api_key)
-        
+
+def build_chat_model(
+    settings: AISettings,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+) -> BaseChatModel:
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+    except ImportError as exc:
+        raise ProviderNotInstalledError("gemini", "langchain-google-genai") from exc
+
+    if not settings.gemini_api_key:
+        raise ProviderNotConfiguredError(
+            "AI_LLM_PROVIDER=gemini but GEMINI_API_KEY/GOOGLE_API_KEY is empty."
+        )
+
     return ChatGoogleGenerativeAI(
         model=model or settings.gemini_model,
+        api_key=SecretStr(settings.gemini_api_key),
         temperature=temperature if temperature is not None else settings.llm_temperature,
-        max_output_tokens=settings.llm_max_tokens,
-        timeout=settings.llm_timeout_seconds,
-        max_retries=settings.llm_max_retries,
-        **kwargs
+        max_tokens=settings.llm_max_tokens,
+        request_timeout=settings.llm_timeout_seconds,
+        retries=settings.llm_max_retries,
     )

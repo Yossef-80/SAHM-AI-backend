@@ -252,14 +252,14 @@ def test_all_three_probes_agree_on_one_endpoint() -> None:
     liveness endpoint. ``/health/ready`` is the readiness gate and deliberately is
     NOT a restart-on-failure probe.
     """
-    docs = (BACKEND_ROOT.parent / "docs" / "RUNNING_BACKEND.md").read_text(encoding="utf-8")
+    docs = (BACKEND_ROOT / "docs" / "RUNNING_BACKEND.md").read_text(encoding="utf-8")
 
     docker_endpoint = _dockerfile_liveness_endpoint()
     compose_endpoint = _compose_liveness_endpoint()
 
     assert docker_endpoint == compose_endpoint
     assert docker_endpoint.endswith("/health"), "liveness must be /health, not /health/ready"
-    # The documented one: section 6 of RUNNING_BACKEND.md probes it with curl.
+    # Section 2 of RUNNING_BACKEND.md documents the exact liveness curl probe.
     assert "curl http://127.0.0.1:8000/health" in docs
     # ...and the doc states which endpoint the container probes.
     assert "`Dockerfile` `HEALTHCHECK`" in docs
@@ -285,6 +285,11 @@ EXPECTED_SECRET_COLUMNS: set[tuple[str, str]] = {
     ("tool_settings", "dataforseo_password_enc"),
     ("tool_settings", "image_api_key_enc"),
     ("tool_settings", "search_api_key_enc"),
+    # llm_provider_settings: per-tier provider secrets and custom headers.
+    ("llm_provider_settings", "fast_api_key_enc"),
+    ("llm_provider_settings", "strong_api_key_enc"),
+    ("llm_provider_settings", "fast_extra_headers_enc"),
+    ("llm_provider_settings", "strong_extra_headers_enc"),
 }
 
 #: Naming rule that decides whether a column is secret-bearing.

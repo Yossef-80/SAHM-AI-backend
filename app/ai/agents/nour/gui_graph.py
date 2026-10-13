@@ -1,28 +1,42 @@
+"""Optional single-agent UI formatter that follows the configured AI provider."""
+
+from __future__ import annotations
+
 from typing import TypedDict
-from langgraph.graph import StateGraph, END, START
-from langchain_core.messages import BaseMessage
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
+
+from langchain_core.messages import BaseMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+from langgraph.graph import END, START, StateGraph
+
+from app.ai.providers.llm import get_llm
+from app.ai.settings import get_ai_settings
 from app.schemas.blocks import MessageWithBlocks
-import os
+
 
 class NourState(TypedDict):
     messages: list[BaseMessage]
     final_blocks: MessageWithBlocks | None
 
-def call_llm(state: NourState):
-    llm = ChatOpenAI(model='gpt-4o-mini', base_url='https://openrouter.ai/api/v1/chat/completions', api_key=os.environ.get('OPENROUTER_API_KEY'))
-    prompt = ChatPromptTemplate.from_messages([
-        ('system', 'You are Nour, a researcher. You MUST output a highly structured JSON array of UI blocks. Use TextBlock for chat, FindingsBlock for insights.'),
-        ('placeholder', '{messages}')
-    ])
-    structured_llm = llm.with_structured_output(MessageWithBlocks)
-    chain = prompt | structured_llm
-    response = chain.invoke({'messages': state['messages']})
-    return {'final_blocks': response}
+
+def call_llm(state: NourState, config: RunnableConfig) -> dict[str, MessageWithBlocks]:
+    """Format the existing conversation; never selects a provider/model itself."""
+    handle = get_llm(provider=get_ai_settings().llm_provider)
+    prompt = [
+        SystemMessage(
+            content=(
+                "You are Nour, a researcher. Convert the completed answer into the "
+                "MessageWithBlocks schema. Preserve evidence URLs, missing inputs, "
+                "and uncertainty. Do not invent facts."
+            )
+        ),
+        *state.get("messages", []),
+    ]
+    formatted = handle.structured(MessageWithBlocks).invoke(prompt, config)
+    return {"final_blocks": formatted}
+
 
 graph_builder = StateGraph(NourState)
-graph_builder.add_node('llm', call_llm)
-graph_builder.add_edge(START, 'llm')
-graph_builder.add_edge('llm', END)
+graph_builder.add_node("llm", call_llm)
+graph_builder.add_edge(START, "llm")
+graph_builder.add_edge("llm", END)
 graph = graph_builder.compile()

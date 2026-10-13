@@ -32,6 +32,19 @@ class MetricSeries(ApiModel):
     unit: str | None = None
 
 
+class DailyMetrics(ApiModel):
+    """One day of campaign performance, shaped for the frontend trend chart.
+
+    Every field is additive, so a client can safely sum a window of these.
+    """
+
+    date: date
+    impressions: float = 0.0
+    clicks: float = 0.0
+    conversions: float = 0.0
+    spend: float = 0.0
+
+
 class InsightsPayload(ToolOutput):
     """Campaign-level metrics. ``status``/``source`` come from ToolOutput.
 
@@ -46,6 +59,9 @@ class InsightsPayload(ToolOutput):
     currency: str | None = None
     metrics: dict[str, float] = Field(default_factory=dict)
     series: list[MetricSeries] = Field(default_factory=list)
+    #: Per-day rows covering ``date_start``..``date_end``. Empty when Meta
+    #: returned nothing or the pull was unavailable.
+    daily: list[DailyMetrics] = Field(default_factory=list)
     top_ads: list[dict[str, object]] = Field(default_factory=list)
     retrieved_at: datetime | None = None
     evidence: list[Evidence] = Field(default_factory=list)

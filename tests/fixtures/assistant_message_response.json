@@ -1,0 +1,90 @@
+{
+  "message": {
+    "id": "msg_assistant_contract",
+    "role": "assistant",
+    "content": "The page explicitly lists EGP 350 per box.",
+    "blocks": [
+      {
+        "type": "text",
+        "text": "The page explicitly lists EGP 350 per box."
+      },
+      {
+        "type": "findings",
+        "title": "Observed evidence",
+        "findings": [
+          {
+            "title": "Listed price",
+            "detail": "EGP 350 per box is visible on the static source page.",
+            "confidence": 0.95,
+            "source": "https://river-roast.example/",
+            "evidence": []
+          }
+        ]
+      },
+      {
+        "type": "action_card",
+        "action_type": "run_task",
+        "label": "Ask Layla for variations",
+        "description": "This is an explicit follow-up action; it does not run automatically.",
+        "target_persona": "layla",
+        "task": "ad_variations",
+        "inputs": {
+          "brief": "Create two copy variations based on the supported offer.",
+          "count": 2
+        },
+        "payload": {}
+      }
+    ],
+    "createdAt": "2026-10-11T09:30:00Z",
+    "taskId": null,
+    "personaId": "researcher"
+  },
+  "userMessage": {
+    "id": "msg_user_contract",
+    "role": "user",
+    "content": "Research the supplied static website.",
+    "blocks": [
+      {
+        "type": "text",
+        "text": "Research the supplied static website."
+      }
+    ],
+    "createdAt": "2026-10-11T09:29:00Z",
+    "taskId": null,
+    "personaId": null
+  },
+  "taskId": null,
+  "blocks": [
+    {
+      "type": "text",
+      "text": "The page explicitly lists EGP 350 per box."
+    },
+    {
+      "type": "findings",
+      "title": "Observed evidence",
+      "findings": [
+        {
+          "title": "Listed price",
+          "detail": "EGP 350 per box is visible on the static source page.",
+          "confidence": 0.95,
+          "source": "https://river-roast.example/",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "type": "action_card",
+      "action_type": "run_task",
+      "label": "Ask Layla for variations",
+      "description": "This is an explicit follow-up action; it does not run automatically.",
+      "target_persona": "layla",
+      "task": "ad_variations",
+      "inputs": {
+        "brief": "Create two copy variations based on the supported offer.",
+        "count": 2
+      },
+      "payload": {}
+    }
+  ],
+  "conversationId": "conv_assistant_contract"
+}

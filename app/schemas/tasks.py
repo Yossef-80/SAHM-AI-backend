@@ -9,6 +9,13 @@ from pydantic import Field
 from app.schemas.common import ApiModel, TaskStatus, TaskStep, Usage
 
 
+class StartTaskBody(ApiModel):
+    """Non-secret inputs and optional conversation link for a queued task."""
+
+    inputs: dict[str, object] = Field(default_factory=dict)
+    conversation_id: str | None = None
+
+
 class AgentTask(ApiModel):
     id: str
     conversation_id: str | None = None

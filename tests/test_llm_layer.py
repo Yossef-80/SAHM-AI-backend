@@ -18,10 +18,10 @@ from pydantic import BaseModel, Field
 
 from app.core.errors import LLMNotConfiguredError, LLMOutputError, LLMProviderError
 from app.core.llm.base import (
+    ImagePart,
     Msg,
     ToolCall,
     ToolSpec,
-    TierName,
     extract_json,
     json_schema_for,
 )
@@ -29,7 +29,6 @@ from app.core.llm.claude_client import ClaudeClient
 from app.core.llm.mock_client import MockClient, sample_for_model, sample_from_schema
 from app.core.llm.openai_client import OpenAIClient
 from app.core.llm.router import get_llm, reset_clients
-
 
 # --------------------------------------------------------------- fixtures ----
 
@@ -265,19 +264,48 @@ async def test_claude_client_appends_schema_instruction() -> None:
     assert isinstance(result.parsed, SmallOutput)
 
 
-async def test_claude_client_retries_on_429_then_succeeds() -> None:
+async def test_claude_client_serializes_attached_image_block() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=_claude_response())
+
+    client = _claude_client(handler)
+    await client.complete(
+        system="inspect the reference",
+        messages=[
+            Msg(
+                role="user",
+                content="Analyse this image.",
+                images=[ImagePart(media_type="image/webp", data="YWJj")],
+            )
+        ],
+    )
+    user_message = captured["body"]["messages"][0]
+    assert user_message["content"] == [
+        {"type": "text", "text": "Analyse this image."},
+        {
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/webp", "data": "YWJj"},
+        },
+    ]
+
+
+async def test_claude_client_retries_once_on_429_then_succeeds() -> None:
+    """429s get one deliberate retry to avoid burning requests in the same TPM window."""
     calls = {"n": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls["n"] += 1
-        if calls["n"] < 3:
+        if calls["n"] == 1:
             return httpx.Response(429, json={"error": "rate limited"})
         return httpx.Response(200, json=_claude_response())
 
     client = _claude_client(handler)
     client.base_delay = 0.0  # keep the test fast
     result = await client.complete(system="s", messages=[Msg(role="user", content="x")])
-    assert calls["n"] == 3
+    assert calls["n"] == 2
     assert result.tool_calls[0].name == "web_search"
 
 
@@ -374,6 +402,34 @@ async def test_openai_client_builds_correct_request_and_parses() -> None:
     assert result.tool_calls[0].arguments == {"query": "y"}
     assert result.usage.tokens_in == 80
     assert result.usage.tokens_out == 30
+
+
+async def test_openai_client_serializes_attached_image_as_data_url() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}}], "usage": {}},
+        )
+
+    client = _openai_client(handler)
+    await client.complete(
+        system="inspect the reference",
+        messages=[
+            Msg(
+                role="user",
+                content="Analyse this image.",
+                images=[ImagePart(media_type="image/png", data="YWJj")],
+            )
+        ],
+    )
+    user_message = next(m for m in captured["body"]["messages"] if m["role"] == "user")
+    assert user_message["content"] == [
+        {"type": "text", "text": "Analyse this image."},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,YWJj"}},
+    ]
 
 
 async def test_openai_client_tool_result_message_shape() -> None:

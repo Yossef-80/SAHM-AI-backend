@@ -2,12 +2,11 @@
 
 Why this exists
 ---------------
-Only two of the thirteen agent tools had a direct HTTP endpoint
-(``POST /creatives/analyze-reference`` and ``POST /creatives/generate``). The other
-eleven could only be reached through a model tool-call inside a task run, which
-makes them impossible to list or to invoke deterministically over HTTP. These two
-routes expose the same ``Tool`` objects the agent runtime uses -- there is no
-second definition of anything here.
+Before these unified endpoints existed, only two of the sixteen agent tools had
+a dedicated HTTP endpoint (``POST /creatives/analyze-reference`` and
+``POST /creatives/generate``). The catalogue and invoke routes now expose the
+same ``Tool`` objects the agent runtime uses, so tools can be listed and invoked
+deterministically over HTTP without a second definition of anything.
 
 Two invariants are preserved:
 

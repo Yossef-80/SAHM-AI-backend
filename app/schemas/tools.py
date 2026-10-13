@@ -246,6 +246,7 @@ class AnalyzeReferenceInput(BaseModel):
     image_url: str | None = None
     upload_id: str | None = None
     campaign_id: str | None = None
+    source_name: str = ""
     focus: str | None = None
 
 
@@ -256,6 +257,7 @@ class GenerateImageInput(BaseModel):
     campaign_id: str | None = None
     num_images: int = Field(default=1, ge=1, le=4)
     reference_analysis_id: str | None = None
+    reference_image_url: str | None = None
 
 
 class GeneratedAssetRecord(BaseModel):

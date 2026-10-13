@@ -10,14 +10,15 @@ from typing import Any
 
 import httpx
 
+from app.config import GROQ_GPT_OSS_MODEL_PREFIX
 from app.core.errors import LLMNotConfiguredError, LLMProviderError
 from app.core.llm.base import (
     BaseLLMClient,
     LLMResult,
     Msg,
+    TierName,
     ToolCall,
     ToolSpec,
-    TierName,
     is_retryable_exception,
     is_retryable_status,
     schema_instruction,
@@ -103,7 +104,7 @@ class OpenAIClient(BaseLLMClient):
         # max_completion_tokens as the preferred output limit field.
         groq_gpt_oss = (
             "api.groq.com" in self.base_url
-            and self.model.startswith("openai/gpt-oss")
+            and self.model.startswith(GROQ_GPT_OSS_MODEL_PREFIX)
         )
         # During structured synthesis, GPT-OSS may try to call an unavailable
         # tool again if the transcript still contains native tool-call records.
@@ -169,10 +170,26 @@ class OpenAIClient(BaseLLMClient):
                         }
                     )
             else:
-                content = msg.content or ""
+                text_content = msg.content or ""
                 if groq_gpt_oss and msg.role == "user" and not instruction_added:
-                    content = f"{effective_system}\n\n{content}"
+                    text_content = f"{effective_system}\n\n{text_content}"
                     instruction_added = True
+                if msg.images:
+                    content_parts: list[dict[str, Any]] = []
+                    if text_content:
+                        content_parts.append({"type": "text", "text": text_content})
+                    content_parts.extend(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{image.media_type};base64,{image.data}"
+                            },
+                        }
+                        for image in msg.images
+                    )
+                    content: str | list[dict[str, Any]] = content_parts
+                else:
+                    content = text_content
                 api_messages.append({"role": msg.role, "content": content})
 
         body: dict[str, Any] = {

@@ -32,7 +32,7 @@ from app.core.logging import (
     current_workspace_id,
     get_logger,
 )
-from app.core.security import DEV_FERNET_KEY
+from app.core.security import DEV_FERNET_KEY, TokenCipher
 from app.core.tools import protected
 from app.core.tools.base import ToolContext
 from app.db.models import (
@@ -350,6 +350,43 @@ async def test_list_creatives_respects_the_workspace(
     assert "cr_a" in ids and "cr_b" not in ids
 
 
+async def test_list_creatives_filters_by_campaign_server_side(
+    api_client, two_workspaces: AsyncSession
+) -> None:
+    """``campaignId`` is a query parameter, not a client-side filter.
+
+    The endpoint used to return the newest 100 rows and let the browser filter,
+    so a workspace past that cap lost its older creatives from the wizard picker.
+    """
+    resp = await api_client.get(
+        "/api/v1/creatives", params={"campaignId": "cmp_a"}, headers=_headers(BIZ_A)
+    )
+    assert resp.status_code == 200
+    assert [c["id"] for c in resp.json()] == ["cr_a"]
+
+    # Another workspace's campaign id must not reach across the tenant boundary.
+    resp = await api_client.get(
+        "/api/v1/creatives", params={"campaignId": "cmp_b"}, headers=_headers(BIZ_A)
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_campaign_detail_exposes_recent_insight_metrics(
+    api_client, two_workspaces: AsyncSession
+) -> None:
+    """The Overview/Performance tabs read ``recentInsights.metrics``.
+
+    ``get_campaign`` never populated it, so both tabs rendered their empty state
+    even for a campaign that already had Insight rows.
+    """
+    resp = await api_client.get("/api/v1/campaigns/cmp_a", headers=_headers(BIZ_A))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["recentInsights"] is not None
+    assert "metrics" in body["recentInsights"]
+
+
 async def test_list_conversations_respects_the_workspace(
     api_client, two_workspaces: AsyncSession
 ) -> None:
@@ -379,7 +416,9 @@ async def test_meta_status_is_scoped_to_the_workspace(
             account_id="act_999",
             account_name="Bravo Ads",
             status="connected",
-            access_token_enc="ciphertext",
+            access_token_enc=TokenCipher(_settings().token_encryption_key).encrypt(
+                "offline-test-meta-grant"
+            ),
             scopes=["ads_read"],
             last_synced_at=datetime.now(timezone.utc),
         )

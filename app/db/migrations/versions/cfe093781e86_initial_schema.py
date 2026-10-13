@@ -256,7 +256,7 @@ def upgrade() -> None:
     sa.Column('persona_id', sa.String(length=64), nullable=True),
     sa.Column('task_name', sa.String(length=60), nullable=True),
     sa.Column('kind', sa.String(length=30), nullable=False),
-    sa.Column('url', sa.String(length=1000), nullable=False),
+    sa.Column('url', sa.Text(), nullable=False),
     sa.Column('prompt', sa.Text(), nullable=False),
     sa.Column('aspect_ratio', sa.String(length=10), nullable=False),
     sa.Column('provider', sa.String(length=40), nullable=True),

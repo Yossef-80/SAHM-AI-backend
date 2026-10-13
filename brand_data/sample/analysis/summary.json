@@ -1,0 +1,24 @@
+{
+  "brand": "sample",
+  "avg_stars": null,
+  "stars_distribution": {
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0
+  },
+  "social": {},
+  "sentiment": {
+    "reviews": {},
+    "posts": {},
+    "text_vs_stars_agreement_pct": null
+  },
+  "happiest_product": null,
+  "unhappiest_product": null,
+  "best_aspect": null,
+  "worst_aspect": null,
+  "top_complaints": {},
+  "top_praises": {},
+  "saved_to": "brand_data/sample/analysis"
+}

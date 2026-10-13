@@ -122,7 +122,8 @@ class ApifyReviewsProvider:
         try:
             response = httpx.post(
                 url,
-                params={"token": self._token, "format": "json"},
+                params={"format": "json"},
+                headers={"Authorization": f"Bearer {self._token}"},
                 json=actor_input,
                 timeout=self._timeout,
             )

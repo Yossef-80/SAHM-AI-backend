@@ -1,81 +1,93 @@
-from typing import TypedDict, Literal, Any, cast
-import json
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolCall
+from __future__ import annotations
+
+from typing import Literal
+
+from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
+from app.ai.agents.nour.schema import MarketResearchReport
 from app.ai.agents.nour.state import NourState
 from app.ai.providers.llm import get_llm
-from app.ai.tools import web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool
 from app.ai.settings import get_ai_settings
-from app.ai.enums import AgentName
-from app.ai.agents.nour.schema import MarketResearchReport
+from app.ai.tools import (
+    analyze_website_tool,
+    brand_report,
+    full_analysis,
+    get_brand_context_tool,
+    get_reviews_tool,
+    route_file_to_tool,
+    save_learning_tool,
+    web_search_tool,
+)
+from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
+
 
 @tool(args_schema=MarketResearchReport)
 def submit_research_report(**kwargs) -> str:
-    """Call this tool ONLY when you have finished all your research and are ready to submit the final, highly structured competitive market research report."""
+    """Submit Nour's final source-backed research report."""
     return "REPORT_SUBMITTED_SUCCESSFULLY"
 
-# Define the tools available to Nour
-NOUR_TOOLS = [web_search_tool, get_brand_context_tool, analyze_website_tool, brand_report, full_analysis, route_file_to_tool, get_reviews_tool, submit_research_report]
 
-# System prompt for Nour
-NOUR_PROMPT = """You are Nour, an expert digital marketing agent and competitive intelligence analyst.
-Your primary role is to help analyze competitors, market trends, and brand strategies.
+NOUR_TOOLS = [
+    *persist_ai_tools(
+        [
+            get_brand_context_tool,
+            web_search_tool,
+            analyze_website_tool,
+            get_reviews_tool,
+            brand_report,
+            full_analysis,
+            route_file_to_tool,
+            save_learning_tool,
+        ]
+    ),
+    *get_core_tools_for_agent("nour"),
+    submit_research_report,
+]
 
-CRITICAL INSTRUCTIONS FOR RESEARCH & ANALYSIS:
-1. FACT-CHECKING: When analyzing competitors from web searches, carefully verify that the business is actually in the correct industry.
-2. ATTRIBUTION: Do not mix up facts between competitors.
-3. CONTEXT: Always check the brand context first using the get_brand_context_tool to understand who you are researching for.
-4. SEARCH: Formulate highly specific queries. Use web_search_tool. YOU ARE STRICTLY LIMITED TO A MAXIMUM OF 2 SEARCH QUERIES. Prioritize your queries!
-5. FINAL OUTPUT: You MUST submit your final findings by calling the `submit_research_report` tool. Do not generate a conversational response at the end. Just call the tool with the structured data.
+NOUR_PROMPT = """You are Nour, an evidence-first market and competitor researcher. Respond in the user's language.
+
+WORKFLOW AND EVIDENCE:
+1. Read get_brand_context_tool first. If there is no profile, state that clearly.
+2. Use the user's website URL with analyze_website_tool when supplied. It audits one page only.
+3. Use no more than TWO live web-search queries total. brand_report performs one query internally; don't combine it with two more.
+4. Use get_social_profile, get_keywords, or get_competitor_ads only when relevant and when a real source is configured. If a tool returns unavailable/partial/mock, label that status and never present placeholders as evidence.
+5. Get reviews only if relevant. If the paid-provider guard blocks it, report that no review provider was contacted.
+6. Keep observed facts, interpretations, gaps, and recommendations separate. Every factual claim needs a source URL or explicit user-supplied evidence.
+7. Do not invent prices, budgets, market share, audience sizes, review counts, or performance. Use missing_inputs where data is absent.
+8. route_file_to_tool accepts explicitly supplied content only; never ask it to read a server-local path.
+9. Call save_learning_tool only when the user explicitly asks you to remember a durable, non-sensitive finding. Never store credentials.
+10. Finish by calling submit_research_report. Do not append an unstructured answer after submission.
 """
 
+
 def call_model(state: NourState, config: RunnableConfig) -> dict:
-    messages = state["messages"]
-    
+    messages = list(state["messages"])
     if not messages or not isinstance(messages[0], SystemMessage):
-        messages = [SystemMessage(content=NOUR_PROMPT)] + list(messages)
-        
-    ai_settings = get_ai_settings()
-    llm_handle = get_llm(provider=ai_settings.llm_provider)
-    
-    model_with_tools = llm_handle.chat.bind_tools(NOUR_TOOLS)
-    response = model_with_tools.invoke(messages, config)
-    
+        messages = [SystemMessage(content=NOUR_PROMPT)] + messages
+    llm_handle = get_llm(provider=get_ai_settings().llm_provider)
+    response = llm_handle.chat.bind_tools(NOUR_TOOLS).invoke(messages, config)
     return {"messages": [response]}
 
 
 def should_continue(state: NourState) -> Literal["tools", END]:
-    messages = state["messages"]
-    last_message = messages[-1]
-    
-    if last_message.tool_calls:
-        # If the LLM called submit_research_report, we can stop the graph here.
-        # But we must let the ToolNode execute it so it gets added to the state.
-        return "tools"
-    return END
+    return "tools" if state["messages"][-1].tool_calls else END
+
 
 def post_tools_routing(state: NourState) -> Literal["agent", END]:
-    messages = state["messages"]
-    last_message = messages[-1]
-    
-    # If the last message is from a tool and it was the submit_research_report tool, end the graph.
+    last_message = state["messages"][-1]
     if last_message.type == "tool" and last_message.name == "submit_research_report":
         return END
     return "agent"
 
-# Build the graph
-workflow = StateGraph(NourState)
 
+workflow = StateGraph(NourState)
 workflow.add_node("agent", call_model)
 workflow.add_node("tools", ToolNode(NOUR_TOOLS))
-
 workflow.add_edge(START, "agent")
 workflow.add_conditional_edges("agent", should_continue, ["tools", END])
 workflow.add_conditional_edges("tools", post_tools_routing, ["agent", END])
-
 nour_graph = workflow.compile()
-

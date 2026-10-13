@@ -1,6 +1,12 @@
-from typing import TypedDict, Annotated, Sequence
+from typing import Annotated, Any, Sequence, TypedDict
+
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-class OmarState(TypedDict):
+
+class OmarState(TypedDict, total=False):
     messages: Annotated[Sequence[BaseMessage], add_messages]
+    marketing_strategy: dict[str, Any]
+    campaign_strategy: dict[str, Any]
+    content_calendar: dict[str, Any]
+    final_report: dict[str, Any]

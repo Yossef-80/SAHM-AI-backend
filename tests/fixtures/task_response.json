@@ -1,0 +1,63 @@
+{
+  "id": "task_contract",
+  "conversationId": "conv_contract",
+  "taskName": "ad_variations",
+  "personaId": "layla",
+  "status": "succeeded",
+  "steps": [
+    {
+      "name": "generate_image",
+      "status": "succeeded",
+      "detail": "status=ok source=mock"
+    },
+    {
+      "name": "complete",
+      "status": "succeeded",
+      "detail": "Result saved."
+    }
+  ],
+  "progress": 1.0,
+  "incomplete": false,
+  "error": null,
+  "result": {
+    "task": "ad_variations",
+    "persona_id": "layla",
+    "output": {
+      "summary": "Two supported creative variations were saved.",
+      "variations": ["Fresh coffee, right at work.", "Good coffee without the commute."],
+      "evidence": [],
+      "unavailable_sources": [],
+      "notes": ""
+    },
+    "tool_calls_made": [],
+    "unavailable_sources": [],
+    "usage": {
+      "tokens_in": 15,
+      "tokens_out": 30,
+      "model": "mock-strong-1",
+      "latency_ms": 0
+    },
+    "request_id": "req_contract",
+    "incomplete": false,
+    "incomplete_reason": null,
+    "persisted": [],
+    "error": null
+  },
+  "blocks": [
+    {
+      "type": "text",
+      "text": "Two supported creative variations were saved."
+    }
+  ],
+  "usage": {
+    "tokensIn": 15,
+    "tokensOut": 30,
+    "model": "mock-strong-1",
+    "latencyMs": 0
+  },
+  "requestId": "req_contract",
+  "createdAt": "2026-10-11T00:00:00Z",
+  "updatedAt": "2026-10-11T00:00:01Z",
+  "startedAt": "2026-10-11T00:00:00Z",
+  "finishedAt": "2026-10-11T00:00:01Z"
+}

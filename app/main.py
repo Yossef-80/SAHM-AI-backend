@@ -23,18 +23,22 @@ from app.api import (
     auth,
     business,
     campaigns,
+    content,
     creatives,
     insights,
     integrations,
+    media_assets,
     memory,
     recommendations,
     research,
-    settings as settings_router,
     tasks,
     tools,
     usage,
 )
 from app.api import personas as personas_router
+from app.api import (
+    settings as settings_router,
+)
 from app.config import get_settings
 from app.core.errors import SahmError
 from app.core.llm.router import close_clients
@@ -198,10 +202,12 @@ def create_app() -> FastAPI:
     app.include_router(personas_router.router, prefix=prefix)
     app.include_router(business.router, prefix=prefix)
     app.include_router(campaigns.router, prefix=prefix)
+    app.include_router(content.router, prefix=prefix)
     app.include_router(creatives.router, prefix=prefix)
     app.include_router(insights.router, prefix=prefix)
     app.include_router(recommendations.router, prefix=prefix)
     app.include_router(integrations.router, prefix=prefix)
+    app.include_router(media_assets.router, prefix=prefix)
     app.include_router(tasks.router, prefix=prefix)
     app.include_router(tools.router, prefix=prefix)
     app.include_router(research.router, prefix=prefix)

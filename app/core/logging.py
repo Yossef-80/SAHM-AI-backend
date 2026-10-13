@@ -128,6 +128,11 @@ _SENSITIVE_KEYS = frozenset(
         "dataforseo_password_enc",
         "image_api_key_enc",
         "search_api_key_enc",
+        # Per-workspace/provider LLM credentials and custom gateway headers.
+        "fast_api_key_enc",
+        "strong_api_key_enc",
+        "fast_extra_headers_enc",
+        "strong_extra_headers_enc",
         "google_places_api_key",
         "image_api_key",
         "meta_app_secret",
