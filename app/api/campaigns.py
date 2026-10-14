@@ -29,8 +29,10 @@ from app.api.deps import (
 )
 from app.config import Settings
 from app.core.campaigns.service import generate_campaign_strategy_draft
-from app.core.errors import ValidationFailed
-from app.db.models import BrandProfile, Campaign as CampaignRow, Creative, Insight, Recommendation
+from app.core.errors import NotFoundError, ValidationFailed
+from app.db.models import Campaign as CampaignRow
+from app.db.models import SavedAudience
+from app.db.models import Creative, Insight, Recommendation
 from app.schemas.campaigns import (
     Campaign,
     CampaignCreateRequest,
@@ -39,11 +41,10 @@ from app.schemas.campaigns import (
     CampaignStrategy,
     CampaignStrategyGenerationRequest,
     CampaignUpdateRequest,
-    GenerateStrategyRequest,
     GeneratedCampaignStrategy,
+    GenerateStrategyRequest,
     MetaAdPlanAssistRequest,
     MetaAdPlanAssistResponse,
-    StrategyKPI,
 )
 from app.schemas.common import ApiModel
 
@@ -76,6 +77,8 @@ def _to_schema(row: CampaignRow, *, creatives: int = 0, recommendations: int = 0
         start_date=row.start_date,
         end_date=row.end_date,
         target_audience=row.target_audience,
+        audience_id=row.audience_id,
+        audience_snapshot=row.audience_snapshot,
         meta_campaign_id=row.meta_campaign_id,
         notes=row.notes,
         created_at=row.created_at,
@@ -85,10 +88,41 @@ def _to_schema(row: CampaignRow, *, creatives: int = 0, recommendations: int = 0
     )
 
 
+async def _resolve_saved_audience(
+    db: AsyncSession, business_id: str, audience_id: str | None
+) -> SavedAudience | None:
+    if not audience_id:
+        return None
+    row = (
+        await db.execute(
+            select(SavedAudience).where(
+                SavedAudience.id == audience_id,
+                SavedAudience.business_id == business_id,
+                SavedAudience.is_archived.is_(False),
+            )
+        )
+    ).scalars().first()
+    if row is None:
+        raise NotFoundError("saved audience not found")
+    return row
+
+
+def _audience_snapshot(row: SavedAudience | None) -> dict[str, object] | None:
+    if row is None:
+        return None
+    return {
+        "id": row.id,
+        "name": row.name,
+        "description": row.description,
+        "targeting": row.targeting or {},
+    }
+
+
 @router.post("", response_model=Campaign)
 async def create_campaign(
     payload: CampaignCreateRequest, ws: WorkspaceDep, db: SessionDep
 ) -> Campaign:
+    saved_audience = await _resolve_saved_audience(db, ws.business_id, payload.audience_id)
     row = CampaignRow(
         id=f"cmp_{uuid.uuid4().hex[:20]}",
         business_id=ws.business_id,
@@ -99,7 +133,9 @@ async def create_campaign(
         currency=payload.currency,
         start_date=payload.start_date,
         end_date=payload.end_date,
-        target_audience=payload.target_audience,
+        target_audience=payload.target_audience or (saved_audience.name if saved_audience else None),
+        audience_id=saved_audience.id if saved_audience else None,
+        audience_snapshot=_audience_snapshot(saved_audience),
         meta_campaign_id=payload.meta_campaign_id,
         notes=payload.notes,
         status="draft",
@@ -229,6 +265,9 @@ async def create_meta_ad_plan(
     only through the existing two-phase recommendation approval endpoint.
     """
     await require_role(principal, settings, ws, minimum="member")
+    saved_audience = await _resolve_saved_audience(
+        db, ws.business_id, payload.campaign.audience_id
+    )
     try:
         # Page identity is owner-managed connector configuration, not a field a
         # campaign user should have to copy into the wizard.
@@ -241,6 +280,7 @@ async def create_meta_ad_plan(
             business_id=ws.business_id,
             campaign_input=payload.campaign,
             plan=plan,
+            audience_snapshot=_audience_snapshot(saved_audience),
         )
     except MetaAdPlanValidationError as exc:
         raise ValidationFailed(
@@ -396,82 +436,34 @@ async def generate_campaign_strategy_endpoint(
     payload: GenerateStrategyRequest,
     ws: WorkspaceDep,
     db: SessionDep,
-    llm: LLMDep,
+    principal: AuthDep,
+    settings: SettingsDep,
 ) -> CampaignStrategy:
-    """Generate an actionable AI marketing campaign strategy for the wizard."""
-    bp_stmt = select(BrandProfile).where(BrandProfile.business_id == ws.business_id)
-    bp = (await db.execute(bp_stmt)).scalars().first()
-    
-    brand_name = ws.business.name or "Brand"
-    industry = ws.business.industry or "Marketing"
-    voice = bp.brand_voice if bp and bp.brand_voice else "Engaging, authentic and direct"
-    offers = bp.key_offers if bp and bp.key_offers else ["Signature Product Offering"]
-
-    obj = payload.objective.lower()
-    summary = (
-        f"A multi-stage {payload.objective.capitalize()} strategy for {brand_name} ({industry}) "
-        f"focused on driving high-intent conversions with a daily budget of {payload.dailyBudget} EGP. "
-        f"Combines high-impact creative storytelling with aggressive retargeting."
+    """Legacy response adapter for the same app.ai-backed strategy draft."""
+    await require_role(principal, settings, ws, minimum="member")
+    currency = str(ws.business.currency or "").strip().upper()
+    language = "ar" if str(ws.business.language or "").lower().startswith("ar") else "en"
+    strategy_request = CampaignStrategyGenerationRequest(
+        objective=payload.objective,
+        audience=payload.audience,
+        daily_budget=payload.dailyBudget,
+        currency=currency if len(currency) == 3 else None,
+        brief=payload.brief,
+        language=language,
     )
-    key_messages = [
-        f"Discover the distinctive quality of {brand_name}.",
-        f"Crafted for customers who value excellence and authenticity in {industry}.",
-        f"Exclusive offer: {offers[0] if offers else 'Order today with fast delivery'}.",
-    ]
-    if payload.brief:
-        summary += f" Strategic focus: {payload.brief}"
-
-    phases = [
-        StrategyPhase(name="Phase 1: Awareness & Hook Testing", durationDays=7, focus="Test 3 video creative hooks and gather initial pixel data."),
-        StrategyPhase(name="Phase 2: Core Conversion Scaling", durationDays=14, focus="Scale winning ad creatives to high-intent lookalike audiences."),
-        StrategyPhase(name="Phase 3: Retargeting & LTV Lift", durationDays=9, focus="Retarget engaged profile visitors and abandon-cart users with urgency incentives."),
-    ]
-
-    kpis = [
-        StrategyKPI(metric="Target ROAS", target=3.2),
-        StrategyKPI(metric="Cost Per Acquisition (CPA)", target=round(payload.dailyBudget * 0.25, 2)),
-        StrategyKPI(metric="Click-Through Rate (CTR)", target=2.4),
-    ]
-
-    if llm:
-        try:
-            from langchain_core.messages import HumanMessage, SystemMessage
-            from pydantic import BaseModel, Field
-
-            class ExtractedStrategy(BaseModel):
-                summary: str = Field(description="Strategic executive summary of the campaign")
-                key_messages: list[str] = Field(description="3-4 compelling ad messages / value propositions")
-                bidding_strategy: str = Field(default="lowest_cost", description="lowest_cost | cost_cap | bid_cap | roas_goal")
-
-            extractor = llm.chat.with_structured_output(ExtractedStrategy)
-            res = await extractor.ainvoke([
-                SystemMessage(content="You are Omar, Chief Marketing Strategist. Formulate a sharp campaign strategy."),
-                HumanMessage(
-                    content=(
-                        f"Brand: {brand_name} ({industry})\n"
-                        f"Brand Voice: {voice}\n"
-                        f"Objective: {payload.objective}\n"
-                        f"Daily Budget: {payload.dailyBudget}\n"
-                        f"Audience: {payload.audience}\n"
-                        f"Brief: {payload.brief or 'None'}\n"
-                    )
-                ),
-            ])
-            if res.summary:
-                summary = res.summary
-            if res.key_messages:
-                key_messages = res.key_messages
-        except Exception:
-            pass
-
+    draft = await generate_campaign_strategy_draft(
+        db,
+        business_id=ws.business_id,
+        request=strategy_request,
+    )
     return CampaignStrategy(
-        summary=summary,
-        keyMessages=key_messages,
-        channels=["instagram", "facebook"],
-        placements=["feed", "stories", "reels"],
-        biddingStrategy="lowest_cost",
-        phases=phases,
-        kpis=kpis,
+        summary=draft.summary,
+        keyMessages=draft.key_messages,
+        channels=[channel.channel for channel in draft.channels],
+        placements=draft.placements,
+        phases=[],
+        # Do not translate metric names into invented numeric targets.
+        kpis=[],
     )
 
 

@@ -263,7 +263,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 async def create_all() -> None:
-    """Create every table. Used for dev/test and for the mock-provider boot."""
+    """Create every table for disposable SQLite dev/test databases only."""
     from app.db.models import Base
 
     engine = get_engine()

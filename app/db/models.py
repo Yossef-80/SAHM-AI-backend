@@ -236,6 +236,25 @@ class BrandProfile(Base, TimestampMixin):
     business: Mapped[Business] = relationship(back_populates="profile")
 
 
+class SavedAudience(Base, TimestampMixin):
+    """Reusable targeting profile scoped to one business/workspace."""
+
+    __tablename__ = "saved_audiences"
+    __table_args__ = (
+        Index("ix_saved_audiences_business_updated", "business_id", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    targeting: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict, nullable=False)
+    source: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+
+
 class BrandMemoryItem(Base):
     """A single memory unit, vector-embedded for similarity retrieval."""
 
@@ -326,6 +345,12 @@ class Campaign(Base, TimestampMixin):
     start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     target_audience: Mapped[str | None] = mapped_column(Text)
+    audience_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("saved_audiences.id", ondelete="SET NULL"), index=True
+    )
+    # Immutable-at-campaign-creation copy; later edits to the reusable audience
+    # must not silently rewrite the targeting shown on historical campaigns.
+    audience_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON_TYPE)
     meta_campaign_id: Mapped[str | None] = mapped_column(String(120), index=True)
     notes: Mapped[str | None] = mapped_column(Text)
 

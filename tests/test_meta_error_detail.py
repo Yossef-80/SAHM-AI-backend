@@ -23,7 +23,7 @@ TOKEN = "EAABsecrettokenvalue1234567890ABCDEF"
 
 def _client() -> HttpMetaGraphClient:
     class _S:
-        meta_graph_version = "v21.0"
+        meta_graph_version = "v26.0"
         meta_api_timeout_seconds = 5.0
 
     return HttpMetaGraphClient(

@@ -90,6 +90,111 @@ async def test_layla_image_tool_uses_operator_settings_without_exposing_credenti
     assert "Palette: navy" in request.await_args.args[0]
 
 
+@pytest.mark.asyncio
+async def test_layla_image_tool_reads_the_workspace_connector_row(monkeypatch):
+    """A workspace-configured provider must win over the process env here too.
+
+    Regression: this tool read ``Settings`` only, so a workspace that had selected
+    ``openai`` and stored its key in Settings -> Connectors still produced a
+    placeholder SVG labelled "MOCK ASSET" with ``status: ok`` from the chat, while
+    the creatives screen generated with the real provider.
+    """
+    env_settings = SimpleNamespace(
+        image_provider="mock",
+        image_api_key=None,
+        image_model="mock-image-1",
+        image_base_url=None,
+        image_allow_mock_assets=False,
+    )
+    monkeypatch.setattr(image_generation, "get_settings", lambda: env_settings)
+
+    # Exactly the surface the adapter reads off a resolved ConnectorSettings.
+    workspace = SimpleNamespace(
+        image_provider="openai",
+        image_api_key="workspace-secret-key",
+        image_model="gpt-image-1",
+        image_base_url="https://gateway.example/v1",
+    )
+
+    async def _resolve(_ctx):
+        return workspace
+
+    monkeypatch.setattr(
+        "app.core.tools.settings.resolve_tool_settings", _resolve, raising=True
+    )
+
+    generated = SimpleNamespace(
+        url="https://gateway.example/out/preview.png",
+        prompt="A product ad.",
+        provider="openai",
+        model="gpt-image-1",
+        aspect_ratio="1:1",
+    )
+    request = AsyncMock(return_value=[generated])
+    monkeypatch.setattr(image_generation, "_generate_openai_image", request)
+
+    context = SimpleNamespace(user_supplied={}, business_id="biz_test")
+    result = await generate_image_draft_tool.ainvoke(
+        {"prompt": "A product ad."},
+        config={
+            "configurable": {
+                "allow_image_generation": True,
+                "tool_context": context,
+            }
+        },
+    )
+
+    payload = json.loads(result)
+    assert payload["status"] == "ok", payload
+    request.assert_awaited_once()
+    assert request.await_args.kwargs["api_key"] == "workspace-secret-key"
+    assert request.await_args.kwargs["model"] == "gpt-image-1"
+    assert request.await_args.kwargs["base_url"] == "https://gateway.example/v1"
+    assert "workspace-secret-key" not in result
+
+
+@pytest.mark.asyncio
+async def test_layla_image_tool_refuses_a_workspace_with_no_real_provider(monkeypatch):
+    """No placeholder is returned as the requested image when a context is present."""
+    env_settings = SimpleNamespace(
+        image_provider="mock",
+        image_api_key=None,
+        image_model="mock-image-1",
+        image_base_url=None,
+        image_allow_mock_assets=False,
+    )
+    monkeypatch.setattr(image_generation, "get_settings", lambda: env_settings)
+
+    workspace = SimpleNamespace(
+        image_provider="mock",
+        image_api_key=None,
+        image_model="mock-image-1",
+        image_base_url=None,
+    )
+
+    async def _resolve(_ctx):
+        return workspace
+
+    monkeypatch.setattr(
+        "app.core.tools.settings.resolve_tool_settings", _resolve, raising=True
+    )
+
+    result = await generate_image_draft_tool.ainvoke(
+        {"prompt": "A product ad."},
+        config={
+            "configurable": {
+                "allow_image_generation": True,
+                "tool_context": SimpleNamespace(user_supplied={}),
+            }
+        },
+    )
+
+    payload = json.loads(result)
+    assert payload["status"] == "unavailable", payload
+    assert "no placeholder was created" in payload["reason"]
+    assert "asset" not in payload
+
+
 def test_image_generation_tool_is_assigned_to_layla_only():
     assert generate_image_draft_tool in LAYLA_TOOLS
     from app.ai.agents.karim.graph import KARIM_TOOLS

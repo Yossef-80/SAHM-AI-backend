@@ -116,6 +116,7 @@ KARIM = Persona(
     language=Language.EN,
     allowed_tools=[
         "get_brand_context",
+        "list_meta_campaigns",
         "get_campaign_insights",
         "get_breakdowns",
         "save_learning",

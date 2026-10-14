@@ -596,10 +596,10 @@ async def test_production_boot_refuses_without_an_encryption_key(
             pass
 
 
-async def test_boot_creates_the_schema_in_development(
+async def test_boot_creates_the_schema_for_development_sqlite(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The dev path is unchanged: create_all still runs outside prod."""
+    """Local/test SQLite keeps the convenient create_all boot path."""
     import app.main as main
 
     issued: list[str] = []
@@ -609,11 +609,37 @@ async def test_boot_creates_the_schema_in_development(
 
     monkeypatch.setattr(main, "create_all", _spy)
     monkeypatch.setattr(_settings(), "environment", "dev")
+    monkeypatch.setattr(
+        _settings(), "database_url", "sqlite+aiosqlite:///./test.db"
+    )
 
     async with main.lifespan(main.app):
         pass
 
     assert issued == ["create_all"]
+
+
+async def test_boot_skips_create_all_for_postgres_in_development(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Supabase/PostgreSQL stays Alembic-managed even with ENVIRONMENT=dev."""
+    import app.main as main
+
+    issued: list[str] = []
+
+    async def _spy() -> None:
+        issued.append("create_all")
+
+    monkeypatch.setattr(main, "create_all", _spy)
+    monkeypatch.setattr(_settings(), "environment", "dev")
+    monkeypatch.setattr(
+        _settings(), "database_url", "postgresql+asyncpg://user:pass@host/db"
+    )
+
+    async with main.lifespan(main.app):
+        pass
+
+    assert issued == [], "PostgreSQL schema changes must go through Alembic"
 
 
 async def test_readiness_reports_ready_against_a_live_database(api_client) -> None:

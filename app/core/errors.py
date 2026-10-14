@@ -57,6 +57,9 @@ class LLMProviderError(LLMError):
         #: Whether the caller should back off and try again.
         self.retryable = retryable
         self.status_code = status_code
+        # Preserve an upstream service-unavailable response for callers. A
+        # transient provider outage is a retryable 503, not a bad-gateway 502.
+        self.http_status = 503 if status_code == 503 else type(self).http_status
         self.retry_after = retry_after
 
 

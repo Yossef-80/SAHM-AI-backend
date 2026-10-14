@@ -1,7 +1,7 @@
 """The unified tools API: catalogue and deterministic invocation.
 
 Covers ``GET /api/v1/tools`` and ``POST /api/v1/tools/{name}/invoke``. Before
-these routes existed only two of the sixteen tools had an HTTP endpoint, so
+these routes existed only two of the seventeen tools had an HTTP endpoint, so
 ``save_learning`` and ``get_brand_context`` had no HTTP-level coverage at all;
 ``test_save_learning_writes_a_memory_row`` closes that gap.
 """
@@ -19,7 +19,7 @@ from app.db.models import BrandMemoryItem
 
 #: Every tool that has ever been agent-callable. Frozen so adding a tool without
 #: covering it here is a deliberate, visible change.
-EXPECTED_TOOL_COUNT = 16
+EXPECTED_TOOL_COUNT = 17
 
 
 # ------------------------------------------------------------- catalogue ----
@@ -187,6 +187,12 @@ async def test_catalogue_reports_each_tools_destination(api_client) -> None:
     insights = by_name["get_campaign_insights"]["connector"]
     assert insights["url"].startswith("https://graph.facebook.com/")
     assert insights["missing_env"] == ["meta_access_token"]
+
+    discovery = by_name["list_meta_campaigns"]["connector"]
+    assert discovery["provider"] == "meta_read"
+    assert discovery["url"].startswith("https://graph.facebook.com/")
+    assert "connected_ad_account" in discovery["url"]
+    assert "Read-only" in discovery["notes"]
 
     # Local-only tools must say so rather than invent a URL.
     assert by_name["save_learning"]["connector"]["url"] is None

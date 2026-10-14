@@ -219,7 +219,7 @@ class Settings(BaseSettings):
     meta_app_id: str | None = None
     meta_app_secret: str | None = None
     meta_graph_base_url: str = "https://graph.facebook.com"
-    meta_graph_version: str = "v21.0"
+    meta_graph_version: str = "v26.0"
     meta_api_timeout_seconds: float = 30.0
 
     # -------------------------------------------------------------- places ---

@@ -53,6 +53,10 @@ class InsightsPayload(ToolOutput):
     """
 
     campaign_id: str = ""
+    #: The campaign's own name, when Sahm has a row for it. The agent must be able
+    #: to say *which* campaign the numbers belong to instead of echoing an opaque
+    #: id back at the user.
+    campaign_name: str | None = None
     meta_campaign_id: str | None = None
     date_start: date | None = None
     date_end: date | None = None

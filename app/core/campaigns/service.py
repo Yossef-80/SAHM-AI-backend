@@ -23,7 +23,7 @@ async def generate_campaign_strategy_draft(
     business_id: str,
     request: CampaignStrategyGenerationRequest,
 ) -> GeneratedCampaignStrategy:
-    """Load saved Settings data, then delegate all generation to app.ai."""
+    """Load saved workspace context, then delegate to Omar's structured strategy generator."""
     business = await db.get(Business, business_id)
     if business is None:
         raise NotFoundError("business not found")

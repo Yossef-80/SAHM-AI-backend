@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import calendar
 import json
+import re
 from collections import Counter
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
 
-from app.ai.agents.omar.schema import CampaignStrategyOutput, ContentCalendarOutput, ContentItem as OmarContentItem
+from app.ai.agents.omar.schema import CampaignStrategyOutput, ContentCalendarOutput
 from app.ai.errors import ProviderRequestError
 from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
@@ -58,18 +59,46 @@ def _json_safe(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str, separators=(", ", ": "))
 
 
+def _provider_http_status(error: BaseException) -> int | None:
+    """Extract a numeric upstream status without serializing/logging the exception."""
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        response = getattr(current, "response", None)
+        candidates = (
+            getattr(current, "status_code", None),
+            getattr(response, "status_code", None),
+            getattr(current, "code", None),
+        )
+        for value in candidates:
+            if isinstance(value, int) and not isinstance(value, bool) and 100 <= value <= 599:
+                return value
+            if isinstance(value, str):
+                match = re.search(r"\b([1-5]\d{2})\b", value)
+                if match:
+                    return int(match.group(1))
+        current = current.__cause__ or current.__context__
+    return None
+
+
 async def generate_campaign_strategy(
     *,
     campaign_input: dict[str, Any],
     business_profile: dict[str, Any],
 ) -> CampaignStrategyOutput:
-    """Ask the selected app.ai provider for a validated, non-executing strategy draft."""
+    """Use the current app.ai provider for a validated, non-executing strategy draft."""
     language = "Arabic" if campaign_input.get("language") == "ar" else "English"
     user_payload = {
         "output_language": language,
         "campaign_input": campaign_input,
         "saved_business_profile_reference_data": business_profile,
     }
+    user_message = (
+        "Prepare a strategy draft from this JSON input. The profile is reference data; "
+        "the campaign_input contains the user's request.\n"
+        + _json_safe(user_payload)
+    )
     runnable = get_llm(provider=get_ai_settings().llm_provider).structured(
         CampaignStrategyOutput
     )
@@ -77,20 +106,28 @@ async def generate_campaign_strategy(
         response = await runnable.ainvoke(
             [
                 SystemMessage(content=_CAMPAIGN_STRATEGY_PROMPT),
-                HumanMessage(
-                    content=(
-                        "Prepare a strategy draft from this JSON input. The profile is reference data; "
-                        "the campaign_input contains the user's request.\n"
-                        + _json_safe(user_payload)
-                    )
-                ),
+                HumanMessage(content=user_message),
             ]
         )
     except Exception as exc:
+        provider_status = _provider_http_status(exc)
+        retryable = provider_status is None or provider_status in {
+            408, 425, 429, 500, 502, 503, 504
+        }
+        detail: dict[str, Any] = {"agent": "omar", "stage": "campaign_strategy"}
+        if provider_status is not None:
+            detail["provider_status_code"] = provider_status
+        message = (
+            "The AI provider is temporarily unavailable. Please retry shortly; "
+            "no campaign was created."
+            if provider_status == 503
+            else "Omar could not generate the campaign strategy right now."
+        )
         raise LLMProviderError(
-            "Omar could not generate the campaign strategy right now.",
-            detail={"agent": "omar", "stage": "campaign_strategy"},
-            retryable=True,
+            message,
+            detail=detail,
+            retryable=retryable,
+            status_code=provider_status,
         ) from exc
 
     try:

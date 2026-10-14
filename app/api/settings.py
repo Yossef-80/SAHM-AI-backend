@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from typing import Any
 
 from fastapi import APIRouter
 from sqlalchemy import select
@@ -106,10 +107,89 @@ def _render(resolved: ResolvedConnector, *, has_override: bool) -> ConnectorOut:
         has_override=has_override,
         configured=resolved.configured,
         provider=resolved.provider or None,
+        providers=list(resolved.spec.allowed_providers),
+        missing_required=list(resolved.missing_required),
         placeholder=resolved.is_placeholder,
         fields=fields,
         notes=resolved.spec.notes,
     )
+
+
+def _validate_provider_selection(
+    spec: ConnectorSpec, resolved: ResolvedConnector, sent: dict[str, Any]
+) -> None:
+    """Refuse a save that stores credentials the selected provider will never read.
+
+    The failure this prevents: a user fills in the image API key and model, never
+    touches the provider box (which defaults to ``mock``), gets a 200 with a green
+    toast, and then watches image generation stay disabled -- because
+    ``generate_image`` only reads ``image_api_key``/``image_model`` when the
+    provider is a real one. Nothing in the old response said so.
+
+    Only the *credential* fields are checked, so clearing a provider on its own
+    (or saving an unrelated field) is still allowed.
+    """
+    if spec.provider_field is None:
+        return
+    credentials = sorted(
+        key for key in sent if key != spec.provider_field
+    )
+    if not credentials or not resolved.is_placeholder:
+        return
+    provider = resolved.provider or "(unset)"
+    allowed = ", ".join(spec.allowed_providers) or "n/a"
+    raise ValidationFailed(
+        (
+            f"{', '.join(repr(key) for key in credentials)} "
+            f"{'was' if len(credentials) == 1 else 'were'} set for connector "
+            f"'{spec.name}', but its provider resolves to '{provider}', which only "
+            f"returns placeholder data and never reads them. Send "
+            f"'{spec.provider_field}' with a real provider in the same request "
+            f"(accepted: {allowed}) -- nothing was saved."
+        ),
+        detail={
+            "code": "provider_not_selected",
+            "connector": spec.name,
+            "provider_field": spec.provider_field,
+            "provider": provider,
+            "accepted": list(spec.allowed_providers),
+            "fields": credentials,
+        },
+    )
+
+
+def _validate_provider_value(spec: ConnectorSpec, sent: dict[str, Any]) -> None:
+    """Reject a provider this build does not implement, and normalise the case.
+
+    ``"OpenAI"`` is stored as ``"openai"`` because every comparison against the
+    provider happens on the stored string (``media.py`` compares it directly, and
+    ``models.py``-backed rows are never validated by a Literal). A name that is
+    simply wrong -- the model id typed into the provider box, say -- is a 422
+    listing what is accepted, rather than a save that silently does nothing.
+    """
+    if spec.provider_field is None or not spec.allowed_providers:
+        return
+    raw = sent.get(spec.provider_field)
+    if raw is None:
+        return
+    value = str(raw).strip().lower()
+    if not value:
+        sent[spec.provider_field] = None
+        return
+    if value not in spec.allowed_providers:
+        raise ValidationFailed(
+            (
+                f"'{raw}' is not a supported '{spec.provider_field}' for connector "
+                f"'{spec.name}'. Accepted: {', '.join(spec.allowed_providers)}."
+            ),
+            detail={
+                "code": "unknown_provider",
+                "connector": spec.name,
+                "provider_field": spec.provider_field,
+                "accepted": list(spec.allowed_providers),
+            },
+        )
+    sent[spec.provider_field] = value
 
 
 @router.get("/connectors", response_model=ConnectorSettingsResponse)
@@ -182,6 +262,10 @@ async def update_connector(
             detail={"accepted": sorted(allowed)},
         )
 
+    # Validate before any row is touched: the provider decides whether the
+    # credential fields mean anything at all.
+    _validate_provider_value(spec, sent)
+
     stmt = select(ToolSettingsRow).where(
         ToolSettingsRow.business_id == ws.business_id,
         ToolSettingsRow.connector == connector,
@@ -215,6 +299,19 @@ async def update_connector(
         else:
             setattr(row, field_spec.db_column, text or None)
     row.updated_by = principal.user_id if principal is not None else None
+
+    # Resolve the row exactly as a tool call would, then refuse a save that left
+    # credentials attached to a placeholder provider. Flushing first means the
+    # check sees the post-patch values; rolling back keeps the 422 atomic.
+    await db.flush()
+    resolved_after = (
+        await load_connector_settings(db, ws.business_id, settings)
+    ).connectors[connector]
+    try:
+        _validate_provider_selection(spec, resolved_after, sent)
+    except ValidationFailed:
+        await db.rollback()
+        raise
 
     await db.commit()
     # Never log the values -- not even a count of characters, which would be a

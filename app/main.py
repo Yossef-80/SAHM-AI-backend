@@ -20,6 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import (
     assistant,
+    audiences,
     audit,
     auth,
     business,
@@ -46,7 +47,11 @@ from app.core.llm.router import close_clients
 from app.core.logging import bind_request_id, configure_logging, get_logger
 from app.core.ratelimit import RateLimitMiddleware, build_limiter
 from app.core.security import verify_runtime_security
-from app.core.security_headers import SecurityHeadersMiddleware, validate_cors
+from app.core.security_headers import (
+    SecurityHeadersMiddleware,
+    build_headers as build_security_headers,
+    validate_cors,
+)
 from app.core.tools.registry import register_all
 from app.db.session import create_all, dispose_engine
 from app.schemas.common import ErrorResponse
@@ -117,18 +122,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     start_usage_writer()
     if settings.environment == "prod":
-        # Never issue DDL at boot in production: the schema is whatever the
-        # last ``alembic upgrade head`` left, and three replicas racing
-        # CREATE TABLE is a real outage. A migration is a release step (P5.5).
+        # Production never issues DDL at boot, even if it is misconfigured to
+        # use SQLite. The schema must already have been installed by release.
         _logger.info(
             "schema_creation_skipped",
             extra={"reason": "production", "schema_source": "alembic"},
         )
-    else:
+    elif settings.database_url.lower().startswith("sqlite"):
+        # create_all is a convenience for disposable local/test SQLite stores.
+        # Never point it at PostgreSQL: it can create future tables without
+        # applying their Alembic revision or alter existing columns, leaving a
+        # live database between schema versions.
         await create_all()
         _logger.info(
             "schema_creation_performed",
             extra={"reason": settings.environment, "schema_source": "create_all"},
+        )
+    else:
+        # PostgreSQL (including Supabase) is migration-managed in every
+        # environment. Apply ``alembic upgrade head`` before starting the app.
+        _logger.info(
+            "schema_creation_skipped",
+            extra={
+                "reason": "alembic_managed_database",
+                "schema_source": "alembic",
+                "environment": settings.environment,
+            },
         )
     _logger.info(
         "app_started",
@@ -258,6 +277,7 @@ def create_app() -> FastAPI:
     prefix = settings.api_prefix
     app.include_router(auth.router, prefix=prefix)
     app.include_router(assistant.router, prefix=prefix)
+    app.include_router(audiences.router, prefix=prefix)
     app.include_router(personas_router.router, prefix=prefix)
     app.include_router(business.router, prefix=prefix)
     app.include_router(campaigns.router, prefix=prefix)
@@ -278,6 +298,44 @@ def create_app() -> FastAPI:
     app.include_router(audit.router, prefix=prefix)
 
     # ------------------------------------------------------------- errors --
+    def browser_visible_headers(request: Request) -> dict[str, str]:
+        """The headers a crashed request would otherwise reach the browser without.
+
+        ``ServerErrorMiddleware`` -- the layer that turns the bare-``Exception``
+        handler's response into an HTTP response -- sits *outside* both the CORS
+        middleware and the security-header middleware. When an exception escapes
+        the request-id middleware (any exception raised anywhere inside it), the
+        response it builds is therefore sent with neither, and the browser
+        refuses to hand it to ``fetch`` at all. The frontend then has no status
+        and no body to report, so it says "could not reach the backend" -- a
+        live server crash presented to the user (and to support) as a
+        connectivity problem, while the 500 never appears in the UI.
+
+        Re-attaching the same headers here keeps a 5xx as diagnosable as a 4xx:
+        the browser can read the envelope, and the request id the log line names
+        travels with it.
+        """
+        headers: dict[str, str] = (
+            dict(build_security_headers(settings))
+            if settings.security_headers_enabled
+            else {}
+        )
+
+        origin = request.headers.get("origin")
+        allowed_origins = list(settings.cors_origins)
+        if origin and origin in allowed_origins:
+            # Echo the exact origin: with credentials allowed, ``*`` is not a
+            # substitute and every browser would discard the response.
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = "true"
+            headers["Access-Control-Expose-Headers"] = "X-Request-Id"
+            headers["Vary"] = "Origin"
+
+        request_id = getattr(request.state, "request_id", None)
+        if request_id:
+            headers["X-Request-Id"] = request_id
+        return headers
+
     def envelope(
         status_code: int,
         *,
@@ -285,6 +343,7 @@ def create_app() -> FastAPI:
         message: str,
         detail: dict[str, object],
         request_id: str | None,
+        headers: dict[str, str] | None = None,
     ) -> JSONResponse:
         """Render the one error shape every failure path must use (P0.6).
 
@@ -302,6 +361,7 @@ def create_app() -> FastAPI:
                     "requestId": request_id,
                 }
             ).model_dump(mode="json", by_alias=True),
+            headers=headers,
         )
 
     @app.exception_handler(SahmError)
@@ -357,6 +417,7 @@ def create_app() -> FastAPI:
             message="An unexpected error occurred.",
             detail={},
             request_id=getattr(request.state, "request_id", None),
+            headers=browser_visible_headers(request),
         )
 
     @app.get("/health")

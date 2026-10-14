@@ -39,8 +39,9 @@ from app.schemas.common import ApiModel
 META_AD_PLAN_ACTION = "create_meta_ad_plan"
 META_AD_PLAN_KIND = "meta_ad_plan_v1"
 META_AD_INSIGHT_KIND = "meta_ad_performance"
-# The wizard does not collect bid caps or ROAS floors, so use Meta's no-cap
-# strategy explicitly at both campaign and ad-set levels.
+# The wizard does not collect bid caps or ROAS floors, so leave campaign-level
+# bidding alone (the budget is assigned at the ad-set level) and use Meta's
+# no-cap strategy on the ad set.
 META_DEFAULT_BID_STRATEGY = "LOWEST_COST_WITHOUT_CAP"
 
 # These are the six objectives exposed by the existing CampaignObjectiveSchema.
@@ -62,13 +63,27 @@ _OBJECTIVE_REQUIRED: dict[str, tuple[str, ...]] = {
     "app_installs": ("promoted_object",),
 }
 
+# Outcome Awareness is launched as Reach billed on impressions. Keep this pair
+# objective-locked instead of trusting a stale wizard draft or a generic MCP
+# enum suggestion. Other objectives retain their existing reviewed settings.
+_META_OBJECTIVE_DELIVERY_DEFAULTS: dict[str, dict[str, str]] = {
+    "awareness": {
+        "billing_event": "IMPRESSIONS",
+        "optimization_goal": "REACH",
+    },
+}
+
+# Keep Advantage+ Audience off by default so Meta respects the audience
+# constraints explicitly selected in the campaign wizard.
+META_DEFAULT_ADVANTAGE_AUDIENCE = 0
+
 
 class MetaAdPlanSettings(ApiModel):
     """Non-secret values needed to create a single Ad Set and one Ad per image.
 
-    Objective values are deliberately user-supplied. In particular there are no
-    defaults for optimization, billing, targeting, special-ad-category status,
-    page identity, destination, CTA, or promoted object.
+    Objective-bound delivery settings are checked/canonicalized before a draft
+    is saved or executed. Targeting, page identity, special-ad-category status,
+    destination, CTA, and promoted object remain explicit plan inputs.
     """
 
     objective: Literal[
@@ -109,6 +124,77 @@ class MetaAdPlanSettings(ApiModel):
         if len(set(value)) != len(value):
             raise ValueError("creativeIds must not contain duplicates")
         return value
+
+
+def canonicalize_objective_delivery_settings(
+    settings: MetaAdPlanSettings,
+) -> MetaAdPlanSettings:
+    """Replace stale objective-bound billing/performance values with the fixed map.
+
+    Awareness plans have historically inherited ``optimization_goal`` from a
+    prior wizard objective (for example, OFFSITE_CONVERSIONS from Sales). This
+    keeps that old plan resumable while guaranteeing that the corrected Ad Set
+    uses the delivery pair supported for OUTCOME_AWARENESS.
+    """
+    defaults = _META_OBJECTIVE_DELIVERY_DEFAULTS.get(settings.objective)
+    if not defaults:
+        return settings
+    updates = {
+        key: value
+        for key, value in defaults.items()
+        if getattr(settings, key) != value
+    }
+    return settings.model_copy(update=updates) if updates else settings
+
+
+def canonicalize_meta_ad_plan_settings(
+    settings: MetaAdPlanSettings,
+) -> MetaAdPlanSettings:
+    """Canonicalize fixed delivery values and URL-only CTA fields.
+
+    ``link_caption`` is optional in Meta's CTA value, but when present Meta
+    requires it to be a URL. The wizard's headline belongs in ``link_data.name``
+    instead; discard a non-URL legacy caption and keep the CTA link aligned with
+    the validated destination URL. This also repairs already-saved drafts during
+    phase-one review, before any Meta write.
+    """
+    result = canonicalize_objective_delivery_settings(settings)
+    cta = result.call_to_action
+    if not isinstance(cta, dict):
+        return result
+    value = cta.get("value")
+    if not isinstance(value, dict):
+        return result
+
+    normalized_value = dict(value)
+    if result.destination_url and _is_public_https_url(result.destination_url):
+        normalized_value["link"] = result.destination_url
+    caption = normalized_value.get("link_caption")
+    if caption is not None and not _is_public_https_url(caption):
+        normalized_value.pop("link_caption", None)
+    if normalized_value == value:
+        return result
+
+    normalized_cta = dict(cta)
+    normalized_cta["value"] = normalized_value
+    return result.model_copy(update={"call_to_action": normalized_cta})
+
+
+def _targeting_with_explicit_advantage_audience(
+    targeting: dict[str, Any],
+) -> dict[str, Any]:
+    """State the audience-expansion choice in the Meta targeting spec.
+
+    Meta now rejects some new Ad Sets unless ``targeting_automation`` explicitly
+    opts Advantage+ Audience in or out. Default to the workspace's current choice
+    (off), while preserving an explicit valid choice carried by a reviewed plan.
+    """
+    result = dict(targeting)
+    automation = result.get("targeting_automation")
+    automation = dict(automation) if isinstance(automation, dict) else {}
+    automation.setdefault("advantage_audience", META_DEFAULT_ADVANTAGE_AUDIENCE)
+    result["targeting_automation"] = automation
+    return result
 
 
 def _contains_credential_key(value: Any) -> bool:
@@ -156,10 +242,28 @@ def missing_meta_ad_settings(settings: MetaAdPlanSettings) -> list[str]:
         if value is None or value == "" or value == {}:
             missing.append(key)
 
+    expected_delivery = _META_OBJECTIVE_DELIVERY_DEFAULTS.get(settings.objective)
+    if expected_delivery:
+        for key, expected in expected_delivery.items():
+            if getattr(settings, key) != expected:
+                missing.append(
+                    f"{key} (for {settings.objective}, use {expected})"
+                )
+
     if settings.targeting is not None:
         geo = settings.targeting.get("geo_locations")
         if not isinstance(geo, dict) or not geo:
             missing.append("targeting.geo_locations")
+        automation = settings.targeting.get("targeting_automation")
+        if automation is not None:
+            if not isinstance(automation, dict):
+                missing.append("targeting.targeting_automation (must be an object)")
+            elif "advantage_audience" in automation:
+                advantage_audience = automation.get("advantage_audience")
+                if type(advantage_audience) is not int or advantage_audience not in {0, 1}:
+                    missing.append(
+                        "targeting.targeting_automation.advantage_audience (use 0 or 1)"
+                    )
         if "genders" in settings.targeting:
             genders = settings.targeting["genders"]
             if (
@@ -298,6 +402,7 @@ async def create_meta_ad_plan_draft(
     business_id: str,
     campaign_input: Any,
     plan: MetaAdPlanSettings,
+    audience_snapshot: dict[str, Any] | None = None,
 ) -> tuple[Campaign, Recommendation]:
     """Persist a local campaign draft and its pending Meta plan atomically.
 
@@ -314,6 +419,7 @@ async def create_meta_ad_plan_draft(
         raise MetaAdPlanValidationError(
             "A new Meta launch plan cannot be linked to an existing Meta Campaign ID."
         )
+    plan = canonicalize_meta_ad_plan_settings(plan)
     missing = missing_meta_ad_settings(plan)
     if missing:
         raise MetaAdPlanValidationError(
@@ -364,7 +470,10 @@ async def create_meta_ad_plan_draft(
         currency=campaign_input.currency,
         start_date=campaign_input.start_date,
         end_date=campaign_input.end_date,
-        target_audience=campaign_input.target_audience,
+        target_audience=campaign_input.target_audience
+        or (audience_snapshot.get("name") if audience_snapshot else None),
+        audience_id=campaign_input.audience_id,
+        audience_snapshot=audience_snapshot,
         meta_campaign_id=None,
         notes=campaign_input.notes,
         status="draft",
@@ -436,6 +545,16 @@ async def preflight_meta_ad_plan(
         plan = MetaAdPlanSettings.model_validate(plan_raw or {})
     except ValidationError:
         return ["The saved Meta plan is invalid; prepare it again from the campaign wizard."]
+    plan = canonicalize_meta_ad_plan_settings(plan)
+    canonical_plan_payload = plan.model_dump(mode="json", by_alias=True)
+    if canonical_plan_payload != plan_raw:
+        # Persist the corrected non-secret plan locally before the operator sees
+        # phase-one approval. The reviewed diff and any later recovery therefore
+        # show/use the same performance goal and billing event.
+        updated_payload = dict(payload)
+        updated_payload["plan"] = canonical_plan_payload
+        recommendation.payload = updated_payload
+        await db.flush()
     issues.extend(missing_meta_ad_settings(plan))
     campaign = await db.get(Campaign, recommendation.campaign_id) if recommendation.campaign_id else None
     if campaign is None:
@@ -769,11 +888,11 @@ async def execute_meta_ad_plan(
 
     Every write is PAUSED. Progress with external IDs is saved into the existing
     Recommendation JSON column after each successful Graph call. Uncertain partial
-    attempts remain blocked. The sole resumable partial is a confirmed HTTP 400
-    rejection while setting the strategy or creating the ad set, when the campaign
-    ID is known; after explicit review, the existing paused campaign is reused
-    rather than duplicated. A prior
-    ``failed_safe`` result with no created IDs can be retried by explicit user action.
+    attempts remain blocked. A reviewed HTTP 400 at the ad-set step may resume with
+    the existing campaign; a reviewed HTTP 400 at the first creative may resume
+    with both the recorded campaign and ad set. Other partial shapes remain blocked
+    to prevent duplicate objects. A prior ``failed_safe`` result with no created IDs
+    can be retried by explicit user action.
     """
     rec_id = recommendation.id
     if recommendation.action_type != META_AD_PLAN_ACTION:
@@ -803,19 +922,37 @@ async def execute_meta_ad_plan(
 
     prior_ids = prior.get("created_ids")
     resume_campaign_id: str | None = None
-    if (
+    resume_ad_set_id: str | None = None
+    attempted_step = prior.get("attempted_step")
+    can_resume_known_400 = (
         prior.get("status") == "partial"
-        and prior.get("attempted_step") in {"campaign_bid_strategy", "ad_set"}
         and prior.get("failure_status_code") == 400
         and prior.get("retry_safe") is True
         and prior.get("campaign_id") == campaign.id
         and isinstance(prior_ids, dict)
-        and set(prior_ids) == {"campaign"}
         and isinstance(prior_ids.get("campaign"), str)
         and bool(prior_ids["campaign"])
         and campaign.meta_campaign_id == prior_ids["campaign"]
-    ):
+    )
+    if can_resume_known_400 and set(prior_ids) == {"campaign"} and attempted_step in {
+        "campaign_bid_strategy",
+        "ad_set",
+    }:
         resume_campaign_id = prior_ids["campaign"]
+    elif (
+        can_resume_known_400
+        and isinstance(attempted_step, str)
+        and attempted_step.startswith("creative:")
+        and bool(attempted_step.removeprefix("creative:"))
+        and set(prior_ids) == {"campaign", "ad_set"}
+        and isinstance(prior_ids.get("ad_set"), str)
+        and bool(prior_ids["ad_set"])
+        and prior.get("ads") == []
+    ):
+        # The creative request is rejected before a creative/ad exists. Reuse
+        # the paused campaign AND ad set; never POST either object a second time.
+        resume_campaign_id = prior_ids["campaign"]
+        resume_ad_set_id = prior_ids["ad_set"]
 
     if (
         prior.get("status") in {"in_progress", "partial", "unknown"}
@@ -847,6 +984,32 @@ async def execute_meta_ad_plan(
             detail="The saved plan settings are invalid.",
             unavailable_reason="Rebuild the plan with all required Meta settings; no Meta write was attempted.",
         )
+    canonical_plan = canonicalize_meta_ad_plan_settings(plan_model)
+    if canonical_plan.model_dump(mode="json", by_alias=True) != plan_model.model_dump(
+        mode="json", by_alias=True
+    ):
+        return MetaAdPlanExecutionResult(
+            recommendation_id=rec_id,
+            detail="Meta plan settings changed and need a fresh review.",
+            unavailable_reason=(
+                "Review the canonical delivery and call-to-action URL settings in phase one "
+                "before confirming this plan; no Meta write was attempted."
+            ),
+            execution_result=prior,
+        )
+    plan_model = canonical_plan
+    if resume_ad_set_id is not None:
+        expected_step = f"creative:{plan_model.creative_ids[0]}"
+        if attempted_step != expected_step:
+            return MetaAdPlanExecutionResult(
+                recommendation_id=rec_id,
+                detail="The saved creative order changed after the partial attempt.",
+                unavailable_reason=(
+                    "The recorded failure is not at the first selected creative. "
+                    "Resolve the partial attempt manually; no Meta write was attempted."
+                ),
+                execution_result=prior,
+            )
     missing = missing_meta_ad_settings(plan_model)
     if missing:
         return MetaAdPlanExecutionResult(
@@ -889,6 +1052,8 @@ async def execute_meta_ad_plan(
         )
     # Preserve user selection order; SQL IN() does not guarantee row order.
     ordered_creatives = [creative_by_id[cid] for cid in plan_model.creative_ids]
+    targeting_spec = _targeting_with_explicit_advantage_audience(plan_model.targeting or {})
+    advantage_audience = targeting_spec["targeting_automation"]["advantage_audience"]
 
     connection = await resolve_meta_connection(db, campaign.business_id, settings)
     if not connection.access_token:
@@ -922,6 +1087,17 @@ async def execute_meta_ad_plan(
         base_url=connection.graph_base_url,
     )
     account_path = f"act_{connection.ad_account_id}"
+    resumed_ids: dict[str, Any] = {}
+    if resume_campaign_id:
+        resumed_ids["campaign"] = resume_campaign_id
+    if resume_ad_set_id:
+        resumed_ids["ad_set"] = resume_ad_set_id
+    prior_uploaded_images = prior.get("uploaded_images")
+    uploaded_images = (
+        dict(prior_uploaded_images)
+        if isinstance(prior_uploaded_images, dict)
+        else {}
+    )
     result: dict[str, Any] = {
         "kind": META_AD_PLAN_KIND,
         "status": "in_progress",
@@ -929,9 +1105,14 @@ async def execute_meta_ad_plan(
         "campaign_id": campaign.id,
         "objective": plan_model.objective,
         "meta_objective": objective,
+        "billing_event": plan_model.billing_event,
+        "optimization_goal": plan_model.optimization_goal,
+        "advantage_audience": advantage_audience,
+        "graph_api_version": settings.meta_graph_version,
         "bid_strategy": META_DEFAULT_BID_STRATEGY,
-        "created_ids": {"campaign": resume_campaign_id} if resume_campaign_id else {},
+        "created_ids": resumed_ids,
         "ads": [],
+        "uploaded_images": uploaded_images,
         "attempted_step": None,
         "resumed_from_partial": bool(resume_campaign_id),
     }
@@ -950,15 +1131,11 @@ async def execute_meta_ad_plan(
 
     try:
         if resume_campaign_id:
-            # Reuse the already-recorded paused campaign; explicitly repair its
-            # strategy before retrying the rejected ad-set request.
+            # Reuse the already-recorded paused campaign. The budget and
+            # no-cap strategy belong to the ad set; do not patch the campaign's
+            # bid strategy when campaign-level budgeting is disabled.
             meta_campaign_id = resume_campaign_id
             campaign.status = "paused"
-            await checkpoint("campaign_bid_strategy")
-            await graph_client.post(
-                meta_campaign_id, {"bid_strategy": META_DEFAULT_BID_STRATEGY}
-            )
-            result["campaign_bid_strategy_updated"] = True
         else:
             await checkpoint("campaign")
             campaign_response = await graph_client.post(
@@ -967,7 +1144,6 @@ async def execute_meta_ad_plan(
                     "name": campaign.name,
                     "objective": objective,
                     "status": "PAUSED",
-                    "bid_strategy": META_DEFAULT_BID_STRATEGY,
                     "special_ad_categories": list(plan_model.special_ad_categories or []),
                     # The budget is assigned at the ad-set level below. Make the
                     # sharing policy explicit and preserve that allocation.
@@ -980,47 +1156,54 @@ async def execute_meta_ad_plan(
             campaign.status = "paused"
             await db.flush()
 
-        adset_body: dict[str, Any] = {
-            "name": f"{campaign.name} — Ad Set",
-            "campaign_id": meta_campaign_id,
-            "daily_budget": daily_budget,
-            "bid_strategy": META_DEFAULT_BID_STRATEGY,
-            "billing_event": plan_model.billing_event,
-            "optimization_goal": plan_model.optimization_goal,
-            "targeting": plan_model.targeting,
-            "status": "PAUSED",
-        }
-        if campaign.start_date:
-            adset_body["start_time"] = _to_utc(campaign.start_date)
-        if campaign.end_date:
-            adset_body["end_time"] = _to_utc(campaign.end_date)
-        if plan_model.destination_type:
-            adset_body["destination_type"] = plan_model.destination_type
-        if plan_model.promoted_object:
-            adset_body["promoted_object"] = plan_model.promoted_object
+        if resume_ad_set_id:
+            meta_adset_id = resume_ad_set_id
+        else:
+            adset_body: dict[str, Any] = {
+                "name": f"{campaign.name} — Ad Set",
+                "campaign_id": meta_campaign_id,
+                "daily_budget": daily_budget,
+                "bid_strategy": META_DEFAULT_BID_STRATEGY,
+                "billing_event": plan_model.billing_event,
+                "optimization_goal": plan_model.optimization_goal,
+                "targeting": targeting_spec,
+                "status": "PAUSED",
+            }
+            if campaign.start_date:
+                adset_body["start_time"] = _to_utc(campaign.start_date)
+            if campaign.end_date:
+                adset_body["end_time"] = _to_utc(campaign.end_date)
+            if plan_model.destination_type:
+                adset_body["destination_type"] = plan_model.destination_type
+            if plan_model.promoted_object:
+                adset_body["promoted_object"] = plan_model.promoted_object
 
-        await checkpoint("ad_set")
-        adset_response = await graph_client.post(f"{account_path}/adsets", adset_body)
-        meta_adset_id = _graph_object_id(adset_response)
-        await save_created_id("ad_set", meta_adset_id)
+            await checkpoint("ad_set")
+            adset_response = await graph_client.post(f"{account_path}/adsets", adset_body)
+            meta_adset_id = _graph_object_id(adset_response)
+            await save_created_id("ad_set", meta_adset_id)
 
         for index, creative in enumerate(ordered_creatives):
-            await checkpoint(f"image_upload:{creative.id}")
-            # Meta's adimages edge accepts `bytes` or `copy_from` — not `url`.
-            # Sending an undocumented field would be rejected live, and only
-            # after the campaign and ad set already existed.
-            image_payload = await _creative_image_payload(
-                creative.url, timeout=settings.meta_api_timeout_seconds
-            )
-            if image_payload is None:
-                raise MetaGraphError(
-                    "The creative image could not be read, so nothing was uploaded to Meta.",
-                    retry_safe=True,
+            image_hash = uploaded_images.get(creative.id)
+            if not isinstance(image_hash, str) or not image_hash:
+                await checkpoint(f"image_upload:{creative.id}")
+                # Meta's adimages edge accepts `bytes` or `copy_from` — not `url`.
+                image_payload = await _creative_image_payload(
+                    creative.url, timeout=settings.meta_api_timeout_seconds
                 )
-            image_response = await graph_client.post_multipart(
-                f"{account_path}/adimages", {"bytes": image_payload}
-            )
-            image_hash = _ad_image_hash(image_response)
+                if image_payload is None:
+                    raise MetaGraphError(
+                        "The creative image could not be read, so nothing was uploaded to Meta.",
+                        retry_safe=True,
+                    )
+                image_response = await graph_client.post_multipart(
+                    f"{account_path}/adimages", {"bytes": image_payload}
+                )
+                image_hash = _ad_image_hash(image_response)
+                uploaded_images[creative.id] = image_hash
+                result["uploaded_images"] = dict(uploaded_images)
+                recommendation.execution_result = dict(result)
+                await db.flush()
 
             creative_name = f"{campaign.name} — {creative.id}"
             object_story_spec: dict[str, Any] = {
@@ -1665,6 +1848,8 @@ __all__ = [
     "MetaAdPlanValidationError",
     "MetaGraphClient",
     "MetaGraphError",
+    "canonicalize_meta_ad_plan_settings",
+    "canonicalize_objective_delivery_settings",
     "execute_meta_ad_plan",
     "missing_meta_ad_settings",
     "objective_to_meta",

@@ -19,6 +19,7 @@ class CampaignCreateRequest(ApiModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     target_audience: str | None = None
+    audience_id: str | None = None
     meta_campaign_id: str | None = None
     notes: str | None = None
 
@@ -45,6 +46,8 @@ class Campaign(ApiModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     target_audience: str | None = None
+    audience_id: str | None = None
+    audience_snapshot: dict[str, Any] | None = None
     meta_campaign_id: str | None = None
     notes: str | None = None
     created_at: datetime
@@ -180,8 +183,8 @@ class CampaignStrategy(ApiModel):
 
 
 class GenerateStrategyRequest(ApiModel):
-    objective: str
-    dailyBudget: float
+    objective: Literal["awareness", "traffic", "engagement", "leads", "sales", "app_installs"]
+    dailyBudget: float = Field(gt=0)
     audience: dict[str, object] = Field(default_factory=dict)
     brief: str | None = None
 

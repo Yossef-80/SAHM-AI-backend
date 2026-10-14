@@ -3,9 +3,10 @@
 
 Two questions, answered in opposite orders of importance:
 
-1. **Is the migration history itself sound?** -- Is it a single linear chain
-   with exactly one head, and is every revision reachable from the base? This is
-   a *pure file* question answered with Alembic's own ``ScriptDirectory``. It
+1. **Is the migration history itself sound?** -- Is it a connected graph
+   with exactly one base and one head, and is every revision reachable from the
+   base? Explicit merge revisions are allowed. This is a *pure file* question
+   answered with Alembic's own ``ScriptDirectory``. It
    needs no database, no ``DATABASE_URL`` and no network, so it runs in a fresh
    container and in CI before anything is provisioned.
 
@@ -26,10 +27,10 @@ Production release is, in this order and no other:
     alembic upgrade head      # exactly once, as a pre-deploy job
     ...then start the app...
 
-The app never issues DDL at boot: ``app/main.py`` skips ``create_all()``
-entirely when ``ENVIRONMENT=prod`` (``app/db/session.py::create_all`` is a dev
-convenience for SQLite, and it is unreachable in prod -- see
-``tests/test_workspace_isolation.py::test_boot_skips_ddl_in_production``).
+The app never issues DDL against PostgreSQL at boot: even a development
+process pointed at Supabase must not create tables behind Alembic's back.
+``create_all()`` is reserved for SQLite dev/test databases (see
+``tests/test_workspace_isolation.py::test_boot_skips_create_all_for_postgres_in_development``).
 Three replicas booting concurrently and racing ``CREATE TABLE`` is a real
 outage, which is why the migration is a release step rather than a boot step.
 
@@ -95,7 +96,7 @@ def build_config() -> object:
 
 
 def check_history() -> HistoryReport:
-    """Assert the history is a single linear chain with exactly one head."""
+    """Assert one connected migration graph with one base/head; merges are valid."""
     from alembic.script import ScriptDirectory
 
     report = HistoryReport()
@@ -215,7 +216,7 @@ def _database_url() -> str | None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="check_migrations.py",
-        description="Verify the Alembic history is one linear chain with a single head.",
+        description="Verify the Alembic history is connected with one base and one head.",
     )
     parser.add_argument(
         "--require-head",
@@ -248,10 +249,10 @@ def main(argv: list[str] | None = None) -> int:
     if report.errors:
         say()
         say("HISTORY INVALID -- do not release. Merge the branches into a single")
-        say("linear chain first (see docs/PRODUCTION_ROADMAP.md section 6, P5.5).")
+        say("one connected history first (see docs/PRODUCTION_ROADMAP.md section 6, P5.5).")
         return 1
 
-    say("  history: OK (single linear chain)")
+    say("  history: OK (single connected migration history; merge revisions allowed)")
 
     # --- optional: compare against a live database -------------------------
     url = None if args.no_database else _database_url()

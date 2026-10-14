@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import RequestIdDep, SessionDep, SettingsDep, WorkspaceDep
 from app.core.agents.persona import load_persona
@@ -66,6 +68,32 @@ def _normalize_task_inputs(inputs: dict[str, object]) -> dict[str, object]:
     normalized.pop("conversationId", None)
     normalized.pop("conversation_id", None)
     return normalized
+
+
+async def _attach_campaign_context(
+    db: AsyncSession, business_id: str, inputs: dict[str, object]
+) -> None:
+    """Add the campaign's name (and Meta id) to a task's inputs, read-only."""
+    campaign_id = str(inputs.get("campaign_id") or "").strip()
+    if not campaign_id:
+        return
+
+    from app.db.models import Campaign
+
+    stmt = select(Campaign).where(
+        Campaign.id == campaign_id, Campaign.business_id == business_id
+    )
+    campaign = await db.scalar(stmt)
+    if campaign is None:
+        return
+    inputs.setdefault("campaign_name", str(campaign.name or ""))
+    inputs.setdefault("campaign_status", str(campaign.status or ""))
+    if campaign.meta_campaign_id:
+        inputs.setdefault("meta_campaign_id", str(campaign.meta_campaign_id))
+    if campaign.budget is not None:
+        inputs.setdefault("campaign_budget", campaign.budget)
+    if campaign.currency:
+        inputs.setdefault("campaign_currency", str(campaign.currency))
 
 
 def _to_schema(row: AgentTask) -> AgentTaskSchema:
@@ -172,6 +200,12 @@ async def start_task(
             detail={"allowed_tasks": persona.allowed_tasks},
         )
     task_inputs = _normalize_task_inputs(body.inputs) if body else {}
+    # Resolve the campaign the UI pointed at into something a prompt can use.
+    # The frontend sends only `campaignId`, so the agent was handed an opaque
+    # `cmp_...` and could not say which campaign it analysed -- or even confirm it
+    # was the right one. The lookup is workspace-scoped, so another tenant's id is
+    # simply not found and the task still runs without a name.
+    await _attach_campaign_context(db, ws.business_id, task_inputs)
     conversation_id = body.conversation_id if body else None
     if conversation_id:
         # Never attach work to another workspace's conversation.

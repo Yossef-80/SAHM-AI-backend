@@ -1,0 +1,2 @@
+2026-10-13 13:22:17 | INFO    | tool.get_competitor_ads | tool_started | agent='nour' input={'max_results': 10, 'page_or_query': 'أبو عوف', 'country': 'EG'}
+2026-10-13 13:22:17 | INFO    | tool.get_competitor_ads | tool_finished | agent='nour' duration_ms=1 output='{"status": "unavailable", "source": "agent_bridge:get_competitor_ads", "unavailable_reason": "This conversation run did not provide a workspace tool context; no data or action was attempted.", "ads": [], "page_or_query": "", "country": "", "used_user_supplied": false}'
