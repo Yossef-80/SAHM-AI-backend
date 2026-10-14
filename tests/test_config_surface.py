@@ -521,6 +521,112 @@ async def test_connector_get_reports_the_layer_that_answered(
     assert _field(meta, "ad_account_id")["value"] == "act_from_workspace"
 
 
+async def test_connector_update_refuses_credentials_under_a_placeholder_provider(
+    api_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reported bug: key + model saved, provider untouched, generation dead.
+
+    ``generate_image`` reads ``image_api_key``/``image_model`` only when the
+    provider is a real one, so saving them while ``provider`` still resolves to
+    ``mock`` used to be a green 200 that changed nothing. The user filled the
+    form, saw "saved", and image generation stayed disabled with no explanation.
+    """
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "image_provider", "mock")
+    monkeypatch.setattr(get_settings(), "image_api_key", None)
+
+    body = await _register(api_client, "image-creds@example.com")
+    headers = _auth(body["accessToken"])
+
+    # 1) Credentials without a provider: refused, and nothing is stored.
+    refused = await api_client.patch(
+        "/api/v1/settings/connectors/image",
+        headers=headers,
+        json={"apiKey": "sk-live-key", "model": "gpt-image-1"},
+    )
+    assert refused.status_code == 422, refused.text
+    payload = refused.json()["error"]
+    assert payload["code"] == "validation_failed", payload
+    assert payload["detail"]["code"] == "provider_not_selected", payload
+    assert payload["detail"]["provider"] == "mock"
+    assert sorted(payload["detail"]["fields"]) == ["api_key", "model"]
+    assert "nothing was saved" in payload["message"]
+    assert "sk-live-key" not in refused.text, "a refused body must not echo the secret"
+
+    after_refusal = (
+        await api_client.get("/api/v1/settings/connectors", headers=headers)
+    ).json()
+    assert after_refusal["overrideCount"] == 0, "a refused patch wrote a row"
+    assert _connector(after_refusal, "image")["hasOverride"] is False
+
+    # 2) The same request plus the provider works, and the connector is live.
+    accepted = await api_client.patch(
+        "/api/v1/settings/connectors/image",
+        headers=headers,
+        json={"provider": "openai", "apiKey": "sk-live-key", "model": "gpt-image-1"},
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["configured"] is True
+    assert accepted.json()["placeholder"] is False
+    assert "sk-live-key" not in accepted.text
+
+    # 3) A credential-only patch is fine once the stored provider is real.
+    again = await api_client.patch(
+        "/api/v1/settings/connectors/image", headers=headers, json={"apiKey": "sk-rotated"}
+    )
+    assert again.status_code == 200, again.text
+
+
+async def test_connector_provider_choices_are_published_and_normalised(
+    api_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The settings screen renders a select from the server's list, not free text.
+
+    Two properties: the accepted values travel with the connector (so the UI
+    cannot drift from the backend), and a differently-cased value is stored
+    normalised instead of breaking every later ``== "openai"`` comparison.
+    """
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "image_provider", "mock")
+
+    body = await _register(api_client, "provider-list@example.com")
+    headers = _auth(body["accessToken"])
+
+    listing = (
+        await api_client.get("/api/v1/settings/connectors", headers=headers)
+    ).json()
+    image = _connector(listing, "image")
+    assert image["providers"] == ["mock", "openai", "stability"], image
+    assert _connector(listing, "search")["providers"] == [
+        "mock",
+        "tavily",
+        "serper",
+        "brave",
+    ]
+    # A connector without a provider selector publishes an empty list.
+    assert _connector(listing, "meta")["providers"] == []
+
+    # "OpenAI" is accepted and stored lowercase.
+    mixed = await api_client.patch(
+        "/api/v1/settings/connectors/image",
+        headers=headers,
+        json={"provider": "  OpenAI  ", "apiKey": "sk-live-key"},
+    )
+    assert mixed.status_code == 200, mixed.text
+    assert mixed.json()["provider"] == "openai"
+    assert mixed.json()["configured"] is True
+
+    # A value this build does not implement is a 422 naming the accepted ones.
+    bogus = await api_client.patch(
+        "/api/v1/settings/connectors/image", headers=headers, json={"provider": "gpt-image-1"}
+    )
+    assert bogus.status_code == 422, bogus.text
+    assert bogus.json()["error"]["detail"]["code"] == "unknown_provider"
+    assert "openai" in bogus.json()["error"]["message"]
+
+
 async def test_a_stored_secret_never_appears_in_any_response(api_client) -> None:
     """Grep the whole JSON, not just the obvious field."""
     body = await _register(api_client, "secret@example.com")
@@ -724,10 +830,13 @@ async def test_tool_settings_are_preferred_over_env(
 
     body = await _register(api_client, "tool-cfg@example.com")
     business_id = body["workspaces"][0]["businessId"]
+    # `provider` is sent with the credentials on purpose: a workspace row that
+    # stores a key while the provider stays on the placeholder `mock` is now a
+    # 422 (see test_connector_update_refuses_credentials_under_a_placeholder_provider).
     await api_client.patch(
         "/api/v1/settings/connectors/image",
         headers=_auth(body["accessToken"]),
-        json={"apiKey": "workspace-image-key", "model": "dall-e-3"},
+        json={"provider": "openai", "apiKey": "workspace-image-key", "model": "dall-e-3"},
     )
 
     ctx = ToolContext(
@@ -755,6 +864,77 @@ async def test_tool_settings_are_preferred_over_env(
         request_id="req-test",
     )
     assert (await resolve_tool_settings(fresh)).image_api_key == "env-image-key"
+
+
+async def test_workspace_image_settings_actually_generate_a_real_image(
+    api_client, seeded_db: AsyncSession, respx_mock
+) -> None:
+    """End to end: fill the form -> the provider is really called with those values.
+
+    The reported failure was "I set the API key and the model and image generation
+    never worked". This is the positive path that has to work once the provider is
+    selected: the workspace row supplies the key, the model and the base URL to
+    ``generate_image``, and the resulting asset is stored as a real provider asset
+    -- not a placeholder.
+    """
+    import httpx
+
+    from app.core.tools.base import ToolContext
+    from app.core.tools.media import _handle_generate_image
+    from app.schemas.tools import GenerateImageInput
+
+    captured: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(
+            {
+                "path": request.url.path,
+                "authorization": request.headers.get("authorization", ""),
+                "body": json.loads(request.content.decode() or "{}"),
+            }
+        )
+        return httpx.Response(
+            200, json={"data": [{"url": "https://assets.example.com/generated.png"}]}
+        )
+
+    respx_mock.route(method="POST", host="image-provider.invalid").mock(
+        side_effect=handler
+    )
+
+    body = await _register(api_client, "image-e2e@example.com")
+    business_id = body["workspaces"][0]["businessId"]
+    headers = _auth(body["accessToken"])
+
+    configured = await api_client.patch(
+        "/api/v1/settings/connectors/image",
+        headers=headers,
+        json={
+            "provider": "openai",
+            "apiKey": "sk-workspace-key",
+            "model": "gpt-image-1",
+            "baseUrl": "https://image-provider.invalid/v1",
+        },
+    )
+    assert configured.status_code == 200, configured.text
+    assert configured.json()["configured"] is True
+
+    ctx = ToolContext(
+        workspace_id=business_id,
+        business_id=business_id,
+        db=seeded_db,
+        llm=None,  # type: ignore[arg-type]
+        request_id="req-image-e2e",
+    )
+    result = await _handle_generate_image(
+        GenerateImageInput(prompt="a coffee cup on a saucer"), ctx
+    )
+
+    assert result.status == "ok", result
+    assert result.assets and result.assets[0].provider == "openai"
+    assert result.assets[0].url == "https://assets.example.com/generated.png"
+    assert captured and captured[0]["path"] == "/v1/images/generations"
+    assert captured[0]["authorization"] == "Bearer sk-workspace-key"
+    assert captured[0]["body"]["model"] == "gpt-image-1", captured[0]["body"]
 
 
 async def test_connector_catalogue_reflects_the_workspace_row(

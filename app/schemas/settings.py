@@ -60,6 +60,12 @@ class ConnectorOut(ApiModel):
     #: True when every required field is present and a real provider is chosen.
     configured: bool = False
     provider: str | None = None
+    #: Values accepted by the provider field, in display order. Empty when the
+    #: connector has no provider selector. A client renders a select from this
+    #: rather than a free-text box, so "openai" cannot be typed as "OpenAI".
+    providers: list[str] = Field(default_factory=list)
+    #: Required field keys with no value; empty when nothing is missing.
+    missing_required: list[str] = Field(default_factory=list)
     #: True when the chosen provider returns placeholder data rather than live data.
     placeholder: bool = False
     fields: list[ConnectorFieldOut] = Field(default_factory=list)

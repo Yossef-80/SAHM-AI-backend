@@ -248,14 +248,17 @@ tests/test_content_calendar.py
 tests/test_content_calendar_api.py
 tests/test_contract.py
 tests/test_conversation_context_persistence.py
+tests/test_creative_generate_reference_style.py
 tests/test_creative_mode_gate.py
 tests/test_creative_mode_transport.py
 tests/test_creative_prompt_workflow.py
 tests/test_creative_upload.py
 tests/test_daily_insights.py
 tests/test_deployment_ops.py
+tests/test_error_response_surface.py
 tests/test_ga4_tool.py
 tests/test_image_edit_endpoint.py
+tests/test_karim_campaign_context.py
 tests/test_layla_image_generation.py
 tests/test_layla_text_generation.py
 tests/test_llm_layer.py

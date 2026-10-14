@@ -107,6 +107,12 @@ class ConnectorSpec:
     provider_field: str | None = None
     #: Providers that return placeholder data, so their key is never required.
     placeholder_providers: tuple[str, ...] = ("mock",)
+    #: Accepted values of ``provider_field``, in the order a UI should list them.
+    #: Empty means "this connector has no provider selector". Enforced on write by
+    #: ``app/api/settings.py`` and published to the client as ``ConnectorOut.providers``
+    #: so the settings screen can render a select instead of a free-text box --
+    #: a typo in this field is otherwise indistinguishable from a saved setup.
+    allowed_providers: tuple[str, ...] = ()
     notes: str = ""
 
     def field(self, key: str) -> FieldSpec | None:
@@ -246,6 +252,7 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
             ),
         ),
         placeholder_providers=("mock",),
+        allowed_providers=("mock", "dataforseo"),
         notes="Used by get_keywords.",
     ),
     "image": ConnectorSpec(
@@ -292,6 +299,9 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
                 max_length=500,
             ),
         ),
+        # `mock` is a placeholder: it satisfies no real generation, so a key set
+        # while it is selected is dead weight (see `_validate_provider_selection`).
+        allowed_providers=("mock", "openai", "stability"),
         notes="Used by generate_image.",
     ),
     "search": ConnectorSpec(
@@ -320,6 +330,7 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
                 ),
             ),
         ),
+        allowed_providers=("mock", "tavily", "serper", "brave"),
         notes="Used by web_search.",
     ),
 }
@@ -401,6 +412,20 @@ class ResolvedConnector:
         return self.provider in self.spec.placeholder_providers
 
     @property
+    def missing_required(self) -> tuple[str, ...]:
+        """Keys of required fields that have no value at all.
+
+        Used by the settings API to explain *why* a connector is not
+        ``configured`` instead of only reporting the boolean.
+        """
+        missing: list[str] = []
+        for spec in self.spec.required_fields:
+            resolved = self.field(spec.key)
+            if resolved is None or not resolved.has_value:
+                missing.append(spec.key)
+        return tuple(missing)
+
+    @property
     def configured(self) -> bool:
         """True when this connector can return *real* data.
 
@@ -413,11 +438,7 @@ class ResolvedConnector:
             return False
         if self.is_placeholder:
             return False
-        for spec in self.spec.required_fields:
-            resolved = self.field(spec.key)
-            if resolved is None or not resolved.has_value:
-                return False
-        return True
+        return not self.missing_required
 
     @property
     def source(self) -> str:

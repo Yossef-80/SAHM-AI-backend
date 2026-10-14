@@ -155,10 +155,53 @@ async def _validate_tool_action(name: str, payload: BaseModel, context: Any) -> 
     return None
 
 
+def _core_tool_context(configurable: dict[str, Any]) -> Any | None:
+    """The ToolContext this run's core tools must use, or None.
+
+    Two sources, in this order:
+
+    1. ``tool_context`` -- an explicitly constructed context. The competitor-Ads
+       route builds one directly because it must be *restricted* to that one
+       lookup.
+    2. The per-run keys the orchestrator always attaches (``tool_db``,
+       ``business_id``, ...). Without this every allowlisted core tool answered
+       "This conversation run did not provide a workspace tool context" -- which
+       is exactly why Karim could not read a single campaign in chat while the
+       campaigns page showed campaigns with spend and metrics. The tools were
+       never broken; they simply never received a workspace.
+    """
+    context = configurable.get("tool_context")
+    if context is not None:
+        return context
+
+    db = configurable.get("tool_db")
+    if db is None:
+        return None
+
+    from app.core.tools.base import ToolContext
+
+    core_llm = configurable.get("core_llm")
+    user_supplied = configurable.get("user_supplied")
+    return ToolContext(
+        workspace_id=str(configurable.get("workspace_id") or ""),
+        business_id=str(configurable.get("business_id") or ""),
+        db=db,
+        llm=core_llm,
+        fast_llm=configurable.get("fast_llm") or core_llm,
+        request_id=str(configurable.get("request_id") or "ai-chat"),
+        conversation_id=configurable.get("conversation_id"),
+        persona_id=str(configurable.get("agent") or "") or None,
+        campaign_id=str(configurable.get("campaign_id") or "") or None,
+        creative_id=str(configurable.get("creative_id") or "") or None,
+        insight_id=str(configurable.get("insight_id") or "") or None,
+        user_supplied=dict(user_supplied) if isinstance(user_supplied, dict) else {},
+    )
+
+
 def _make_langchain_tool(core_tool: Any) -> StructuredTool:
     async def _invoke(config: RunnableConfig, **kwargs: Any) -> str:
         configurable = (config or {}).get("configurable") or {}
-        context = configurable.get("tool_context")
+        context = _core_tool_context(configurable)
         if context is None:
             return _unavailable(
                 core_tool,

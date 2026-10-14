@@ -74,7 +74,23 @@ async def _resolve_meta_campaign_id(
             f"Campaign '{campaign.name}' is not linked to a Meta campaign. Link it in "
             "the campaign settings to read real performance data."
         )
+    # Remember the name on the context: `get_campaign_insights` reports back what
+    # it read, and "which campaign?" is the first thing a user asks about numbers.
+    ctx.user_supplied.setdefault("campaign_name", str(campaign.name or ""))
     return campaign.meta_campaign_id, None
+
+
+def _campaign_label(ctx: ToolContext) -> str | None:
+    """The Sahm campaign name resolved for this call, when there is one.
+
+    ``_resolve_meta_campaign_id`` stores it on the context so every return path --
+    ok, partial, unavailable -- can say which campaign it is talking about.
+    """
+    supplied = getattr(ctx, "user_supplied", None) or {}
+    if not isinstance(supplied, dict):
+        return None
+    name = str(supplied.get("campaign_name") or "").strip()
+    return name or None
 
 
 async def _get_meta_token(ctx: ToolContext) -> str | None:
@@ -411,6 +427,7 @@ async def _handle_get_campaign_insights(
         ).model_copy(
             update={
                 "campaign_id": payload.campaign_id,
+                "campaign_name": _campaign_label(ctx),
                 "meta_campaign_id": meta_campaign_id,
                 "date_start": start,
                 "date_end": end,
@@ -424,6 +441,7 @@ async def _handle_get_campaign_insights(
         ).model_copy(
             update={
                 "campaign_id": payload.campaign_id,
+                "campaign_name": _campaign_label(ctx),
                 "meta_campaign_id": meta_campaign_id,
                 "date_start": start,
                 "date_end": end,
@@ -456,8 +474,10 @@ async def _handle_get_campaign_insights(
 
     # Ratios are derived from the totals, never summed across days.
     metrics_out = {**totals, **_derive_ratio_metrics(totals)}
+    campaign_name = _campaign_label(ctx)
     return InsightsPayload(
         campaign_id=payload.campaign_id,
+        campaign_name=campaign_name,
         meta_campaign_id=meta_campaign_id,
         date_start=start,
         date_end=end,
@@ -476,7 +496,9 @@ async def _handle_get_campaign_insights(
             Evidence(
                 source=source,
                 detail=(
-                    f"Meta campaign {meta_campaign_id}, {start} to {end}: "
+                    f"Meta campaign {meta_campaign_id}"
+                    + (f" (Sahm campaign '{campaign_name}')" if campaign_name else "")
+                    + f", {start} to {end}: "
                     f"{len(daily)} daily row(s). Ratio metrics are recomputed "
                     "from summed spend/impressions/clicks/conversions; "
                     "frequency uses the sum of daily reach and is approximate."

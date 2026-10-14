@@ -5,9 +5,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.ai.errors import ProviderError
@@ -19,6 +20,7 @@ from app.api.deps import (
     assert_owned,
 )
 from app.core.errors import NotFoundError, TaskNotAllowedError, ToolUnavailable
+from app.core.logging import get_logger
 from app.core.tools.media import (
     analyze_reference_for_workspace,
     aspect_ratio_label,
@@ -42,6 +44,38 @@ from app.schemas.creatives import (
 from app.schemas.tools import AnalyzeReferenceInput, GenerateImageInput
 
 router = APIRouter(prefix="/creatives", tags=["creatives"])
+
+_logger = get_logger(__name__)
+
+
+def _style_spec_payload(value: object) -> dict[str, Any]:
+    """A ``StyleSpec`` as the plain dict the generation input expects.
+
+    Accepts both shapes on purpose. The request field is declared
+    ``StyleSpec | None``, but the style of a saved reference analysis lives in
+    the database as raw JSON, and it used to be pushed onto the request with
+    ``model_copy(update=...)`` -- which skips validation. ``payload.style_spec``
+    was then a ``dict``, and the first thing to notice was a ``.model_dump()``
+    further down: ``AttributeError: 'dict' object has no attribute 'model_dump'``
+    and a 500 on every request that carried a ``referenceAnalysisId``.
+
+    Validating here keeps the field what its type says it is, and a stored style
+    that no longer parses degrades to "no style" instead of failing the request:
+    the prompt alone still generates an image, and the operator gets a log line
+    naming the reference instead of a stack trace.
+    """
+    if isinstance(value, StyleSpec):
+        return value.model_dump()
+    if isinstance(value, dict):
+        try:
+            return StyleSpec.model_validate(value).model_dump()
+        except ValidationError:
+            _logger.warning(
+                "reference_style_ignored",
+                extra={"reason": "stored style is not a valid StyleSpec"},
+            )
+            return {}
+    return {}
 
 
 @router.post("/analyze-reference", response_model=ReferenceAnalysis)
@@ -151,25 +185,23 @@ async def generate_creative(
     """Generate image creatives from a prompt and an optional style spec."""
     await assert_campaign_owned(db, payload.campaign_id, ws)
 
+    # Resolve the style before the request object is used: ``style_spec`` is a
+    # dict from here on, never a half-validated model.
+    style_spec = _style_spec_payload(payload.style_spec)
+
     analysis: ReferenceAnalysis | None = None
-    if payload.reference_analysis_id and not payload.style_spec:
+    if payload.reference_analysis_id and not style_spec:
         item = await db.get(BrandMemoryItem, payload.reference_analysis_id)
         # Another workspace's reference analysis is simply not found here:
         # degrading to "no style spec" rather than erroring keeps generation
         # working without ever reading across the boundary.
-        if (
-            item is not None
-            and item.business_id == ws.business_id
-            and (item.metadata_ or {}).get("style")
-        ):
-            payload = payload.model_copy(
-                update={"style_spec": dict(item.metadata_["style"])}
-            )
+        if item is not None and item.business_id == ws.business_id:
+            style_spec = _style_spec_payload((item.metadata_ or {}).get("style"))
 
     result = await generate_image_for_workspace(
         GenerateImageInput(
             prompt=payload.prompt,
-            style_spec=payload.style_spec.model_dump() if payload.style_spec else {},
+            style_spec=style_spec,
             aspect_ratio=payload.aspect_ratio,
             campaign_id=payload.campaign_id,
             num_images=payload.num_images,
@@ -196,8 +228,14 @@ async def generate_creative(
             model=a.model,
             style_spec=StyleSpec(**a.style_spec) if a.style_spec else None,
             reference_analysis_id=a.reference_analysis_id,
-            status=a.status,
-            source=a.source,
+            # ``result.assets`` are ``GeneratedAssetRecord``s: status and source
+            # describe the *generation*, not the single asset, and live on the
+            # output. Reading them off the asset raised AttributeError -- a 500
+            # on the success path, after the image had already been generated
+            # and persisted, so the creative existed but the caller was told the
+            # request had failed.
+            status=result.status,
+            source=result.source,
             created_at=None,
         )
         for a in result.assets

@@ -3,6 +3,18 @@
 This adapter deliberately uses only server-side image settings and does not
 construct a ToolContext. The tool is guarded by a server-set RunnableConfig
 flag so it is callable only when the user explicitly asks for an in-app draft.
+
+Credential resolution
+---------------------
+When the run carries a ``tool_context`` (the normal chat path) the workspace
+connector row is resolved first -- the same three layers ``generate_image`` uses
+-- so Settings -> Connectors -> Image generation actually takes effect here too.
+Reading ``Settings`` alone was a real bug: a workspace that had configured
+``openai`` plus its key in the UI still got a placeholder SVG labelled "MOCK
+ASSET" with ``status: ok`` from this tool, while the creatives screen generated
+with the real provider. Without a context (direct tool invocation in tests or
+scripts) the process env remains the only source, and a ``mock`` preview stays
+allowed, which is the pre-existing behaviour.
 """
 
 from __future__ import annotations
@@ -16,6 +28,10 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.core.tools.media import _compose_image_prompt, _generate_openai_image, _mock_asset
+
+#: The placeholder model id ``config.py`` ships as a default. Sending it to a real
+#: provider is always a configuration mistake, never an intent.
+_MOCK_MODEL = "mock-image-1"
 
 
 class LaylaImageGenerationInput(BaseModel):
@@ -39,6 +55,42 @@ def _result(status: str, *, reason: str | None = None, asset: Any = None) -> str
     return json.dumps(payload, ensure_ascii=False)
 
 
+async def _resolve_image_configuration(
+    configurable: dict[str, Any],
+) -> tuple[str, str | None, str | None, str | None, bool]:
+    """Return ``(provider, api_key, model, base_url, allow_mock)`` for this run.
+
+    A workspace connector row beats the env var exactly like it does for every
+    other tool; the process env is the fallback, not the only source.
+    """
+    settings = get_settings()
+    context = configurable.get("tool_context")
+    if context is None:
+        # No workspace context: keep the historical env-only behaviour, where an
+        # explicit in-app request may legitimately produce a labelled mock.
+        return (
+            str(settings.image_provider).strip().lower(),
+            settings.image_api_key,
+            settings.image_model,
+            settings.image_base_url,
+            True,
+        )
+
+    from app.core.tools.settings import resolve_tool_settings
+
+    resolved = await resolve_tool_settings(context)
+    supplied = getattr(context, "user_supplied", {}) or {}
+    allow_mock = bool(supplied.get("allow_mock_assets")) if isinstance(supplied, dict) else False
+    allow_mock = allow_mock or bool(getattr(settings, "image_allow_mock_assets", False))
+    return (
+        str(resolved.image_provider or settings.image_provider or "mock").strip().lower(),
+        resolved.image_api_key or settings.image_api_key,
+        resolved.image_model or settings.image_model,
+        resolved.image_base_url or settings.image_base_url,
+        allow_mock,
+    )
+
+
 @tool(args_schema=LaylaImageGenerationInput)
 async def generate_image_draft_tool(
     prompt: str,
@@ -55,18 +107,26 @@ async def generate_image_draft_tool(
     if configurable.get("allow_image_generation") is not True:
         return _result("unavailable", reason="Image generation was not explicitly requested.")
 
-    settings = get_settings()
-    provider = str(settings.image_provider)
+    provider, api_key, model, base_url, allow_mock = await _resolve_image_configuration(configurable)
     style = dict(style_spec or {})
     effective_prompt = _compose_image_prompt(prompt[:4000], style)
 
     try:
         if provider == "mock":
+            if not allow_mock:
+                # Never hand back a placeholder as if it were the requested image:
+                # a workspace with a real provider configured must fail loudly here
+                # instead of quietly returning an SVG labelled "MOCK ASSET".
+                return _result(
+                    "unavailable",
+                    reason=(
+                        "No real image provider is configured for this workspace. Select an "
+                        "image provider in Settings -> Connectors; no placeholder was created."
+                    ),
+                )
             asset = _mock_asset(effective_prompt, aspect_ratio, 0)
         elif provider == "openai":
-            api_key = settings.image_api_key
-            model = settings.image_model
-            if not api_key or not model or model == "mock-image-1":
+            if not api_key or not model or model == _MOCK_MODEL:
                 return _result(
                     "unavailable",
                     reason="Configure IMAGE_API_KEY and IMAGE_MODEL for the selected image provider.",
@@ -76,7 +136,7 @@ async def generate_image_draft_tool(
                 aspect_ratio,
                 api_key=api_key,
                 model=model,
-                base_url=settings.image_base_url,
+                base_url=base_url,
             )
             asset = next((item for item in assets if item.url), None)
             if asset is None:
