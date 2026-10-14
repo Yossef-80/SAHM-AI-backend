@@ -20,6 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import (
     assistant,
+    audiences,
     audit,
     auth,
     business,
@@ -110,19 +111,39 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     for message in verify_runtime_security(settings):
         _logger.warning("insecure_runtime_configuration", extra={"detail": message})
     register_all()
+    # Token accounting writer. Every LLM call anywhere in the process queues a
+    # usage delta; this task is what turns those deltas into ``usage_records``
+    # rows, on its own session, so the request transaction is never involved.
+    from app.core.ai_usage import start_usage_writer
+
+    start_usage_writer()
     if settings.environment == "prod":
-        # Never issue DDL at boot in production: the schema is whatever the
-        # last ``alembic upgrade head`` left, and three replicas racing
-        # CREATE TABLE is a real outage. A migration is a release step (P5.5).
+        # Production never issues DDL at boot, even if it is misconfigured to
+        # use SQLite. The schema must already have been installed by release.
         _logger.info(
             "schema_creation_skipped",
             extra={"reason": "production", "schema_source": "alembic"},
         )
-    else:
+    elif settings.database_url.lower().startswith("sqlite"):
+        # create_all is a convenience for disposable local/test SQLite stores.
+        # Never point it at PostgreSQL: it can create future tables without
+        # applying their Alembic revision or alter existing columns, leaving a
+        # live database between schema versions.
         await create_all()
         _logger.info(
             "schema_creation_performed",
             extra={"reason": settings.environment, "schema_source": "create_all"},
+        )
+    else:
+        # PostgreSQL (including Supabase) is migration-managed in every
+        # environment. Apply ``alembic upgrade head`` before starting the app.
+        _logger.info(
+            "schema_creation_skipped",
+            extra={
+                "reason": "alembic_managed_database",
+                "schema_source": "alembic",
+                "environment": settings.environment,
+            },
         )
     _logger.info(
         "app_started",
@@ -139,6 +160,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         },
     )
     yield
+    from app.core.ai_usage import stop_usage_writer
+
+    await stop_usage_writer()
     await close_clients()
     await dispose_engine()
     _logger.info("app_stopped")
@@ -249,6 +273,7 @@ def create_app() -> FastAPI:
     prefix = settings.api_prefix
     app.include_router(auth.router, prefix=prefix)
     app.include_router(assistant.router, prefix=prefix)
+    app.include_router(audiences.router, prefix=prefix)
     app.include_router(personas_router.router, prefix=prefix)
     app.include_router(business.router, prefix=prefix)
     app.include_router(campaigns.router, prefix=prefix)

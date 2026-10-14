@@ -98,17 +98,18 @@ def test_no_agent_module_imports_protected_tools() -> None:
     assert not offenders, "unexpected importers of protected tools: " + ", ".join(offenders)
 
 
-def test_all_sixteen_tools_are_registered() -> None:
+def test_all_seventeen_tools_are_registered() -> None:
     registry = register_all()
-    assert len(registry.all()) == 16
+    assert len(registry.all()) == 17
     expected = {
         "web_search", "analyze_website", "get_social_profile", "get_reviews",
         "get_keywords", "get_competitor_ads", "brand_report", "full_analysis",
         "route_file_to_tool", "get_brand_context", "save_learning",
-        "get_campaign_insights", "get_breakdowns", "analyze_reference_creative",
-        "generate_image", "create_recommendation",
+        "list_meta_campaigns", "get_campaign_insights", "get_breakdowns",
+        "analyze_reference_creative", "generate_image", "create_recommendation",
     }
     assert set(registry.names()) == expected
+    assert registry.get("list_meta_campaigns").side_effect == ToolSideEffect.NONE
 
 
 def test_every_tool_has_a_typed_io_pair() -> None:

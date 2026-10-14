@@ -223,8 +223,15 @@ class Learning(ToolOutput):
 
 
 class GetCampaignInsightsInput(BaseModel):
-    campaign_id: str = Field(min_length=1)
-    meta_campaign_id: str | None = None
+    campaign_id: str = Field(
+        min_length=1,
+        description="Sahm campaign ID; for an external campaign, pass its Meta campaign ID here and in meta_campaign_id.",
+    )
+    meta_campaign_id: str | None = Field(
+        default=None,
+        pattern=r"^[0-9]{1,64}$",
+        description="Numeric Meta campaign ID from list_meta_campaigns; enables read-only analysis without a Sahm campaign row.",
+    )
     date_start: date | None = None
     date_end: date | None = None
     #: Metrics to request. Empty means the default set.
@@ -232,11 +239,45 @@ class GetCampaignInsightsInput(BaseModel):
 
 
 class GetBreakdownsInput(BaseModel):
-    campaign_id: str = Field(min_length=1)
-    meta_campaign_id: str | None = None
+    campaign_id: str = Field(
+        min_length=1,
+        description="Sahm campaign ID; for an external campaign, pass its Meta campaign ID here and in meta_campaign_id.",
+    )
+    meta_campaign_id: str | None = Field(
+        default=None,
+        pattern=r"^[0-9]{1,64}$",
+        description="Numeric Meta campaign ID from list_meta_campaigns; enables read-only analysis without a Sahm campaign row.",
+    )
     by: str = Field(description="ad | placement | audience | age | gender")
     date_start: date | None = None
     date_end: date | None = None
+
+
+class ListMetaCampaignsInput(BaseModel):
+    """Read-only campaign discovery for the workspace's connected Meta ad account."""
+
+    search: str | None = Field(default=None, max_length=200, description="Optional name or Meta ID substring.")
+    limit: int = Field(default=50, ge=1, le=100, description="Maximum rows in this page.")
+    after: str | None = Field(default=None, max_length=500, description="Cursor returned by the previous page.")
+
+
+class MetaCampaignSummary(BaseModel):
+    meta_campaign_id: str
+    name: str = ""
+    objective: str | None = None
+    status: str | None = None
+    effective_status: str | None = None
+    created_time: str | None = None
+    start_time: str | None = None
+    stop_time: str | None = None
+
+
+class ListMetaCampaignsOutput(ToolOutput):
+    account_id: str = ""
+    campaigns: list[MetaCampaignSummary] = Field(default_factory=list)
+    has_more: bool = False
+    next_cursor: str | None = None
+    retrieved_at: datetime | None = None
 
 
 # ================================================================== media ====
@@ -324,6 +365,9 @@ __all__ = [
     "GetBrandContextInput",
     "GetBreakdownsInput",
     "GetCampaignInsightsInput",
+    "ListMetaCampaignsInput",
+    "ListMetaCampaignsOutput",
+    "MetaCampaignSummary",
     "GetCompetitorAdsInput",
     "GetCompetitorAdsOutput",
     "GetKeywordsInput",

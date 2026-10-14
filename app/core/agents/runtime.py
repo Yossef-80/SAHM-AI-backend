@@ -612,6 +612,10 @@ async def _execute(
             usage=result.usage,
             persona_id=persona.id,
             tier=task.tier.value,
+            # Label the billable act, not just the model: the usage screen breaks
+            # spend down by action, and an unlabelled row is money nobody can
+            # explain.
+            action=f"task.{task_name}.step",
         )
 
         # The provider abstraction returns whole completions, not token streams,
@@ -740,6 +744,7 @@ async def _execute(
                     usage=final.usage,
                     persona_id=persona.id,
                     tier=task.tier.value,
+                    action=f"task.{task_name}.final",
                 )
                 if final.parsed is not None:
                     output_model_data = final.parsed.model_dump(mode="json")

@@ -581,4 +581,4 @@ def test_check_migrations_runs_standalone() -> None:
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert "single linear chain" in result.stdout
+    assert "single connected migration history" in result.stdout

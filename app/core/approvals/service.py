@@ -125,6 +125,12 @@ async def build_diff(db: AsyncSession, recommendation: RecommendationRow) -> lis
         plan = payload.get("plan") if isinstance(payload, dict) else {}
         summary = summary if isinstance(summary, dict) else {}
         plan = plan if isinstance(plan, dict) else {}
+        targeting = plan.get("targeting") if isinstance(plan.get("targeting"), dict) else {}
+        targeting_automation = (
+            targeting.get("targeting_automation")
+            if isinstance(targeting.get("targeting_automation"), dict)
+            else {}
+        )
         return [
             ChangeDiff(
                 field="meta_creation_plan",
@@ -138,8 +144,10 @@ async def build_diff(db: AsyncSession, recommendation: RecommendationRow) -> lis
                     "page_id": plan.get("pageId"),
                     "billing_event": plan.get("billingEvent"),
                     "optimization_goal": plan.get("optimizationGoal"),
+                    "advantage_audience": targeting_automation.get("advantage_audience", 0),
                     "destination_type": plan.get("destinationType"),
                     "destination_url": plan.get("destinationUrl"),
+                    "call_to_action": plan.get("callToAction"),
                     "creative_ids": plan.get("creativeIds", []),
                     "meta_status": "PAUSED",
                     "hierarchy": "Campaign → Ad Set → Creative(s) → Ad(s)",

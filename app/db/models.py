@@ -236,6 +236,25 @@ class BrandProfile(Base, TimestampMixin):
     business: Mapped[Business] = relationship(back_populates="profile")
 
 
+class SavedAudience(Base, TimestampMixin):
+    """Reusable targeting profile scoped to one business/workspace."""
+
+    __tablename__ = "saved_audiences"
+    __table_args__ = (
+        Index("ix_saved_audiences_business_updated", "business_id", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    business_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("businesses.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    targeting: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict, nullable=False)
+    source: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+
+
 class BrandMemoryItem(Base):
     """A single memory unit, vector-embedded for similarity retrieval."""
 
@@ -326,6 +345,12 @@ class Campaign(Base, TimestampMixin):
     start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     target_audience: Mapped[str | None] = mapped_column(Text)
+    audience_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("saved_audiences.id", ondelete="SET NULL"), index=True
+    )
+    # Immutable-at-campaign-creation copy; later edits to the reusable audience
+    # must not silently rewrite the targeting shown on historical campaigns.
+    audience_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON_TYPE)
     meta_campaign_id: Mapped[str | None] = mapped_column(String(120), index=True)
     notes: Mapped[str | None] = mapped_column(Text)
 
@@ -787,7 +812,15 @@ class LlmProviderSettings(Base, TimestampMixin):
 
 
 class UsageRecord(Base):
-    """Per-call token accounting, used for the daily budget guard."""
+    """Per-call token accounting, used for the daily budget guard and billing.
+
+    ``action`` is the billable *act* (``chat``, ``research.website``,
+    ``creative.text`` ...). It is what lets the usage screen answer "which part
+    of the product is spending my tokens?", which a bare per-model total cannot.
+    ``estimated`` marks a row whose token counts were derived from text length
+    because the provider reported no usage -- a billing report must be able to
+    tell a measured number from a guess.
+    """
 
     __tablename__ = "usage_records"
 
@@ -797,9 +830,11 @@ class UsageRecord(Base):
     task_id: Mapped[str | None] = mapped_column(String(64), index=True)
     persona_id: Mapped[str | None] = mapped_column(String(64))
     tier: Mapped[str | None] = mapped_column(String(10))
+    action: Mapped[str | None] = mapped_column(String(64), index=True)
     model: Mapped[str | None] = mapped_column(String(80))
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    estimated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

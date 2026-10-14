@@ -24,7 +24,7 @@ from app.schemas.common import ToolSideEffect
 _AGENT_TOOL_NAMES: dict[str, tuple[str, ...]] = {
     "nour": ("get_social_profile", "get_keywords", "get_competitor_ads"),
     "layla": ("analyze_reference_creative", "generate_image"),
-    "karim": ("get_campaign_insights", "get_breakdowns"),
+    "karim": ("list_meta_campaigns", "get_campaign_insights", "get_breakdowns"),
     "salma": ("get_campaign_insights", "get_breakdowns", "create_recommendation"),
 }
 _CORE_TOOL_NAMES = {name for names in _AGENT_TOOL_NAMES.values() for name in names}

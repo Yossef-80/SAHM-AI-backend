@@ -236,8 +236,15 @@ async def record_usage(
     task_id: str | None = None,
     persona_id: str | None = None,
     tier: str | None = None,
+    action: str | None = None,
+    estimated: bool = False,
 ) -> None:
-    """Append one usage row. Never raises: accounting must not break a run."""
+    """Append one usage row. Never raises: accounting must not break a run.
+
+    ``action`` is the billable act the tokens were spent on. The AI layer's own
+    calls are metered globally by :mod:`app.core.ai_usage`; this signature is
+    what the legacy agent runtime uses.
+    """
     try:
         db.add(
             UsageRecord(
@@ -247,9 +254,11 @@ async def record_usage(
                 task_id=task_id,
                 persona_id=persona_id,
                 tier=tier,
+                action=action,
                 model=usage.model,
                 tokens_in=usage.tokens_in,
                 tokens_out=usage.tokens_out,
+                estimated=estimated,
             )
         )
         await db.flush()

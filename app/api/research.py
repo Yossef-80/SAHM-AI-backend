@@ -15,6 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.api.deps import RequestIdDep, SessionDep, SettingsDep, WorkspaceDep
+from app.core.ai_usage import usage_action
+from app.core.research_reports import (
+    resolve_output_language,
+    required_headings,
+    shape_report,
+    split_sections,
+)
 from app.db.models import BrandMemoryItem, BrandProfile, Profile
 from app.ai.providers.search import get_search_provider
 from app.ai.tools.analyze_website import analyze_website_tool
@@ -526,11 +533,22 @@ async def run_research(
     fast_llm = get_llm().chat
     search_provider = get_search_provider(ai_settings.search_provider)
 
-    req_lang = (payload.language or "").lower()
-    is_ar = req_lang == "ar" or bool(re.search(r"[\u0600-\u06FF]", query))
+    # Output language: the client's explicit request first, then the workspace's
+    # saved profile language, then the query text itself. Relying on the browser
+    # cookie alone is what made an Arabic workspace get English reports.
+    workspace_language = (
+        getattr(brand_profile, "language", None)
+        or getattr(ws.business, "language", None)
+        or ""
+    )
+    language = resolve_output_language(
+        payload.language, workspace_language=str(workspace_language), query=query
+    )
+    is_ar = language == "ar"
 
     # 1. Ground-Truth Verification & Typo Detection
-    verification = await verify_and_resolve_entity(query, tool_type, fast_llm)
+    with usage_action(f"research.{tool_type}.verify"):
+        verification = await verify_and_resolve_entity(query, tool_type, fast_llm)
     v_status = verification["status"]
     target_subject = verification.get("target_brand") or query
     v_explanation = verification.get("explanation", "")
@@ -574,6 +592,9 @@ async def run_research(
                 "verification_status": "not_found",
                 "explanation": v_explanation,
                 "sources": [],
+                "language": language,
+                "sections": split_sections(not_found_report),
+                "structure_warnings": [],
                 "analyzed_at": datetime.now(timezone.utc).isoformat(),
             },
             saved_to_memory=False,
@@ -627,7 +648,8 @@ async def run_research(
     evidence_blocks: list[str] = []
 
     if tool_type == "analyze_website":
-        raw_site = await analyze_website_tool.ainvoke({"url": effective_query})
+        with usage_action("research.analyze_website.fetch"):
+            raw_site = await analyze_website_tool.ainvoke({"url": effective_query})
         evidence_blocks.append(f"Domain Content Extraction ({effective_query}):\n{raw_site}")
         sources.append({"title": f"Analyzed Website ({effective_query})", "url": effective_query})
     else:
@@ -704,7 +726,8 @@ async def run_research(
 
     try:
         import asyncio
-        res = await asyncio.to_thread(llm.invoke, [sys_prompt, usr_prompt])
+        with usage_action(f"research.{tool_type}"):
+            res = await asyncio.to_thread(llm.invoke, [sys_prompt, usr_prompt])
         summary_text = extract_clean_text(res.content)
     except Exception as e:
         logger.error("research_synthesis_failed", extra={"error": str(e)})
@@ -715,12 +738,20 @@ async def run_research(
     if typo_callout:
         summary_text = typo_callout + summary_text
 
-    # Ensure source references exist at the bottom if sources were found
-    sources_hdr = "المصادر والمراجع" if is_ar else "Sources & References"
-    if sources and sources_hdr not in summary_text and "## Sources" not in summary_text and "## المصادر" not in summary_text:
-        source_links_md = "\n".join([f"- [{s['title']}]({s['url']})" for s in sources if s.get("url")])
-        summary_text += f"\n\n## 🌐 {sources_hdr}\n{source_links_md}\n"
-
+    # Language + structure guarantees. Both are checks on the model's output, not
+    # requests to it: a prompt that says "answer in Arabic" cannot enforce
+    # anything, and the structure of each tool's report is part of the product
+    # contract (the UI renders these sections).
+    summary_text = clean_raw_string(summary_text)
+    report_headings = required_headings(sys_instruction)
+    with usage_action(f"research.{tool_type}.format"):
+        summary_text, structure_warnings = await shape_report(
+            summary_text,
+            language=language,
+            headings=report_headings,
+            llm=llm,
+            sources=sources,
+        )
     summary_text = clean_raw_string(summary_text)
     memory_id = f"mem_res_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc)
@@ -747,7 +778,8 @@ async def run_research(
     distill_usr = HumanMessage(content=f"Research Title: {title}\nReport:\n{summary_text}")
     try:
         import asyncio
-        distill_res = await asyncio.to_thread(fast_llm.invoke, [distill_sys, distill_usr])
+        with usage_action(f"research.{tool_type}.distill"):
+            distill_res = await asyncio.to_thread(fast_llm.invoke, [distill_sys, distill_usr])
         compact_memory_text = extract_clean_text(distill_res.content)
     except Exception as e:
         logger.warning("memory_distillation_fallback", extra={"error": str(e)})
@@ -787,6 +819,10 @@ async def run_research(
                 "verification_status": v_status,
                 "corrected_from": query if v_status == "typo_corrected" else None,
                 "sources": sources,
+                "language": language,
+                "sections": split_sections(summary_text),
+                "expected_sections": report_headings,
+                "structure_warnings": structure_warnings,
                 "analyzed_at": now.isoformat(),
             },
         },
@@ -822,7 +858,8 @@ async def run_research(
     ))
     try:
         import asyncio
-        ltm_res = await asyncio.to_thread(fast_llm.invoke, [ltm_sys, ltm_usr])
+        with usage_action("research.ltm_integration"):
+            ltm_res = await asyncio.to_thread(fast_llm.invoke, [ltm_sys, ltm_usr])
         integrated_facts = extract_clean_text(ltm_res.content)
         profile.user_context_summary = await enforce_token_cap(
             integrated_facts,
@@ -846,6 +883,10 @@ async def run_research(
             "verification_status": v_status,
             "corrected_from": query if v_status == "typo_corrected" else None,
             "sources": sources,
+            "language": language,
+            "sections": split_sections(summary_text),
+            "expected_sections": report_headings,
+            "structure_warnings": structure_warnings,
             "analyzed_at": now.isoformat(),
         },
         saved_to_memory=True,

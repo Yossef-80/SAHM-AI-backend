@@ -86,11 +86,12 @@ async def test_compiled_specialist_graph_submits_its_named_report(
 
 
 def test_langgraph_submit_tools_remain_separate_from_meta_write_tools() -> None:
-    """The legacy LangGraphs expose only their declared, non-Meta tool sets."""
+    """Karim may read Meta data; protected Meta writes stay out of every graph."""
     graph_modules = [
         importlib.import_module(f"app.ai.agents.{agent}.graph")
         for agent in ("nour", "omar", "layla", "karim", "salma")
     ]
+    protected_write_names = {"apply_change", "publish_campaign"}
     for module in graph_modules:
         tool_names = [tool.name for tool in module.NOUR_TOOLS] if hasattr(module, "NOUR_TOOLS") else None
         if tool_names is None:
@@ -100,4 +101,22 @@ def test_langgraph_submit_tools_remain_separate_from_meta_write_tools() -> None:
                 for tool in getattr(module, attr, [])
             ]
         assert tool_names
-        assert not any("meta" in name.lower() and "submit" not in name.lower() for name in tool_names)
+        assert not protected_write_names.intersection(tool_names)
+
+
+
+def test_karim_is_instructed_to_use_saved_context_and_cite_real_metrics() -> None:
+    from app.ai.agents.karim.graph import KARIM_PROMPT, KARIM_TOOLS
+
+    tool_names = {tool.name for tool in KARIM_TOOLS}
+    assert "get_brand_context_tool" in tool_names
+    assert "list_meta_campaigns" in tool_names
+    assert "get_campaign_insights" in tool_names
+    assert "get_breakdowns" in tool_names
+    assert "fetch_ga4_performance" in tool_names
+    assert "not created in Sahm" in KARIM_PROMPT
+    assert "import the campaign into Sahm" in KARIM_PROMPT
+    assert "get_brand_context_tool" in KARIM_PROMPT
+    assert "date range" in KARIM_PROMPT
+    assert "never replace it with estimates" in KARIM_PROMPT
+    assert "0-3 practical recommendations" in KARIM_PROMPT

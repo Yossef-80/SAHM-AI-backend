@@ -151,6 +151,16 @@ class Settings(BaseSettings):
 
     # Cost guard: per-workspace daily token budget.
     daily_token_budget: int = 2_000_000
+    # Billing: USD price per one million tokens, used to turn the meter into an
+    # invoice-ready estimate. Both default to 0, which means "show tokens only,
+    # do not quote a price" -- inventing a rate for a customer is worse than
+    # showing none. Set these once the resale price is agreed.
+    token_price_in_usd_per_million: float = Field(
+        0.0, validation_alias=AliasChoices("AI_TOKEN_PRICE_IN_USD_PER_MILLION")
+    )
+    token_price_out_usd_per_million: float = Field(
+        0.0, validation_alias=AliasChoices("AI_TOKEN_PRICE_OUT_USD_PER_MILLION")
+    )
     # Hard cap on tokens a single agent run may consume.
     max_tokens_per_run: int = 60_000
     # Hard cap on agent iterations (LLM<->tool round trips) per run.
@@ -209,7 +219,7 @@ class Settings(BaseSettings):
     meta_app_id: str | None = None
     meta_app_secret: str | None = None
     meta_graph_base_url: str = "https://graph.facebook.com"
-    meta_graph_version: str = "v21.0"
+    meta_graph_version: str = "v26.0"
     meta_api_timeout_seconds: float = 30.0
 
     # -------------------------------------------------------------- places ---

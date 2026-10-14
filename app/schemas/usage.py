@@ -62,8 +62,17 @@ class UsageResponse(ApiModel):
     projected_total_tokens: int = 0
     #: Where ``budget_tokens`` came from: ``workspace`` or ``default``.
     budget_source: str = "default"
+    #: Rows whose token counts were estimated (provider reported no usage).
+    estimated_calls: int = 0
+    #: ``tokens_in``/``tokens_out`` priced at the configured per-million rates.
+    #: ``null`` when no rate is configured -- never a fabricated number.
+    estimated_cost_usd: float | None = None
+    cost_per_million_in_usd: float = 0.0
+    cost_per_million_out_usd: float = 0.0
     by_model: list[UsageBreakdown] = Field(default_factory=list)
     by_persona: list[UsageBreakdown] = Field(default_factory=list)
+    #: Per-action spend: which part of the product is consuming the budget.
+    by_action: list[UsageBreakdown] = Field(default_factory=list)
 
 
 __all__ = ["UsageBreakdown", "UsageResponse"]

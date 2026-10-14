@@ -6,7 +6,6 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-
 _LABELS_AR = {
     "summary": "الخلاصة",
     "details": "التفاصيل",
@@ -24,6 +23,16 @@ _LABELS_AR = {
     "opportunities_for_target_brand": "فرص للنشاط",
     "risks": "المخاطر",
     "evidence": "الشواهد",
+    "brand_context": "سياق العلامة والأبحاث المحفوظة",
+    "finding": "المعلومة المحفوظة",
+    "recorded_at": "تاريخ الحفظ",
+    "recommendations": "التوصيات العملية",
+    "action": "الإجراء المقترح",
+    "priority": "الأولوية",
+    "supporting_context": "السياق المحفوظ الداعم",
+    "next_test": "الاختبار التالي",
+    "source": "المصدر",
+    "value": "القيمة",
     "claim": "المعلومة المرصودة",
     "source_url": "المصدر",
     "observed_text": "النص المرصود",
@@ -73,6 +82,7 @@ _LABELS_AR = {
     "audio_or_dialogue": "الصوت أو الحوار",
     "on_screen_text": "النص الظاهر",
     "date_range": "الفترة الزمنية",
+    "campaign_name": "اسم الحملة",
     "campaign_id": "معرّف الحملة",
     "metrics": "المقاييس",
     "breakdowns": "التقسيمات",
@@ -114,6 +124,16 @@ _LABELS_EN = {
     "opportunities_for_target_brand": "Opportunities for the business",
     "risks": "Risks",
     "evidence": "Evidence",
+    "brand_context": "Relevant saved brand and research context",
+    "finding": "Saved finding",
+    "recorded_at": "Recorded at",
+    "recommendations": "Actionable recommendations",
+    "action": "Proposed action",
+    "priority": "Priority",
+    "supporting_context": "Supporting saved context",
+    "next_test": "Next test",
+    "source": "Source",
+    "value": "Value",
     "claim": "Observed claim",
     "source_url": "Source",
     "observed_text": "Observed text",
@@ -163,6 +183,7 @@ _LABELS_EN = {
     "audio_or_dialogue": "Audio or dialogue",
     "on_screen_text": "On-screen text",
     "date_range": "Date range",
+    "campaign_name": "Campaign name",
     "campaign_id": "Campaign ID",
     "metrics": "Metrics",
     "breakdowns": "Breakdowns",
@@ -283,7 +304,7 @@ def _append_value_section(
                     lines.append(f"- {text}")
                 continue
             title_key = next(
-                (candidate for candidate in ("brand", "channel", "metric", "title", "name", "claim", "week") if _clean(row.get(candidate))),
+                (candidate for candidate in ("brand", "channel", "metric", "title", "action", "finding", "name", "claim", "week") if _clean(row.get(candidate))),
                 None,
             )
             title = _clean(row.get(title_key)) if title_key else ""
@@ -579,12 +600,76 @@ def _format_omar(data: dict[str, Any], arabic: bool) -> str:
     return "\n".join(lines)
 
 
+def _format_performance_context(values: Any, arabic: bool) -> list[str]:
+    entries = _as_list(values)
+    if not entries:
+        return []
+    lines = [f"### {_label('brand_context', arabic)}"]
+    source_label = "المصدر" if arabic else "source"
+    date_label = _label("recorded_at", arabic)
+    for item in entries:
+        row = _mapping(item)
+        if row is None:
+            text = _clean(item)
+            if text:
+                lines.append(f"- {text}")
+            continue
+        finding = _clean(row.get("finding"))
+        if not finding:
+            continue
+        line = f"- {finding}"
+        source = _clean(row.get("source"))
+        source_url = _clean(row.get("source_url"))
+        recorded_at = _clean(row.get("recorded_at"))
+        if source_url.startswith(("https://", "http://")):
+            line += f" — [{source or source_label}]({source_url})"
+        elif source:
+            line += f" — **{source_label}:** {source}"
+        if recorded_at:
+            line += f" — **{date_label}:** {recorded_at}"
+        lines.append(line)
+    return lines if len(lines) > 1 else []
+
+
+def _format_performance_recommendations(values: Any, arabic: bool) -> list[str]:
+    entries = _as_list(values)
+    if not entries:
+        return []
+    lines = [f"### {_label('recommendations', arabic)}"]
+    item_label = "توصية" if arabic else "Recommendation"
+    for index, item in enumerate(entries, start=1):
+        row = _mapping(item)
+        if row is None:
+            text = _clean(item)
+            if text:
+                lines.append(f"- {text}")
+            continue
+        action = _clean(row.get("action"))
+        lines.append(f"#### {index}. {action or item_label}")
+        priority = _clean(row.get("priority"))
+        rationale = _clean(row.get("rationale"))
+        if priority:
+            lines.append(f"- **{_label('priority', arabic)}:** {priority}")
+        if rationale:
+            lines.append(f"- **{_label('rationale', arabic)}:** {rationale}")
+        if row.get("evidence"):
+            _append_evidence(lines, row["evidence"], arabic, heading_level=5)
+        context = [text for text in (_clean(value) for value in _as_list(row.get("supporting_context"))) if text]
+        if context:
+            lines.append(f"##### {_label('supporting_context', arabic)}")
+            _append_bullets(lines, context, arabic)
+        next_test = _clean(row.get("next_test"))
+        if next_test:
+            lines.append(f"- **{_label('next_test', arabic)}:** {next_test}")
+    return lines if len(lines) > 1 else []
+
+
 def _format_performance(data: dict[str, Any], arabic: bool) -> str:
     title = "تقرير أداء الحملة" if arabic else "Campaign performance report"
     lines = [f"## {title}"]
     _append_value_section(lines, "summary", data.get("summary"), arabic=arabic, heading_level=3)
     _append_value_section(lines, "details", data.get("details"), arabic=arabic, heading_level=3)
-    for key in ("date_range", "campaign_id"):
+    for key in ("campaign_name", "campaign_id", "date_range"):
         if data.get(key):
             _append_value_section(lines, key, data[key], arabic=arabic, heading_level=3)
     if data.get("metrics"):
@@ -592,6 +677,8 @@ def _format_performance(data: dict[str, Any], arabic: bool) -> str:
     if data.get("breakdowns"):
         _append_value_section(lines, "breakdowns", data["breakdowns"], arabic=arabic, heading_level=3)
     _append_evidence(lines, data.get("evidence"), arabic, heading_level=3)
+    lines.extend(_format_performance_context(data.get("brand_context"), arabic))
+    lines.extend(_format_performance_recommendations(data.get("recommendations"), arabic))
     if data.get("missing_inputs"):
         _append_value_section(lines, "missing_inputs", data["missing_inputs"], arabic=arabic, heading_level=3)
     return "\n".join(lines)

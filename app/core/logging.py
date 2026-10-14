@@ -286,6 +286,12 @@ def configure_logging(
         file_handler.setFormatter(TraceTextFormatter())
         root.addHandler(file_handler)
 
+    # httpx emits complete request URLs at INFO. Meta Graph access tokens are
+    # currently supplied as a query parameter, so those lines would leak them
+    # before the application's structured-field redactor even runs. Keep normal
+    # app/request tracing, but suppress httpx's URL-bearing INFO records.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     configured = True
 
 

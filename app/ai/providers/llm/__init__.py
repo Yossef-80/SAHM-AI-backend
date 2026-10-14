@@ -77,6 +77,14 @@ def get_llm(
     method = cfg.structured_output_method or module.DEFAULT_STRUCTURED_METHOD
     model_name = str(getattr(chat, "model", None) or getattr(chat, "model_name", None) or choice)
 
+    # Metering is attached here, and only here, so *every* consumer -- the
+    # assistant turn, every agent graph, the research tab, memory distillation --
+    # is accounted for without any call site opting in. Without this the usage
+    # screen was reporting an empty table while the product spent real tokens.
+    from app.core.ai_usage import attach_usage_metering
+
+    chat = attach_usage_metering(chat, provider=choice.value, model_name=model_name)
+
     logger.info("llm_built", provider=choice.value, model=model_name, structured_method=method.value)
     return LLMHandle(chat=chat, provider=choice, model_name=model_name, structured_method=method)
 

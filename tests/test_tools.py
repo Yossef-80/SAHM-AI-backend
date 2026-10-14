@@ -113,7 +113,8 @@ async def test_karim_reports_missing_data_instead_of_analysing_nothing(
     result = await run_agent(KARIM, "performance_analysis", {}, tool_ctx, llm=MockClient())
     assert result.error is None
     assert result.output["headline_metrics"] == {}
-    assert len(result.unavailable_sources) == 2  # insights + breakdowns
+    assert len(result.unavailable_sources) == 3  # campaign list + insights + breakdowns
+    assert any("list_meta_campaigns" in s for s in result.unavailable_sources)
     assert any("get_campaign_insights" in s for s in result.unavailable_sources)
 
 

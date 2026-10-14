@@ -187,7 +187,7 @@ def resolve_url(template: str, settings: Settings) -> str:
     )
 
 
-#: Tool name -> the service it reaches. ``ALL_TOOLS`` (16) plus the two protected
+#: Tool name -> the service it reaches. ``ALL_TOOLS`` (17) plus the two protected
 #: tools, which no agent may call but which still talk to Meta.
 CONNECTORS: dict[str, Connector] = {
     # ---------------------------------------------------------- research ------
@@ -286,6 +286,16 @@ CONNECTORS: dict[str, Connector] = {
         notes="Local only. Writes one brand_memory_items row of kind 'learning'.",
     ),
     # -------------------------------------------------------------- meta ------
+    "list_meta_campaigns": Connector(
+        provider="meta_read",
+        url_template="{base}/{version}/act_<connected_ad_account>/campaigns",
+        configurable_via="META_GRAPH_BASE_URL",
+        required_env=("meta_access_token",),
+        notes=(
+            "Read-only campaign discovery. The ad account ID and token resolve from the connected "
+            "Meta Integration/workspace settings; the displayed URL uses a dynamic account placeholder."
+        ),
+    ),
     "get_campaign_insights": Connector(
         provider="meta_read",
         url_template="{base}/{version}/{meta_campaign_id}/insights",

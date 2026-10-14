@@ -304,6 +304,59 @@ def _bind(business: Business) -> WorkspaceContext:
     )
 
 
+def _bind_usage_scope(request: Request, ctx: WorkspaceContext) -> None:
+    """Attribute every LLM call in this request to this workspace and action.
+
+    Set here -- in the one dependency that resolves the tenant -- so token
+    accounting needs no cooperation from the 40-odd handlers that can spend
+    tokens. The action label is derived from the route and refined by
+    ``usage_action`` around the interesting sub-steps (e.g. which research tool
+    ran).
+    """
+    from app.core.ai_usage import UsageScope, set_usage_scope
+
+    # ``resolve_workspace`` is also called directly (tests, scripts) with a
+    # request object that has no URL; the action degrades to "unknown" there.
+    path = str(getattr(getattr(request, "url", None), "path", "") or "")
+    api_prefix = get_settings().api_prefix.rstrip("/")
+    route = path[len(api_prefix) :] if api_prefix and path.startswith(api_prefix) else path
+    set_usage_scope(
+        UsageScope(
+            workspace_id=ctx.workspace_id,
+            business_id=ctx.business_id,
+            action=_usage_action_for(route),
+        )
+    )
+
+
+#: Route prefix -> billable action. Anything unmatched is reported as
+#: ``api:<first-segment>`` so a new endpoint shows up in the usage screen
+#: immediately instead of being silently unattributed.
+_USAGE_ACTION_ROUTES: tuple[tuple[str, str], ...] = (
+    ("/assistant/message", "chat"),
+    ("/assistant/attachments", "chat.attachment"),
+    ("/research", "research"),
+    ("/creatives/analyze-reference", "creative.reference"),
+    ("/creatives/generate-text", "creative.text"),
+    ("/creatives/generate", "creative.image"),
+    ("/content/generate", "content.calendar"),
+    ("/campaigns/strategy", "campaign.strategy"),
+    ("/campaigns/meta-ad-plan", "campaign.meta_plan"),
+    ("/tasks", "task"),
+    ("/insights", "insights"),
+    ("/memory", "memory"),
+    ("/personas", "personas"),
+)
+
+
+def _usage_action_for(route: str) -> str:
+    for prefix, action in _USAGE_ACTION_ROUTES:
+        if route.startswith(prefix):
+            return action
+    segment = route.strip("/").split("/", 1)[0] or "root"
+    return f"api:{segment}"
+
+
 async def _resolve_for_principal(
     db: AsyncSession, principal: Principal, requested: str | None
 ) -> WorkspaceContext:
@@ -401,6 +454,7 @@ async def resolve_workspace(
         ctx = await _resolve_for_principal(db, principal, requested)
         if hasattr(request, "state"):
             request.state.workspace_context = ctx
+        _bind_usage_scope(request, ctx)
         return ctx
 
     if requested:
@@ -413,6 +467,7 @@ async def resolve_workspace(
         ctx = _bind(business)
         if hasattr(request, "state"):
             request.state.workspace_context = ctx
+        _bind_usage_scope(request, ctx)
         return ctx
 
     if settings.require_workspace_header:
@@ -431,6 +486,7 @@ async def resolve_workspace(
     ctx = _bind(await _single_tenant_business(db))
     if hasattr(request, "state"):
         request.state.workspace_context = ctx
+    _bind_usage_scope(request, ctx)
     return ctx
 
 

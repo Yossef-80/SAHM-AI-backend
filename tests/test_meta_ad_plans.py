@@ -34,13 +34,22 @@ DESTINATION = "https://shop.example.com/offer"
 
 
 def _plan(objective: str = "sales", creative_ids: list[str] | None = None) -> meta_ads.MetaAdPlanSettings:
+    delivery = {
+        "awareness": ("IMPRESSIONS", "REACH"),
+        "traffic": ("LINK_CLICKS", "LINK_CLICKS"),
+        "engagement": ("IMPRESSIONS", "POST_ENGAGEMENT"),
+        "leads": ("OFFSITE_CONVERSIONS", "OFFSITE_CONVERSIONS"),
+        "sales": ("OFFSITE_CONVERSIONS", "OFFSITE_CONVERSIONS"),
+        "app_installs": ("APP_INSTALLS", "APP_INSTALLS"),
+    }
+    billing_event, optimization_goal = delivery[objective]
     return meta_ads.MetaAdPlanSettings(
         objective=objective,
         creative_ids=creative_ids or ["cr_a", "cr_b"],
         page_id="page_123",
         targeting={"geo_locations": {"countries": ["EG"]}},
-        billing_event="IMPRESSIONS",
-        optimization_goal="OFFSITE_CONVERSIONS",
+        billing_event=billing_event,
+        optimization_goal=optimization_goal,
         special_ad_categories=[],
         destination_type="WEBSITE" if objective in {"traffic", "engagement", "leads"} else None,
         promoted_object={"pixel_id": "pixel_42", "custom_event_type": "PURCHASE"}
@@ -187,6 +196,48 @@ async def test_supported_objective_mapping_and_server_required_settings_are_expl
         assert common | required_by_objective[objective] <= set(meta_ads.missing_meta_ad_settings(incomplete))
 
 
+def test_awareness_delivery_validation_rejects_a_stale_sales_pair() -> None:
+    stale = _plan("awareness").model_copy(
+        update={
+            "billing_event": "OFFSITE_CONVERSIONS",
+            "optimization_goal": "OFFSITE_CONVERSIONS",
+        }
+    )
+    issues = meta_ads.missing_meta_ad_settings(stale)
+    assert "billing_event (for awareness, use IMPRESSIONS)" in issues
+    assert "optimization_goal (for awareness, use REACH)" in issues
+
+
+async def test_new_awareness_draft_canonicalizes_stale_delivery_fields(
+    seeded_db: AsyncSession,
+) -> None:
+    await _add_creatives(seeded_db)
+    plan = _plan("awareness").model_copy(
+        update={
+            "billing_event": "OFFSITE_CONVERSIONS",
+            "optimization_goal": "OFFSITE_CONVERSIONS",
+        }
+    )
+    campaign_input = CampaignCreateRequest(
+        name="Awareness delivery map",
+        objective="awareness",
+        channel="meta_ads",
+        budget=250.50,
+        currency="EGP",
+        start_date=datetime(2026, 10, 12, tzinfo=timezone.utc),
+        target_audience="Explicitly supplied by test",
+    )
+    _, recommendation = await meta_ads.create_meta_ad_plan_draft(
+        seeded_db,
+        business_id="biz_test",
+        campaign_input=campaign_input,
+        plan=plan,
+    )
+    saved_plan = recommendation.payload["plan"]
+    assert saved_plan["billingEvent"] == "IMPRESSIONS"
+    assert saved_plan["optimizationGoal"] == "REACH"
+
+
 async def test_credentials_are_rejected_from_free_form_plan_json() -> None:
     candidate = _plan()
     candidate.targeting = {"geo_locations": {"countries": ["EG"]}, "access_token": "not-a-real-token"}
@@ -205,6 +256,31 @@ def test_targeting_genders_requires_a_meta_collection_and_omits_all() -> None:
     assert not any("targeting.genders" in issue for issue in meta_ads.missing_meta_ad_settings(plan))
     plan.targeting.pop("genders")
     assert not any("targeting.genders" in issue for issue in meta_ads.missing_meta_ad_settings(plan))
+
+
+def test_meta_plan_canonicalization_drops_text_caption_and_aligns_cta_link() -> None:
+    plan = _plan("awareness")
+    plan.call_to_action = {
+        "type": "LEARN_MORE",
+        "value": {"link": "https://old.example.com/path", "link_caption": "Shop now"},
+    }
+
+    normalized = meta_ads.canonicalize_meta_ad_plan_settings(plan)
+
+    assert normalized.call_to_action == {
+        "type": "LEARN_MORE",
+        "value": {"link": DESTINATION},
+    }
+
+
+def test_advantage_audience_flag_only_accepts_zero_or_one() -> None:
+    plan = _plan("awareness")
+    plan.targeting = {
+        "geo_locations": {"countries": ["EG"]},
+        "targeting_automation": {"advantage_audience": 2},
+    }
+    issues = meta_ads.missing_meta_ad_settings(plan)
+    assert "targeting.targeting_automation.advantage_audience (use 0 or 1)" in issues
 
 
 async def test_campaign_plan_api_saves_pending_draft_without_meta_writes(
@@ -365,9 +441,22 @@ async def test_two_phase_approval_creates_full_hierarchy_paused_and_maps_each_cr
     assert fake.calls[0][1]["objective"] == meta_ads.OBJECTIVE_TO_META[objective]
     assert fake.calls[0][1]["status"] == "PAUSED"
     assert fake.calls[0][1]["is_adset_budget_sharing_enabled"] is False
-    assert fake.calls[0][1]["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
+    assert "bid_strategy" not in fake.calls[0][1]
     assert fake.calls[1][1]["status"] == "PAUSED"
     assert fake.calls[1][1]["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
+    expected_delivery = {
+        "awareness": ("IMPRESSIONS", "REACH"),
+        "traffic": ("LINK_CLICKS", "LINK_CLICKS"),
+        "engagement": ("IMPRESSIONS", "POST_ENGAGEMENT"),
+        "leads": ("OFFSITE_CONVERSIONS", "OFFSITE_CONVERSIONS"),
+        "sales": ("OFFSITE_CONVERSIONS", "OFFSITE_CONVERSIONS"),
+        "app_installs": ("APP_INSTALLS", "APP_INSTALLS"),
+    }[objective]
+    assert (
+        fake.calls[1][1]["billing_event"],
+        fake.calls[1][1]["optimization_goal"],
+    ) == expected_delivery
+    assert fake.calls[1][1]["targeting"]["targeting_automation"]["advantage_audience"] == 0
     assert "bid_amount" not in fake.calls[1][1]
     assert "bid_constraints" not in fake.calls[1][1]
     assert all(fake.calls[i][1]["status"] == "PAUSED" for i in (4, 7))
@@ -376,6 +465,10 @@ async def test_two_phase_approval_creates_full_hierarchy_paused_and_maps_each_cr
     execution = recommendation.execution_result
     assert execution["status"] == "ok"
     assert execution["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
+    assert execution["billing_event"] == expected_delivery[0]
+    assert execution["optimization_goal"] == expected_delivery[1]
+    assert execution["advantage_audience"] == 0
+    assert execution["graph_api_version"] == test_settings.meta_graph_version
     assert [entry["creative_id"] for entry in execution["ads"]] == ["cr_a", "cr_b"]
     assert [entry["creative_prompt"] for entry in execution["ads"]] == [
         "Prompt for final image A",
@@ -504,6 +597,9 @@ async def test_failed_safe_campaign_creation_can_retry_saved_plan(
     assert failed["retry_safe"] is True
     assert failed["created_ids"] == {}
     assert len(fake.calls) == 1
+    campaign_payload = fake.calls[0][1]
+    assert "bid_strategy" not in campaign_payload
+    assert campaign_payload["is_adset_budget_sharing_enabled"] is False
 
     # A retry still repeats phase one; the failed Meta call is not replayed
     # until the operator reviews and confirms again.
@@ -563,12 +659,198 @@ async def test_rejected_adset_request_resumes_campaign_without_creating_a_duplic
     assert recommendation.status == "executed"
     assert campaign.meta_campaign_id == "meta_campaign_1"
     assert recommendation.execution_result["resumed_from_partial"] is True
-    assert recommendation.execution_result["campaign_bid_strategy_updated"] is True
     paths = [path for path, _ in fake.calls]
     assert paths.count("act_987/campaigns") == 1
-    assert paths.count("meta_campaign_1") == 1
-    assert fake.calls[2] == ("meta_campaign_1", {"bid_strategy": "LOWEST_COST_WITHOUT_CAP"})
+    assert paths.count("meta_campaign_1") == 0
     assert paths.count("act_987/adsets") == 2
+    # Resume only retries the failed ad set; the campaign is not re-posted or edited.
+    assert fake.calls[2][0] == "act_987/adsets"
+    assert fake.calls[2][1]["daily_budget"]
+    assert fake.calls[2][1]["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
+
+
+async def test_legacy_awareness_partial_reuses_campaign_and_reviews_corrected_goal(
+    seeded_db: AsyncSession,
+    test_settings: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Recover the exact partial shape without another campaign POST."""
+    campaign, recommendation = await _create_plan(seeded_db, "awareness")
+    existing_meta_campaign_id = "120252033253890323"
+    campaign.meta_campaign_id = existing_meta_campaign_id
+    campaign.status = "paused"
+
+    # Simulate an older wizard draft that carried Sales delivery values into an
+    # Awareness objective, plus the already-created paused campaign in Meta.
+    legacy_payload = dict(recommendation.payload)
+    legacy_plan = dict(legacy_payload["plan"])
+    legacy_plan["billingEvent"] = "OFFSITE_CONVERSIONS"
+    legacy_plan["optimizationGoal"] = "OFFSITE_CONVERSIONS"
+    legacy_payload["plan"] = legacy_plan
+    recommendation.payload = legacy_payload
+    recommendation.status = "failed"
+    recommendation.execution_result = {
+        "kind": meta_ads.META_AD_PLAN_KIND,
+        "status": "partial",
+        "recommendation_id": recommendation.id,
+        "campaign_id": campaign.id,
+        "objective": "awareness",
+        "meta_objective": "OUTCOME_AWARENESS",
+        "created_ids": {"campaign": existing_meta_campaign_id},
+        "ads": [],
+        "attempted_step": "ad_set",
+        "resumed_from_partial": False,
+        "failure_status_code": 400,
+        "retry_safe": True,
+    }
+
+    test_settings.meta_access_token = "offline-test-token"
+    test_settings.meta_ad_account_id = "987"
+    fake = FakeGraph()
+    monkeypatch.setattr(meta_ads, "HttpMetaGraphClient", lambda **kwargs: fake)
+
+    review = await approvals.approve_recommendation(
+        seeded_db,
+        recommendation.id,
+        ApproveRecommendationRequest(confirm=False),
+        actor="member-test",
+        request_id="req-awareness-resume-review",
+        settings=test_settings,
+    )
+    assert review.requires_confirmation is True
+    assert fake.calls == []
+    reviewed_delivery = review.diff[0].after
+    assert reviewed_delivery["billing_event"] == "IMPRESSIONS"
+    assert reviewed_delivery["optimization_goal"] == "REACH"
+    assert reviewed_delivery["advantage_audience"] == 0
+    assert recommendation.payload["plan"]["billingEvent"] == "IMPRESSIONS"
+    assert recommendation.payload["plan"]["optimizationGoal"] == "REACH"
+
+    resumed = await approvals.approve_recommendation(
+        seeded_db,
+        recommendation.id,
+        ApproveRecommendationRequest(confirm=True),
+        actor="member-test",
+        request_id="req-awareness-resume-confirm",
+        settings=test_settings,
+    )
+    assert resumed.executed is True, resumed.message
+    assert recommendation.execution_result["resumed_from_partial"] is True
+    assert recommendation.execution_result["created_ids"]["campaign"] == existing_meta_campaign_id
+    assert recommendation.execution_result["billing_event"] == "IMPRESSIONS"
+    assert recommendation.execution_result["optimization_goal"] == "REACH"
+    assert recommendation.execution_result["advantage_audience"] == 0
+    assert recommendation.execution_result["graph_api_version"] == test_settings.meta_graph_version
+    paths = [path for path, _ in fake.calls]
+    assert "act_987/campaigns" not in paths
+    assert paths.count("act_987/adsets") == 1
+    adset_payload = fake.calls[0][1]
+    assert adset_payload["campaign_id"] == existing_meta_campaign_id
+    assert adset_payload["billing_event"] == "IMPRESSIONS"
+    assert adset_payload["optimization_goal"] == "REACH"
+    assert adset_payload["targeting"]["targeting_automation"]["advantage_audience"] == 0
+
+
+async def test_creative_cta_rejection_resumes_without_recreating_campaign_or_ad_set(
+    seeded_db: AsyncSession,
+    test_settings: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The known creative 400 is repaired locally, then resumes at the creative.
+
+    The previous attempt created a paused campaign and ad set, but Meta rejected
+    the first creative. Phase one must remove the invalid text-valued
+    ``link_caption``; phase two may then reuse the recorded IDs but must not POST
+    another campaign or ad set. All Graph calls here go to FakeGraph.
+    """
+    campaign, recommendation = await _create_plan(seeded_db, "awareness")
+    meta_campaign_id = "120252033253890323"
+    meta_ad_set_id = "120252033617460323"
+    campaign.meta_campaign_id = meta_campaign_id
+    campaign.status = "paused"
+
+    payload = dict(recommendation.payload)
+    plan = dict(payload["plan"])
+    plan["callToAction"] = {
+        "type": "LEARN_MORE",
+        "value": {
+            "link": DESTINATION,
+            "link_caption": plan["headline"],
+        },
+    }
+    payload["plan"] = plan
+    recommendation.payload = payload
+    recommendation.status = "failed"
+    recommendation.execution_result = {
+        "kind": meta_ads.META_AD_PLAN_KIND,
+        "status": "partial",
+        "recommendation_id": recommendation.id,
+        "campaign_id": campaign.id,
+        "objective": "awareness",
+        "meta_objective": "OUTCOME_AWARENESS",
+        "advantage_audience": 0,
+        "created_ids": {"campaign": meta_campaign_id, "ad_set": meta_ad_set_id},
+        "ads": [],
+        "attempted_step": f"creative:{plan['creativeIds'][0]}",
+        "resumed_from_partial": True,
+        "failure_status_code": 400,
+        "retry_safe": True,
+    }
+
+    test_settings.meta_access_token = "offline-test-token"
+    test_settings.meta_ad_account_id = "987"
+    fake = FakeGraph()
+    monkeypatch.setattr(meta_ads, "HttpMetaGraphClient", lambda **kwargs: fake)
+
+    review = await approvals.approve_recommendation(
+        seeded_db,
+        recommendation.id,
+        ApproveRecommendationRequest(confirm=False),
+        actor="member-test",
+        request_id="req-creative-resume-review",
+        settings=test_settings,
+    )
+    assert review.requires_confirmation is True
+    assert fake.calls == []
+    reviewed_diff_cta = review.diff[0].after["call_to_action"]
+    assert reviewed_diff_cta["value"]["link"] == DESTINATION
+    assert "link_caption" not in reviewed_diff_cta["value"]
+    reviewed_cta = recommendation.payload["plan"]["callToAction"]
+    assert reviewed_cta["value"]["link"] == DESTINATION
+    assert "link_caption" not in reviewed_cta["value"]
+
+    resumed = await approvals.approve_recommendation(
+        seeded_db,
+        recommendation.id,
+        ApproveRecommendationRequest(confirm=True),
+        actor="member-test",
+        request_id="req-creative-resume-confirm",
+        settings=test_settings,
+    )
+    assert resumed.executed is True, resumed.message
+    assert recommendation.execution_result["resumed_from_partial"] is True
+    assert recommendation.execution_result["created_ids"]["campaign"] == meta_campaign_id
+    assert recommendation.execution_result["created_ids"]["ad_set"] == meta_ad_set_id
+
+    paths = [path for path, _ in fake.calls]
+    assert "act_987/campaigns" not in paths
+    assert "act_987/adsets" not in paths
+    assert paths == [
+        "act_987/adimages",
+        "act_987/adcreatives",
+        "act_987/ads",
+        "act_987/adimages",
+        "act_987/adcreatives",
+        "act_987/ads",
+    ]
+    creative_payloads = [body for path, body in fake.calls if path.endswith("/adcreatives")]
+    assert len(creative_payloads) == 2
+    for body in creative_payloads:
+        link_data = body["object_story_spec"]["link_data"]
+        assert link_data["link"] == DESTINATION
+        assert link_data["call_to_action"]["value"]["link"] == DESTINATION
+        assert "link_caption" not in link_data["call_to_action"]["value"]
+    assert recommendation.execution_result["advantage_audience"] == 0
 
 
 async def test_uncertain_partial_meta_failure_is_recorded_and_never_replayed(
@@ -1138,6 +1420,8 @@ async def test_audience_age_and_gender_reach_the_ad_set(
     sent = adset_calls[0][1]["targeting"]
     assert sent["age_min"] == 25, sent
     assert sent["age_max"] == 44, sent
+    assert sent["targeting_automation"]["advantage_audience"] == 0, sent
+    assert "age_range" not in sent, sent
     assert sent["genders"] == [1], sent
     assert sent["geo_locations"] == {"countries": ["EG"]}, sent
     assert sent["flexible_spec"] == [

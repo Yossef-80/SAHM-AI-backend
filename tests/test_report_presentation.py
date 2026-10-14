@@ -84,5 +84,68 @@ def test_research_report_includes_competitor_findings_and_source_link() -> None:
     assert '"competitor_summary"' not in text
 
 
+def test_performance_report_shows_metric_sources_periods_saved_context_and_actions() -> None:
+    report = {
+        "summary": "Meta returned click activity; cost per conversion was not available.",
+        "campaign_name": "Spring Promo",
+        "campaign_id": "cmp_123",
+        "date_range": "2026-10-01 to 2026-10-12",
+        "metrics": {"spend": 1250.0, "impressions": 42000, "clicks": 510, "ctr": 1.2143},
+        "breakdowns": [{"placement": "Instagram Reels", "clicks": 260, "spend": 620.0}],
+        "evidence": [
+            {
+                "metric": "CTR",
+                "value": "1.2143%",
+                "source": "Meta Marketing API",
+                "date_range": "2026-10-01 to 2026-10-12",
+            }
+        ],
+        "brand_context": [
+            {
+                "finding": "Saved research notes that Cairo office managers order coffee for teams.",
+                "source": "saved learning",
+                "source_url": "https://research.example.test/office-coffee",
+                "recorded_at": "2026-10-10T12:00:00Z",
+            }
+        ],
+        "recommendations": [
+            {
+                "action": "Test a team-order landing page against the current destination.",
+                "rationale": "The saved audience finding suggests team ordering is relevant; compare actual landing-page conversions before scaling.",
+                "priority": "medium",
+                "evidence": [
+                    {
+                        "metric": "CTR",
+                        "value": "1.2143%",
+                        "source": "Meta Marketing API",
+                        "date_range": "2026-10-01 to 2026-10-12",
+                    }
+                ],
+                "supporting_context": ["Cairo office managers order coffee for teams."],
+                "next_test": "Split traffic between the two destinations and compare measured conversions for the same date range.",
+            }
+        ],
+        "missing_inputs": ["The Meta campaign is not linked to a conversion event."],
+    }
+
+    text = format_agent_report("karim", report, arabic=False)
+
+    assert "Campaign performance report" in text
+    assert "Campaign name" in text
+    assert "Spring Promo" in text
+    assert "Meta Marketing API" in text
+    assert "2026-10-01 to 2026-10-12" in text
+    assert "Relevant saved brand and research context" in text
+    assert "[saved learning](https://research.example.test/office-coffee)" in text
+    assert "Actionable recommendations" in text
+    assert "Test a team-order landing page" in text
+    assert "Next test" in text
+    assert "conversion event" in text
+
+    arabic_text = format_agent_report("karim", report, arabic=True)
+    assert "اسم الحملة" in arabic_text
+    assert "Spring Promo" in arabic_text
+
+
 def test_plain_text_agent_output_is_preserved() -> None:
     assert format_agent_report("omar", "تعذر إكمال الخطة الآن.", arabic=True) == "تعذر إكمال الخطة الآن."

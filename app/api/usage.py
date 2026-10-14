@@ -20,9 +20,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import SessionDep, WorkspaceDep
+from app.config import get_settings
 from app.core.errors import ValidationFailed
 from app.core.usage import (
     USAGE_PERIODS,
@@ -120,6 +121,34 @@ async def get_usage(
     personas = await usage_breakdown(
         db, ws.workspace_id, since=start, column=UsageRecord.persona_id
     )
+    actions = await usage_breakdown(
+        db, ws.workspace_id, since=start, column=UsageRecord.action
+    )
+    estimated_calls = int(
+        (
+            await db.execute(
+                select(func.count(UsageRecord.id)).where(
+                    UsageRecord.workspace_id == ws.workspace_id,
+                    UsageRecord.created_at >= start,
+                    UsageRecord.estimated.is_(True),
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    settings = get_settings()
+    price_in = float(settings.token_price_in_usd_per_million or 0.0)
+    price_out = float(settings.token_price_out_usd_per_million or 0.0)
+    cost = (
+        round(
+            (window.tokens_in / 1_000_000) * price_in
+            + (window.tokens_out / 1_000_000) * price_out,
+            6,
+        )
+        if (price_in > 0 or price_out > 0)
+        else None
+    )
 
     return UsageResponse(
         workspace_id=ws.workspace_id,
@@ -138,8 +167,13 @@ async def get_usage(
         burn_rate_per_hour=burn_rate,
         projected_total_tokens=projected,
         budget_source="workspace" if override is not None else "default",
+        estimated_calls=estimated_calls,
+        estimated_cost_usd=cost,
+        cost_per_million_in_usd=price_in,
+        cost_per_million_out_usd=price_out,
         by_model=_breakdown(models, total),
         by_persona=_breakdown(personas, total),
+        by_action=_breakdown(actions, total),
     )
 
 
