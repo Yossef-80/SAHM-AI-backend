@@ -38,6 +38,9 @@ class ConnectorFieldOut(ApiModel):
     required: bool = False
     max_length: int = MAX_VALUE
     description: str = ""
+    #: Accepted values when the field is a closed set; empty for free text. The
+    #: client renders a select from this, so an invalid quality cannot be typed.
+    choices: list[str] = Field(default_factory=list)
     #: Non-secret fields only.
     value: str | None = None
     has_value: bool = False
@@ -113,6 +116,10 @@ class ConnectorUpdateRequest(ApiModel):
     password: SecretStr | None = None
     # -- image --
     model: str | None = Field(default=None, max_length=80)
+    #: ``auto`` | ``low`` | ``medium`` | ``high``. Free-form here and validated
+    #: against the connector spec, so a typo is a 422 naming the accepted values
+    #: rather than a silently ignored field.
+    quality: str | None = Field(default=None, max_length=16)
 
     def sent(self) -> dict[str, Any]:
         """The keys the caller actually sent, secrets unwrapped.

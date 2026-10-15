@@ -132,3 +132,44 @@ async def test_the_url_and_token_never_reach_the_raised_error(respx_mock) -> Non
     assert TOKEN not in text
     assert "access_token" not in text
     assert "graph.facebook.com" not in text
+
+
+def test_the_development_mode_subcode_carries_its_fix() -> None:
+    """Subcode 1885183 is a Meta app setting, not a retryable request.
+
+    The ad's Page post is created inline by our app and Meta only lets a *public*
+    app do that, so the campaign and ad set can be created while the creative
+    step is refused. The message has to say so: from the failure alone the user
+    sees a paused campaign on Meta and no idea that the app is the blocker.
+    """
+    payload = {
+        "error": {
+            "message": "Invalid parameter",
+            "type": "OAuthException",
+            "code": 100,
+            "error_subcode": 1885183,
+            "error_user_title": "Ads creative post was created by an app that is in development mode",
+            "error_user_msg": (
+                "Ads creative post was created by an app that is in development mode. "
+                "It must be in public to create this ad."
+            ),
+            "fbtrace_id": "A1B2C3",
+        }
+    }
+
+    message = HttpMetaGraphClient._error_message(payload, 400)
+
+    assert "subcode 1885183" in message
+    assert "Development mode" in message
+    # The remedy, and what it does *not* cost the user.
+    assert "Live" in message
+    assert "reused, not recreated" in message
+    assert "Nothing in this step was created" in message
+
+
+def test_an_unknown_subcode_adds_no_hint() -> None:
+    """Only the subcodes whose remedy is known get advice attached."""
+    payload = {"error": {"code": 100, "message": "Invalid parameter", "error_subcode": 1234567}}
+    message = HttpMetaGraphClient._error_message(payload, 400)
+    assert "subcode 1234567" in message
+    assert "Live" not in message

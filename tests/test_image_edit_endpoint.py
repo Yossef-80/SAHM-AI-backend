@@ -69,9 +69,17 @@ async def test_reference_image_selects_the_edits_endpoint_and_sends_bytes(
     # Multipart encodes fields as parts, not as urlencoded key=value pairs.
     assert b'name="model"' in call["body"]
     assert b"gpt-image-1" in call["body"]
-    # 4:5 maps to 1024x1280, not the square default.
+    # 4:5 maps to 1024x1536, not the square default.
+    #
+    # This used to assert 1024x1280, which is DALL-E's portrait size. A GPT Image
+    # model rejects it, so the assertion was pinning a 400 in place. The value is
+    # now chosen per model family by ``model_compat.image_size_for_model``.
     assert b'name="size"' in call["body"]
-    assert b"1024x1280" in call["body"]
+    assert b"1024x1536" in call["body"]
+    # The quality is sent explicitly instead of leaving the provider default
+    # (``high`` on GPT Image, the expensive one) to be bought silently.
+    assert b'name="quality"' in call["body"]
+    assert b"auto" in call["body"]
     # The prompt must travel with the edit request.
     assert b"name=\"prompt\"" in call["body"]
     assert assets and assets[0].url.startswith("https://")
@@ -98,6 +106,8 @@ async def test_no_reference_selects_the_generations_endpoint(respx_mock) -> None
     assert payload["model"] == "gpt-image-1"
     assert payload["size"] == "1024x1024"
     assert payload["n"] == 1
+    # No quality setting configured -> "auto", never the provider's silent high.
+    assert payload["quality"] == "auto"
 
 
 async def test_base64_responses_are_persisted_as_data_urls(respx_mock) -> None:
@@ -124,17 +134,63 @@ async def test_base64_responses_are_persisted_as_data_urls(respx_mock) -> None:
 
 
 async def test_every_supported_aspect_ratio_maps_to_a_real_size(respx_mock) -> None:
+    """Each model family gets the sizes *it* accepts, per aspect ratio."""
     captured: list[dict] = []
     _mock(respx_mock, captured)
 
-    expected = {
+    gpt_image = {
         "1:1": "1024x1024",
-        "4:5": "1024x1280",
+        "4:5": "1024x1536",
+        "9:16": "1024x1536",
+        "16:9": "1536x1024",
+    }
+    for ratio in gpt_image:
+        await _generate_openai_image(
+            "p", ratio, api_key="k", model="gpt-image-1", base_url=BASE, reference_image=None
+        )
+    assert [json.loads(c["body"])["size"] for c in captured] == list(gpt_image.values())
+
+    captured.clear()
+    dall_e = {
+        "1:1": "1024x1024",
+        "4:5": "1024x1792",
         "9:16": "1024x1792",
         "16:9": "1792x1024",
     }
-    for ratio, size in expected.items():
+    for ratio in dall_e:
         await _generate_openai_image(
-            "p", ratio, api_key="k", model="m", base_url=BASE, reference_image=None
+            "p", ratio, api_key="k", model="dall-e-3", base_url=BASE, reference_image=None
         )
-    assert [json.loads(c["body"])["size"] for c in captured] == list(expected.values())
+    assert [json.loads(c["body"])["size"] for c in captured] == list(dall_e.values())
+    # DALL-E 3 has no "auto": it must be translated, not forwarded verbatim.
+    assert [json.loads(c["body"])["quality"] for c in captured] == ["standard"] * len(dall_e)
+
+
+async def test_configured_quality_reaches_the_provider(respx_mock) -> None:
+    """A saved quality is the one on the wire -- and is refused when unsupported."""
+    captured: list[dict] = []
+    _mock(respx_mock, captured)
+
+    await _generate_openai_image(
+        "p",
+        "1:1",
+        api_key="k",
+        model="gpt-image-1",
+        base_url=BASE,
+        reference_image=None,
+        quality="low",
+    )
+    assert json.loads(captured[0]["body"])["quality"] == "low"
+
+    captured.clear()
+    # DALL-E 3 spells the same idea standard/hd.
+    await _generate_openai_image(
+        "p",
+        "1:1",
+        api_key="k",
+        model="dall-e-3",
+        base_url=BASE,
+        reference_image=None,
+        quality="high",
+    )
+    assert json.loads(captured[0]["body"])["quality"] == "hd"

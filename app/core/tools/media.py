@@ -411,6 +411,7 @@ async def _generate_openai_image(
     model: str,
     base_url: str | None = None,
     reference_image: tuple[str, bytes] | None = None,
+    quality: str | None = None,
 ) -> list[GeneratedAssetRecord]:
     """Call the configured OpenAI-compatible generation or image-edit endpoint.
 
@@ -418,13 +419,23 @@ async def _generate_openai_image(
     is present, its bytes are sent as image-edit input; it is never reused as the
     final asset. Image-edit models that return base64 are persisted separately by
     the local asset store below.
+
+    ``size`` and ``quality`` are resolved per model family, because the two
+    generations of OpenAI image models disagree about both. The single mapping
+    this used to send (``1024x1280``, ``1024x1792``, ``1792x1024``) is DALL-E's,
+    and a GPT Image model rejects it outright: it accepts only ``1024x1024``,
+    ``1536x1024`` and ``1024x1536``. ``quality`` was never sent at all, which
+    silently bought the provider default -- ``high`` on GPT Image, the expensive
+    one -- for every workspace.
     """
-    size = {"1:1": "1024x1024", "4:5": "1024x1280", "9:16": "1024x1792", "16:9": "1792x1024"}.get(
-        aspect_ratio, "1024x1024"
-    )
+    from app.core.llm.model_compat import image_quality_for_model, image_size_for_model
+
+    size = image_size_for_model(aspect_ratio, model)
+    resolved_quality = image_quality_for_model(quality, model)
     endpoint = "/images/edits" if reference_image else "/images/generations"
     url = (base_url or "https://api.openai.com/v1").rstrip("/") + endpoint
     headers = {"authorization": f"Bearer {api_key}"}
+    optional: dict[str, object] = {"quality": resolved_quality} if resolved_quality else {}
     async with httpx.AsyncClient(timeout=120.0, trust_env=False) as client:
         if reference_image:
             mime, image_bytes = reference_image
@@ -432,14 +443,14 @@ async def _generate_openai_image(
             resp = await client.post(
                 url,
                 headers=headers,
-                data={"model": model, "prompt": prompt, "size": size, "n": "1"},
+                data={"model": model, "prompt": prompt, "size": size, "n": "1", **optional},
                 files={"image": (f"reference.{extension}", image_bytes, mime)},
             )
         else:
             resp = await client.post(
                 url,
                 headers=headers,
-                json={"model": model, "prompt": prompt, "size": size, "n": 1},
+                json={"model": model, "prompt": prompt, "size": size, "n": 1, **optional},
             )
         resp.raise_for_status()
         data = resp.json().get("data", [])
@@ -535,6 +546,11 @@ async def generate_image_for_workspace(
     image_key = tools_cfg.image_api_key or cfg.image_api_key
     image_model = tools_cfg.image_model or cfg.image_model
     image_base = tools_cfg.image_base_url or cfg.image_base_url
+    # Resolved workspace -> env -> default ("auto") by the connector layer.
+    # getattr: several call sites pass a hand-built settings object (tests, and
+    # the VLM bridge), and a missing attribute must not take image generation
+    # down when the answer is simply "no preference".
+    image_quality = getattr(tools_cfg, "image_quality", None)
     source = f"generate_image:{image_provider}"
 
     style = dict(payload.style_spec or {})
@@ -574,6 +590,7 @@ async def generate_image_for_workspace(
                 model=image_model,
                 base_url=image_base,
                 reference_image=reference_image,
+                quality=image_quality,
             )
         elif reference_image is not None:
             return GenerateImageOutput.unavailable(

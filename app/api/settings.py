@@ -46,6 +46,7 @@ from app.core.tools.settings import (
     connector_spec,
     load_connector_settings,
 )
+from app.core.llm.model_compat import AVAILABLE_REASONING_EFFORTS
 from app.core.llm.router import invalidate_workspace_llm_cache, resolve_workspace_tier
 from app.db.models import LlmProviderSettings, ToolSettings as ToolSettingsRow
 from app.schemas.llm_settings import LlmSettingsOut, LlmSettingsUpdate, LlmTierOut
@@ -56,6 +57,12 @@ from app.schemas.settings import (
     ConnectorSettingsResponse,
     ConnectorUpdateRequest,
 )
+
+#: The four values this build accepts, imported from the compat layer so the
+#: validated set and the forwarded set cannot drift. Anything else is rejected
+#: here rather than sent and refused as a provider-side "unsupported value".
+REASONING_EFFORT_VALUES = AVAILABLE_REASONING_EFFORTS
+
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -94,6 +101,7 @@ def _render(resolved: ResolvedConnector, *, has_override: bool) -> ConnectorOut:
                 required=item.spec.required,
                 max_length=item.spec.max_length,
                 description=item.spec.description,
+                choices=list(item.spec.choices),
                 value=None if secret else item.value,
                 has_value=item.has_value,
                 masked=SECRET_MASK if (secret and item.has_value) else None,
@@ -192,6 +200,41 @@ def _validate_provider_value(spec: ConnectorSpec, sent: dict[str, Any]) -> None:
     sent[spec.provider_field] = value
 
 
+def _validate_field_choices(spec: ConnectorSpec, sent: dict[str, Any]) -> None:
+    """Reject a value outside a field's declared set, and normalise its case.
+
+    Mirrors ``_validate_provider_value`` for every field that declares
+    ``choices`` -- today the image connector's ``quality``. A typo there used to
+    be indistinguishable from a working setting, because the call site falls back
+    to the provider default; a 422 that names the accepted values is the only
+    outcome a user can act on.
+    """
+    for field_spec in spec.fields:
+        if not field_spec.choices or field_spec.key not in sent:
+            continue
+        raw = sent[field_spec.key]
+        if raw is None:
+            continue
+        value = str(raw).strip().lower()
+        if not value:
+            sent[field_spec.key] = None
+            continue
+        if value not in field_spec.choices:
+            raise ValidationFailed(
+                (
+                    f"'{raw}' is not a valid '{field_spec.key}' for connector "
+                    f"'{spec.name}'. Accepted: {', '.join(field_spec.choices)}."
+                ),
+                detail={
+                    "code": "invalid_field_value",
+                    "connector": spec.name,
+                    "field": field_spec.key,
+                    "accepted": list(field_spec.choices),
+                },
+            )
+        sent[field_spec.key] = value
+
+
 @router.get("/connectors", response_model=ConnectorSettingsResponse)
 async def get_connectors(
     ws: WorkspaceDep, db: SessionDep, settings: SettingsDep
@@ -265,6 +308,7 @@ async def update_connector(
     # Validate before any row is touched: the provider decides whether the
     # credential fields mean anything at all.
     _validate_provider_value(spec, sent)
+    _validate_field_choices(spec, sent)
 
     stmt = select(ToolSettingsRow).where(
         ToolSettingsRow.business_id == ws.business_id,
@@ -383,6 +427,11 @@ def _llm_tier_out(values: dict[str, object]) -> LlmTierOut:
         provider=values["provider"],
         model=values["model"],
         base_url=values["base_url"],
+        # Effective, so the form can show what is actually in force: the
+        # workspace value when set, otherwise None ("process default").
+        max_tokens=values.get("max_tokens"),  # type: ignore[arg-type]
+        temperature=values.get("temperature"),  # type: ignore[arg-type]
+        reasoning_effort=values.get("reasoning_effort"),  # type: ignore[arg-type]
         key_configured=values["api_key"] is not None,
         key_source=values["key_source"],
         extra_headers_configured=bool(values["extra_headers"]),
@@ -442,10 +491,33 @@ async def update_llm_settings(
         if patch is None:
             continue
         sent = patch.model_dump(exclude_unset=True)
-        for field in ("provider", "model", "base_url"):
+        for field in (
+            "provider",
+            "model",
+            "base_url",
+            # Sampling controls. `null` is sent explicitly by the UI to mean
+            # "remove my override", so they are written whenever the key is
+            # present, not only when it carries a value.
+            "max_tokens",
+            "temperature",
+            "reasoning_effort",
+        ):
             if field not in sent:
                 continue
             value = sent[field]
+            if field == "reasoning_effort" and isinstance(value, str):
+                value = value.strip().lower() or None
+                if value is not None and value not in REASONING_EFFORT_VALUES:
+                    raise ValidationFailed(
+                        "'reasoning_effort' must be one of "
+                        + ", ".join(REASONING_EFFORT_VALUES),
+                        detail={
+                            "code": "invalid_reasoning_effort",
+                            "field": "reasoning_effort",
+                            "value": value,
+                            "accepted": list(REASONING_EFFORT_VALUES),
+                        },
+                    )
             setattr(row, f"{tier}_{field}", value.strip() or None if isinstance(value, str) else value)
         if "api_key" in sent:
             secret = sent["api_key"]

@@ -770,6 +770,9 @@ class ToolSettings(Base, TimestampMixin):
     #: Provider selection for the two swappable connectors.
     image_provider: Mapped[str | None] = mapped_column(String(30))
     image_model: Mapped[str | None] = mapped_column(String(80))
+    #: auto | low | medium | high. NULL keeps the provider's own default; the
+    #: connector map declares ``auto`` so the resolved value is always explicit.
+    image_quality: Mapped[str | None] = mapped_column(String(16))
     search_provider: Mapped[str | None] = mapped_column(String(30))
     keyword_provider: Mapped[str | None] = mapped_column(String(30))
     #: Repointing column: the connector's base URL, when the map says the
@@ -808,6 +811,18 @@ class LlmProviderSettings(Base, TimestampMixin):
     strong_base_url: Mapped[str | None] = mapped_column(String(500))
     strong_api_key_enc: Mapped[str | None] = mapped_column(Text)
     strong_extra_headers_enc: Mapped[str | None] = mapped_column(Text)
+    #: How much a tier may generate and how creatively, per workspace. NULL
+    #: means "keep the process default" (``AI_LLM_MAX_TOKENS`` /
+    #: ``AI_LLM_TEMPERATURE``), so a row that predates these columns behaves
+    #: exactly as it did.
+    fast_max_tokens: Mapped[int | None] = mapped_column(Integer)
+    fast_temperature: Mapped[float | None] = mapped_column(Float)
+    #: Only meaningful for OpenAI reasoning models, where ``none`` is what makes
+    #: tool calling work on Chat Completions.
+    fast_reasoning_effort: Mapped[str | None] = mapped_column(String(16))
+    strong_max_tokens: Mapped[int | None] = mapped_column(Integer)
+    strong_temperature: Mapped[float | None] = mapped_column(Float)
+    strong_reasoning_effort: Mapped[str | None] = mapped_column(String(16))
     updated_by: Mapped[str | None] = mapped_column(String(64))
 
 

@@ -12,6 +12,11 @@ import httpx
 
 from app.config import GROQ_GPT_OSS_MODEL_PREFIX
 from app.core.errors import LLMNotConfiguredError, LLMProviderError
+from app.core.llm.model_compat import (
+    recommended_reasoning_effort,
+    supports_temperature,
+    token_limit_param,
+)
 from app.core.llm.base import (
     BaseLLMClient,
     LLMResult,
@@ -52,12 +57,16 @@ class OpenAIClient(BaseLLMClient):
         base_url: str = API_URL,
         extra_headers: dict[str, str] | None = None,
         client: httpx.AsyncClient | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         super().__init__(model=model, timeout=timeout, max_retries=max_retries, base_delay=base_delay)
         self.api_key = api_key
         self.base_url = base_url
         self.extra_headers: dict[str, str] = dict(extra_headers or {})
         self._client = client
+        #: Workspace/deployment choice for reasoning models; None means "use the
+        #: family default" (`recommended_reasoning_effort`).
+        self.reasoning_effort = reasoning_effort
 
     @property
     def client(self) -> httpx.AsyncClient:
@@ -192,12 +201,26 @@ class OpenAIClient(BaseLLMClient):
                     content = text_content
                 api_messages.append({"role": msg.role, "content": content})
 
+        # GPT-4-era models take `max_tokens` and any temperature. Reasoning
+        # models (o-series, GPT-5, GPT-6) reject `max_tokens` outright and accept
+        # only the default temperature, so the field name follows the model
+        # family instead of the provider. `app/core/llm/model_compat.py` owns the
+        # rules; this is the only place they touch the wire.
+        token_field = token_limit_param(self.model)
+        if groq_gpt_oss:
+            token_field = "max_completion_tokens"
         body: dict[str, Any] = {
             "model": self.model,
-            "max_completion_tokens" if groq_gpt_oss else "max_tokens": max_tokens,
-            "temperature": temperature,
+            token_field: max_tokens,
             "messages": api_messages,
         }
+        if supports_temperature(self.model):
+            body["temperature"] = temperature
+        effort = recommended_reasoning_effort(self.model, self.reasoning_effort)
+        if effort is not None:
+            # Required for tool calling on Chat Completions from GPT-5.4 on;
+            # harmless and explicit otherwise.
+            body["reasoning_effort"] = effort
         if tools and not flatten_tool_history:
             body["tools"] = [
                 {

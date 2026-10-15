@@ -43,7 +43,7 @@ OPENAI_COMPATIBLE_URLS = {
 }
 
 #: Credentials are included only as a one-way digest, never logged.
-_ClientKey = tuple[str, str, str, str, tuple[tuple[str, str], ...], str]
+_ClientKey = tuple[str, str, str, str, tuple[tuple[str, str], ...], str, str]
 
 _clients: dict[_ClientKey, LLMClient] = {}
 
@@ -60,8 +60,18 @@ def invalidate_workspace_llm_cache(business_id: str | None = None) -> None:
         _WORKSPACE_SETTINGS_CACHE.pop(business_id, None)
 
 
-def build_client(tier: TierName, settings: Settings | None = None) -> LLMClient:
-    """Construct a client for ``tier`` from config. Not cached."""
+def build_client(
+    tier: TierName,
+    settings: Settings | None = None,
+    *,
+    reasoning_effort: str | None = None,
+) -> LLMClient:
+    """Construct a client for ``tier`` from config. Not cached.
+
+    ``reasoning_effort`` only reaches the OpenAI-compatible client: it is the
+    field reasoning models need before they will accept function tools on Chat
+    Completions (see ``app/core/llm/model_compat.py``).
+    """
     cfg = settings or get_settings()
     provider = cfg.provider_for_tier[tier]
     model = cfg.model_for_tier[tier]
@@ -78,7 +88,18 @@ def build_client(tier: TierName, settings: Settings | None = None) -> LLMClient:
         else (cfg.gemini_api_key or cfg.openai_api_key if provider == "gemini" else cfg.openai_api_key)
     )
     credential_fp = hashlib.sha256((credential or "").encode()).hexdigest()
-    key: _ClientKey = (tier, provider, model, base_url, header_fp, credential_fp)
+    # `reasoning_effort` changes the request body, so it belongs in the identity
+    # of the cached client: two workspaces on the same model with different
+    # efforts must not share an instance.
+    key: _ClientKey = (
+        tier,
+        provider,
+        model,
+        base_url,
+        header_fp,
+        credential_fp,
+        reasoning_effort or "",
+    )
 
     cached = _clients.get(key)
     if cached is not None:
@@ -116,6 +137,7 @@ def build_client(tier: TierName, settings: Settings | None = None) -> LLMClient:
             base_delay=cfg.llm_retry_base_delay,
             base_url=base_url,
             extra_headers=cfg.llm_extra_headers,
+            reasoning_effort=reasoning_effort,
         )
     else:  # pragma: no cover - Literal makes this unreachable via config
         raise LLMNotConfiguredError(f"unknown llm provider '{provider}'")
@@ -177,12 +199,22 @@ async def resolve_workspace_tier(
     workspace_headers = (
         json.loads(cipher.decrypt(encrypted_headers)) if encrypted_headers else None
     )
+    # Sampling controls. NULL on the row means "no workspace opinion", which the
+    # chat provider layer reads as "use the process default" -- so omitting them
+    # is never the same as sending zero.
+    sampling = {
+        field: getattr(row, f"{tier}_{field}", None) if row else None
+        for field in ("max_tokens", "temperature", "reasoning_effort")
+    }
+    if sampling["reasoning_effort"]:
+        sampling["reasoning_effort"] = str(sampling["reasoning_effort"]).strip().lower() or None
     return {
         "provider": provider,
         "model": model,
         "base_url": base_url_value
         or (cfg.llm_base_url if provider == "openai" else None),
         "api_key": workspace_key or env_key,
+        **sampling,
         "key_source": "workspace" if workspace_key else "environment" if env_key else "missing",
         "extra_headers": workspace_headers or cfg.llm_extra_headers,
         "headers_source": "workspace" if workspace_headers else "environment" if cfg.llm_extra_headers else "missing",
@@ -217,12 +249,21 @@ async def get_workspace_llm(
         # OpenAIClient, so their workspace-scoped secret must reach its key
         # field as well. Without this, the key is saved/decrypted but discarded.
         updates["openai_api_key"] = values["api_key"]
-    return get_llm(tier, cfg.model_copy(update=updates))
+    return get_llm(
+        tier,
+        cfg.model_copy(update=updates),
+        reasoning_effort=values.get("reasoning_effort"),  # type: ignore[arg-type]
+    )
 
 
-def get_llm(tier: TierName = "strong", settings: Settings | None = None) -> LLMClient:
+def get_llm(
+    tier: TierName = "strong",
+    settings: Settings | None = None,
+    *,
+    reasoning_effort: str | None = None,
+) -> LLMClient:
     """Return a client for ``tier``. Cached per tier, provider, model and endpoint."""
-    return build_client(tier, settings)
+    return build_client(tier, settings, reasoning_effort=reasoning_effort)
 
 
 def reset_clients() -> None:

@@ -15,7 +15,14 @@ DEFAULT_STRUCTURED_METHOD = StructuredOutputMethod.FUNCTION_CALLING
 
 
 def build_chat_model(
-    settings: AISettings, *, model: str | None = None, temperature: float | None = None
+    settings: AISettings,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    #: Accepted for a uniform `get_llm` signature; Claude has no separate
+    #: reasoning-effort knob and its output limit comes from settings.
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> BaseChatModel:
     try:
         from langchain_anthropic import ChatAnthropic

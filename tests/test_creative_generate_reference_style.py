@@ -39,14 +39,23 @@ async def _seed_reference(
     reference_id: str = "mem_ref_a",
     business_id: str = "biz_test",
     style: object = REFERENCE_STYLE,
+    **metadata: object,
 ) -> None:
+    """A row the way ``analyze_reference_for_workspace`` writes one."""
     db.add(
         BrandMemoryItem(
             id=reference_id,
             business_id=business_id,
             kind="reference_analysis",
             text="A saved reference analysis.",
-            metadata_={"source_name": "saved.png", "summary": "saved", "style": style},
+            metadata_={
+                "source": "upload_reference:analyze",
+                "source_name": "saved.png",
+                "summary": "saved",
+                "favorite": False,
+                "style": style,
+                **metadata,
+            },
         )
     )
     await db.commit()
@@ -103,6 +112,13 @@ async def test_unparseable_saved_style_degrades_instead_of_failing(
     resp = await _generate(api_client, referenceAnalysisId="mem_ref_a")  # type: ignore[arg-type]
 
     assert resp.status_code == 200, resp.text  # type: ignore[attr-defined]
+    analysis = resp.json()["referenceAnalysis"]  # type: ignore[attr-defined]
+    # The reference was still resolved, so it is reported -- honestly, as a
+    # partial read with no style, rather than as a clean one.
+    assert analysis["id"] == "mem_ref_a"
+    assert analysis["status"] == "partial"
+    assert analysis["style"]["palette"] == []
+    assert analysis["unavailable_reason"]
 
 
 async def test_another_workspaces_reference_is_still_ignored(
@@ -114,6 +130,9 @@ async def test_another_workspaces_reference_is_still_ignored(
     resp = await _generate(api_client, referenceAnalysisId="mem_ref_other")  # type: ignore[arg-type]
 
     assert resp.status_code == 200, resp.text  # type: ignore[attr-defined]
+    # Not found means not described either: the response must not even name
+    # another workspace's reference.
+    assert resp.json()["referenceAnalysis"] is None  # type: ignore[attr-defined]
 
 
 async def test_style_spec_from_the_body_reaches_the_generated_asset(
@@ -145,3 +164,35 @@ async def test_style_spec_from_the_body_reaches_the_generated_asset(
     # them off the asset record used to be a 500 on this (success) path.
     assert asset["status"] == "ok"
     assert asset["source"] == "generate_image:mock"
+
+
+async def test_the_used_reference_is_described_in_the_response(
+    api_client: object, seeded_db: AsyncSession
+) -> None:
+    """``referenceAnalysis`` used to be ``null`` even when a reference was used."""
+    await _seed_reference(seeded_db, model="refs-vlm-1")
+
+    resp = await _generate(api_client, referenceAnalysisId="mem_ref_a")  # type: ignore[arg-type]
+
+    analysis = resp.json()["referenceAnalysis"]  # type: ignore[attr-defined]
+    assert analysis is not None
+    # A tool output: snake_case inside the camelCase envelope.
+    assert analysis["id"] == "mem_ref_a"
+    assert analysis["source"] == "upload_reference:analyze"
+    assert analysis["source_name"] == "saved.png"
+    assert analysis["summary"] == "saved"
+    assert analysis["model"] == "refs-vlm-1"
+    assert analysis["status"] == "ok"
+    assert analysis["unavailable_reason"] is None
+    assert analysis["style"]["palette"] == REFERENCE_STYLE["palette"]
+    assert analysis["style"]["composition"] == REFERENCE_STYLE["composition"]
+
+
+async def test_no_reference_means_no_analysis(
+    api_client: object, seeded_db: AsyncSession
+) -> None:
+    """A plain prompt must not come back describing a reference it never had."""
+    resp = await _generate(api_client, prompt="صمم لي بوست بسيط")  # type: ignore[arg-type]
+
+    assert resp.status_code == 200, resp.text  # type: ignore[attr-defined]
+    assert resp.json()["referenceAnalysis"] is None  # type: ignore[attr-defined]

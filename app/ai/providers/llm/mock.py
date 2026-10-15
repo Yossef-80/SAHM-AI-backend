@@ -103,7 +103,12 @@ class MockChatModel(BaseChatModel):
         return RunnableLambda(lambda inp: fake_instance(schema, _last_human_text(inp)))
 
 
-def build_chat_model(
-    settings: AISettings, *, model: str | None = None, temperature: float | None = None  # noqa: ARG001
+def build_chat_model(  # noqa: ARG001
+    settings: AISettings,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> BaseChatModel:
     return MockChatModel(model=model or "mock-chat")

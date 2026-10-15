@@ -27,7 +27,7 @@ from app.ai.agents.orchestrator.presentation import (
 from app.ai.agents.salma.graph import salma_graph
 from app.ai.loggers.callbacks import AILoggingCallback, AIToolAuditCallback
 from app.ai.memory.compressor import compress_history_messages
-from app.ai.providers.llm import get_llm
+from app.ai.providers.llm import get_llm, get_workspace_chat_llm
 from app.ai.security import redact_sensitive_data
 from app.ai.settings import get_ai_settings
 from app.core.logging import get_logger
@@ -2367,6 +2367,27 @@ async def orchestrate(
         )
 
     ai_settings = get_ai_settings()
+
+    # The workspace's own LLM choice (Settings -> LLM: provider, model, base URL,
+    # key, max tokens, temperature, reasoning effort) applies to the assistant
+    # too, not only to background tasks. Resolved once per turn and reused, and
+    # it falls back to the process configuration on any failure -- a broken
+    # settings row must never take a chat turn down.
+    _workspace_llm_cache: dict[str, Any] = {}
+
+    async def _chat_llm() -> Any:
+        handle = _workspace_llm_cache.get("handle")
+        if handle is None:
+            try:
+                handle = await get_workspace_chat_llm(
+                    db=db, business_id=business_id, tier="strong", settings=ai_settings
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                print(f"[ORCHESTRATOR] Workspace LLM settings unavailable: {exc}")
+                handle = get_llm(provider=ai_settings.llm_provider)
+            _workspace_llm_cache["handle"] = handle
+        return handle
+
     creative_prompt_workflow = context.get("workflow") == "creative_prompt"
     if creative_prompt_workflow:
         kind = "video" if context.get("prompt_type") == "video" else "image"
@@ -2560,7 +2581,7 @@ async def orchestrate(
                 workflow="single",
             )
         else:
-            llm_inst = get_llm(provider=ai_settings.llm_provider)
+            llm_inst = await _chat_llm()
             router = (
                 llm_inst.structured(RoutingDecision)
                 if hasattr(llm_inst, "structured")
@@ -2622,7 +2643,7 @@ async def orchestrate(
     # router's structured call stays text-only, and only for this turn's agent
     # input -- a photo must not be re-sent to the model on later turns.
     try:
-        attachment_handle = get_llm(provider=ai_settings.llm_provider)
+        attachment_handle = await _chat_llm()
     except Exception:  # pragma: no cover - provider construction already succeeded above
         attachment_handle = None
     agent_history = chat_history + _attachment_messages(context, attachment_handle)
@@ -2946,7 +2967,7 @@ async def orchestrate(
                 {"type": "step_started", "step": "chat", "detail": detail}
             )
         try:
-            general_llm = get_llm(provider=ai_settings.llm_provider).chat
+            general_llm = (await _chat_llm()).chat
             sys_msg = SystemMessage(
                 content=(
                     "You are a fast, conversational AI assistant. You will be provided with "
@@ -3014,7 +3035,7 @@ async def orchestrate(
             creative_prompt_unresolved_fields=context.get("creative_prompt_unresolved_fields"),
         )
     try:
-        llm_block_inst = get_llm(provider=ai_settings.llm_provider)
+        llm_block_inst = await _chat_llm()
         block_llm = (
             llm_block_inst.structured(MessageWithBlocks)
             if hasattr(llm_block_inst, "structured")

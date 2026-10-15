@@ -114,6 +114,11 @@ async def test_layla_image_tool_reads_the_workspace_connector_row(monkeypatch):
         image_api_key="workspace-secret-key",
         image_model="gpt-image-1",
         image_base_url="https://gateway.example/v1",
+        # Saved in Settings -> Connectors -> Image generation. This is the chat
+        # path, so a quality the workspace picked has to travel with the request
+        # here too -- it used to be dropped on this side while the creatives
+        # screen honoured it.
+        image_quality="medium",
     )
 
     async def _resolve(_ctx):
@@ -150,6 +155,7 @@ async def test_layla_image_tool_reads_the_workspace_connector_row(monkeypatch):
     assert request.await_args.kwargs["api_key"] == "workspace-secret-key"
     assert request.await_args.kwargs["model"] == "gpt-image-1"
     assert request.await_args.kwargs["base_url"] == "https://gateway.example/v1"
+    assert request.await_args.kwargs["quality"] == "medium"
     assert "workspace-secret-key" not in result
 
 

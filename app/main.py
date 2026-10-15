@@ -54,6 +54,7 @@ from app.core.security_headers import (
 )
 from app.core.tools.registry import register_all
 from app.db.session import create_all, dispose_engine
+from app.db.schema_state import check_schema_state
 from app.schemas.common import ErrorResponse
 
 _logger = get_logger(__name__)
@@ -148,6 +149,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "schema_source": "alembic",
                 "environment": settings.environment,
             },
+        )
+    # A database behind the code keeps serving traffic and fails only when it
+    # writes, which is how a missing ``usage_records.action`` column silently
+    # dropped every usage row in a live deployment. Say it once, at boot, with
+    # the command that fixes it, and keep saying it from ``/health/ready``.
+    schema_state = await check_schema_state()
+    if schema_state.is_behind:
+        _logger.error(
+            "schema_out_of_date",
+            extra={
+                "current_revision": schema_state.current,
+                "expected_revision": schema_state.head,
+                "action": "run `alembic upgrade head` before serving traffic",
+            },
+        )
+    elif schema_state.state == "ahead":
+        _logger.warning(
+            "schema_newer_than_code",
+            extra={
+                "current_revision": schema_state.current,
+                "expected_revision": schema_state.head,
+                "action": "deploy code that matches the database, or roll the database back",
+            },
+        )
+    else:
+        _logger.info(
+            "schema_revision_checked",
+            extra={"state": schema_state.state, "revision": schema_state.current},
         )
     _logger.info(
         "app_started",
@@ -464,11 +493,29 @@ def create_app() -> FastAPI:
         except SahmError as exc:
             checks["encryption_key"] = exc.code
 
+        # ``behind`` is a real outage in waiting: the code reads and writes
+        # columns the database does not have, and it fails silently at write
+        # time (a dropped usage row, a missing budget check). Refuse to take
+        # traffic until the documented release order -- ``alembic upgrade head``
+        # then start the app -- has actually been followed. ``ahead`` and the
+        # unmanaged/unknown states are reported but do not degrade: a rolling
+        # deploy can legitimately be a revision behind the scripts, and the
+        # SQLite dev/test schema is created by ``create_all`` with no Alembic at
+        # all.
+        if db_ok:
+            schema_state = await check_schema_state()
+            checks["schema"] = schema_state.describe()
+        else:
+            schema_state = None
+            checks["schema"] = "not checked: database unavailable"
+
         degraded = [
             name
             for name, value in checks.items()
-            if name != "database" and value != "ok"
+            if name not in {"database", "schema"} and value != "ok"
         ]
+        if schema_state is not None and schema_state.is_behind:
+            degraded.append("schema")
 
         if db_ok and not degraded:
             return JSONResponse(

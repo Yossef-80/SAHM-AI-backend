@@ -57,11 +57,14 @@ def _result(status: str, *, reason: str | None = None, asset: Any = None) -> str
 
 async def _resolve_image_configuration(
     configurable: dict[str, Any],
-) -> tuple[str, str | None, str | None, str | None, bool]:
-    """Return ``(provider, api_key, model, base_url, allow_mock)`` for this run.
+) -> tuple[str, str | None, str | None, str | None, str | None, bool]:
+    """Return ``(provider, key, model, base_url, quality, allow_mock)`` for this run.
 
     A workspace connector row beats the env var exactly like it does for every
-    other tool; the process env is the fallback, not the only source.
+    other tool; the process env is the fallback, not the only source. ``quality``
+    is part of the tuple for the same reason ``model`` is: this is the path chat
+    takes, and until it was forwarded here the quality a workspace saved in
+    Settings -> Connectors never reached the request built by Layla.
     """
     settings = get_settings()
     context = configurable.get("tool_context")
@@ -73,6 +76,7 @@ async def _resolve_image_configuration(
             settings.image_api_key,
             settings.image_model,
             settings.image_base_url,
+            getattr(settings, "image_quality", None),
             True,
         )
 
@@ -87,6 +91,7 @@ async def _resolve_image_configuration(
         resolved.image_api_key or settings.image_api_key,
         resolved.image_model or settings.image_model,
         resolved.image_base_url or settings.image_base_url,
+        getattr(resolved, "image_quality", None) or getattr(settings, "image_quality", None),
         allow_mock,
     )
 
@@ -107,7 +112,9 @@ async def generate_image_draft_tool(
     if configurable.get("allow_image_generation") is not True:
         return _result("unavailable", reason="Image generation was not explicitly requested.")
 
-    provider, api_key, model, base_url, allow_mock = await _resolve_image_configuration(configurable)
+    provider, api_key, model, base_url, quality, allow_mock = await _resolve_image_configuration(
+        configurable
+    )
     style = dict(style_spec or {})
     effective_prompt = _compose_image_prompt(prompt[:4000], style)
 
@@ -137,6 +144,7 @@ async def generate_image_draft_tool(
                 api_key=api_key,
                 model=model,
                 base_url=base_url,
+                quality=quality,
             )
             asset = next((item for item in assets if item.url), None)
             if asset is None:

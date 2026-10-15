@@ -208,6 +208,11 @@ class Settings(BaseSettings):
     image_api_key: str | None = None
     image_model: str = "mock-image-1"
     image_base_url: str | None = None
+    #: auto | low | medium | high -- the process-wide default for the `quality`
+    #: field of the image connector. A workspace row overrides it; `auto` (the
+    #: connector default) means "the provider decides", which is honest about
+    #: what the request asks for instead of silently buying `high`.
+    image_quality: str | None = None
     # Placeholder SVGs are never returned unless an operator explicitly opts in.
     image_allow_mock_assets: bool = False
 

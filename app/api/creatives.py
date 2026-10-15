@@ -29,6 +29,7 @@ from app.core.tools.media import (
     persist_inline_reference_image,
 )
 from app.db.models import BrandMemoryItem, BrandProfile, Creative
+from app.schemas.common import ToolStatus
 from app.schemas.creatives import (
     AnalyzeReferenceRequest,
     CreativeReferenceItem,
@@ -48,8 +49,8 @@ router = APIRouter(prefix="/creatives", tags=["creatives"])
 _logger = get_logger(__name__)
 
 
-def _style_spec_payload(value: object) -> dict[str, Any]:
-    """A ``StyleSpec`` as the plain dict the generation input expects.
+def _style_spec_model(value: object) -> StyleSpec | None:
+    """A validated ``StyleSpec`` from either shape, or ``None`` if it cannot be read.
 
     Accepts both shapes on purpose. The request field is declared
     ``StyleSpec | None``, but the style of a saved reference analysis lives in
@@ -59,23 +60,60 @@ def _style_spec_payload(value: object) -> dict[str, Any]:
     further down: ``AttributeError: 'dict' object has no attribute 'model_dump'``
     and a 500 on every request that carried a ``referenceAnalysisId``.
 
-    Validating here keeps the field what its type says it is, and a stored style
-    that no longer parses degrades to "no style" instead of failing the request:
-    the prompt alone still generates an image, and the operator gets a log line
-    naming the reference instead of a stack trace.
+    Everything that reads a style -- from the request or from a row -- goes
+    through here, so a stored style that no longer parses is a logged "no style"
+    instead of a failed request.
     """
     if isinstance(value, StyleSpec):
-        return value.model_dump()
+        return value
     if isinstance(value, dict):
         try:
-            return StyleSpec.model_validate(value).model_dump()
+            return StyleSpec.model_validate(value)
         except ValidationError:
             _logger.warning(
                 "reference_style_ignored",
                 extra={"reason": "stored style is not a valid StyleSpec"},
             )
-            return {}
-    return {}
+            return None
+    return None
+
+
+def _style_spec_payload(value: object) -> dict[str, Any]:
+    """The generation input's ``style_spec``: a validated model as a plain dict."""
+    model = _style_spec_model(value)
+    return model.model_dump() if model is not None else {}
+
+
+def _reference_analysis_from_item(item: BrandMemoryItem) -> ReferenceAnalysis:
+    """A stored reference analysis, in the shape the analyse endpoint returns.
+
+    The row keeps the analysis as JSON (``style``) plus the labels it was saved
+    with. Reading it back means a caller of ``/creatives/generate`` can show
+    *which* reference a creative came from and what was read off it, instead of
+    receiving ``referenceAnalysis: null`` for a reference that was used.
+
+    A style that can no longer be read is reported, not hidden: the analysis is
+    ``partial`` with a reason, which is exactly what happened.
+    """
+    metadata = item.metadata_ or {}
+    style = _style_spec_model(metadata.get("style"))
+    return ReferenceAnalysis(
+        id=item.id,
+        source=str(metadata.get("source") or ""),
+        source_name=str(metadata.get("source_name") or "Saved reference")[:160],
+        status=ToolStatus.OK if style is not None else ToolStatus.PARTIAL,
+        unavailable_reason=(
+            None
+            if style is not None
+            else "The saved reference's style could not be read; the image was generated from the prompt only."
+        ),
+        summary=str(metadata.get("summary") or "")[:2000],
+        style=style or StyleSpec(),
+        observed_offers=[str(offer) for offer in metadata.get("observed_offers") or []],
+        observed_cta=[str(cta) for cta in metadata.get("observed_cta") or []],
+        model=str(metadata.get("model") or ""),
+        created_at=item.created_at,
+    )
 
 
 @router.post("/analyze-reference", response_model=ReferenceAnalysis)
@@ -133,15 +171,18 @@ async def list_creative_references(
     references: list[CreativeReferenceItem] = []
     for row in rows:
         metadata = row.metadata_ or {}
-        style = metadata.get("style")
-        if not isinstance(style, dict):
+        # A row whose style can no longer be read is not a usable reference. It
+        # is skipped rather than raised: ``StyleSpec.model_validate`` here used to
+        # take the whole list -- and so every workspace's picker -- down with it.
+        style = _style_spec_model(metadata.get("style"))
+        if style is None:
             continue
         references.append(
             CreativeReferenceItem(
                 id=row.id,
                 source_name=str(metadata.get("source_name") or "Saved reference")[:160],
                 summary=str(metadata.get("summary") or "")[:2000],
-                style=StyleSpec.model_validate(style),
+                style=style,
                 favorite=bool(metadata.get("favorite", False)),
                 created_at=row.created_at,
             )
@@ -165,11 +206,13 @@ async def update_creative_reference(
     row.metadata_ = metadata
     await db.commit()
     await db.refresh(row)
+    # Favouriting is a flag on the row, not a re-read of its style: a style that
+    # no longer parses must not turn this PATCH into a 500 either.
     return CreativeReferenceItem(
         id=row.id,
         source_name=str(metadata.get("source_name") or "Saved reference")[:160],
         summary=str(metadata.get("summary") or "")[:2000],
-        style=StyleSpec.model_validate(metadata.get("style") or {}),
+        style=_style_spec_model(metadata.get("style")) or StyleSpec(),
         favorite=bool(metadata.get("favorite", False)),
         created_at=row.created_at,
     )
@@ -197,6 +240,7 @@ async def generate_creative(
         # working without ever reading across the boundary.
         if item is not None and item.business_id == ws.business_id:
             style_spec = _style_spec_payload((item.metadata_ or {}).get("style"))
+            analysis = _reference_analysis_from_item(item)
 
     result = await generate_image_for_workspace(
         GenerateImageInput(

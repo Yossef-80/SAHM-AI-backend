@@ -17,6 +17,11 @@ def build_chat_model(
     *,
     model: str | None = None,
     temperature: float | None = None,
+    #: Accepted for a uniform `get_llm` signature. None of the non-OpenAI
+    #: providers has a separate "reasoning effort" knob, and their own token
+    #: limit already comes from settings, so both are intentionally unused.
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> BaseChatModel:
     try:
         from langchain_groq import ChatGroq

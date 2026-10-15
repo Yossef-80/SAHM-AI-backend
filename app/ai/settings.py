@@ -72,6 +72,13 @@ class AISettings(BaseSettings):
     llm_model: str | None = Field(None, validation_alias=_env("AI_LLM_MODEL"))
     llm_temperature: float = Field(0.2, ge=0, le=2, validation_alias=_env("AI_LLM_TEMPERATURE"))
     llm_max_tokens: int = Field(4096, gt=0, validation_alias=_env("AI_LLM_MAX_TOKENS"))
+    #: Reasoning models (o-series, GPT-5, GPT-6) take ``reasoning_effort`` instead
+    #: of an eager answer. Left unset, the provider layer sends ``none`` for those
+    #: models -- required for tool calling on Chat Completions from GPT-5.4 on.
+    #: Set it to ``low``/``medium``/``high`` for non-tool, quality-first turns.
+    llm_reasoning_effort: str | None = Field(
+        None, validation_alias=_env("AI_LLM_REASONING_EFFORT")
+    )
     llm_timeout_seconds: float = Field(180.0, gt=0, validation_alias=_env("AI_LLM_TIMEOUT_SECONDS"))
     llm_max_retries: int = Field(2, ge=0, validation_alias=_env("AI_LLM_MAX_RETRIES"))
 

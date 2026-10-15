@@ -94,6 +94,11 @@ class FieldSpec:
     required: bool = False
     default: str | None = None
     description: str = ""
+    #: Closed set of accepted values, published to the client so a form can
+    #: render a select. Empty means free text. Enforced on write by the settings
+    #: API, the same way ``allowed_providers`` is: a quality of "HGIH" must be a
+    #: rejected request, not a saved value that the image call then ignores.
+    choices: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -297,6 +302,19 @@ CONNECTOR_SPECS: dict[str, ConnectorSpec] = {
                 db_column="base_url",
                 env=("IMAGE_BASE_URL",),
                 max_length=500,
+            ),
+            FieldSpec(
+                key="quality",
+                label="Quality",
+                db_column="image_quality",
+                env=("IMAGE_QUALITY",),
+                max_length=16,
+                # `auto` lets the provider decide, which is the honest default:
+                # GPT Image's own default is `high`, the expensive one, and
+                # nobody should pay for it by not knowing the setting exists.
+                default="auto",
+                description="How much effort the image model spends. GPT Image models only.",
+                choices=("auto", "low", "medium", "high"),
             ),
         ),
         # `mock` is a placeholder: it satisfies no real generation, so a key set
@@ -602,6 +620,10 @@ class ConnectorSettings:
     @property
     def image_model(self) -> str | None:
         return self.value("image", "model")
+
+    @property
+    def image_quality(self) -> str | None:
+        return self.value("image", "quality")
 
     @property
     def image_base_url(self) -> str | None:

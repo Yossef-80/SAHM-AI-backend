@@ -601,6 +601,26 @@ _META_TOKEN_SHAPED = re.compile(r"[A-Za-z0-9_-]{24,}")
 # This long value is a public Graph API field name, not a secret token.
 _META_SAFE_ERROR_IDENTIFIERS = frozenset({"is_adset_budget_sharing_enabled"})
 
+#: Subcodes whose remedy is knowable in advance. The message a user or an
+#: operator sees is usually the entire diagnosis they have, so when the fix is a
+#: setting rather than a retry, the setting travels with the error instead of a
+#: support ticket.
+#:
+#: 1885183: the ad's Page post is created *inline* by this app
+#: (``object_story_spec`` with ``page_id`` + ``link_data``), and Meta only lets a
+#: **public** app create it -- content from a Development-mode app is visible
+#: only to that app's own admins/developers/testers. Campaign and ad set creation
+#: are unaffected, which is why the failure lands on the creative step after
+#: paused objects already exist.
+_KNOWN_META_SUBCODE_HINTS: dict[int, str] = {
+    1885183: (
+        "The Meta app that creates the ad's Page post is in Development mode; Meta "
+        "requires a public app to create that post. Switch the app to Live in the App "
+        "Dashboard (App Mode), then continue this plan -- the paused campaign and ad set "
+        "are reused, not recreated. Nothing in this step was created."
+    ),
+}
+
 
 def _sanitize_meta_error_text(value: Any) -> str:
     """Collapse whitespace, redact token-shaped runs, and cap the length."""
@@ -673,8 +693,14 @@ class HttpMetaGraphClient:
         )
         hints: list[str] = []
         subcode = error.get("error_subcode")
+        subcode_hint = ""
         if isinstance(subcode, (int, str)):
             hints.append(f"subcode {subcode}")
+            digits = subcode if isinstance(subcode, int) else (
+                int(subcode) if str(subcode).isdigit() else None
+            )
+            if digits is not None:
+                subcode_hint = _KNOWN_META_SUBCODE_HINTS.get(digits, "")
         blame = error.get("error_data")
         if isinstance(blame, dict):
             fields = blame.get("blame_field_specs")
@@ -686,8 +712,17 @@ class HttpMetaGraphClient:
 
         # Still never the request URL or the raw body: the URL carries the token.
         if reason:
-            return f"Meta rejected the request{suffix}: {reason}"
-        return f"Meta rejected the request{suffix}. Check the submitted settings and permissions."
+            message = f"Meta rejected the request{suffix}: {reason}"
+        else:
+            message = (
+                f"Meta rejected the request{suffix}. "
+                "Check the submitted settings and permissions."
+            )
+        if subcode_hint:
+            # A known subcode means the fix is a setting, not another attempt.
+            message = f"{message} {subcode_hint}"
+        return message
+
 
     async def _request(
         self,

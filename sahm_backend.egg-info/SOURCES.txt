@@ -159,6 +159,7 @@ app/core/llm/__init__.py
 app/core/llm/base.py
 app/core/llm/claude_client.py
 app/core/llm/mock_client.py
+app/core/llm/model_compat.py
 app/core/llm/ollama_client.py
 app/core/llm/openai_client.py
 app/core/llm/router.py
@@ -181,12 +182,14 @@ app/core/tools/research.py
 app/core/tools/settings.py
 app/db/__init__.py
 app/db/models.py
+app/db/schema_state.py
 app/db/session.py
 app/db/migrations/__init__.py
 app/db/migrations/env.py
 app/db/migrations/versions/9ab6bffb43a6_add_profiles_table_for_supabase_auth.py
 app/db/migrations/versions/__init__.py
 app/db/migrations/versions/a7d8c3e219b4_add_meta_page_id.py
+app/db/migrations/versions/b3d51c7a9f02_add_sampling_and_image_quality_controls.py
 app/db/migrations/versions/b60e91f42c73_add_content_calendar_items.py
 app/db/migrations/versions/b7c8d9e0f1a2_add_composite_indexes.py
 app/db/migrations/versions/c1f4a9d27e35_add_usage_action_and_estimated.py
@@ -252,6 +255,7 @@ tests/test_creative_generate_reference_style.py
 tests/test_creative_mode_gate.py
 tests/test_creative_mode_transport.py
 tests/test_creative_prompt_workflow.py
+tests/test_creative_reference_list.py
 tests/test_creative_upload.py
 tests/test_daily_insights.py
 tests/test_deployment_ops.py
@@ -270,8 +274,10 @@ tests/test_meta_competitor_ads_flow.py
 tests/test_meta_error_detail.py
 tests/test_meta_plan_assist.py
 tests/test_meta_plan_assist_api.py
+tests/test_model_compat.py
 tests/test_omar_layla_handoff.py
 tests/test_omar_layla_handoff_flow.py
+tests/test_openai_payload_compat.py
 tests/test_profile_field_families.py
 tests/test_reference_vision.py
 tests/test_registry_policy.py
@@ -279,6 +285,7 @@ tests/test_report_presentation.py
 tests/test_research_report_shaping.py
 tests/test_runtime.py
 tests/test_saved_audiences_api.py
+tests/test_schema_revision_guard.py
 tests/test_security.py
 tests/test_strategy_tools.py
 tests/test_targeting_search.py
@@ -286,3 +293,4 @@ tests/test_task_routes.py
 tests/test_tools.py
 tests/test_usage_rate_limit.py
 tests/test_workspace_isolation.py
+tests/test_workspace_llm_controls.py
