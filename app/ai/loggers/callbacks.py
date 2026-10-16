@@ -224,6 +224,32 @@ class AIToolAuditCallback(BaseCallbackHandler):
             name=kwargs.get("name"),
         )
 
+    def completed_records(self) -> list[dict[str, Any]]:
+        """Copy of the finished tool records, without consuming them (``drain`` owns that).
+
+        Needed when a run dies *after* a tool already did something valuable: the
+        output summary is the only surviving proof of what was produced.
+        """
+        with self._lock:
+            return [dict(record) for record in self._records]
+
+    def tools_completed(self) -> list[str]:
+        """Tool names that already finished in this run, without consuming them.
+
+        ``drain`` is for the telemetry flush and empties the buffer; a caller that
+        needs to know "has this run already produced something expensive?" must not
+        steal those records. A tool that has completed is unambiguous -- the one
+        currently starting has not -- which is what makes this safe to ask from
+        inside a tool call.
+        """
+        with self._lock:
+            return [str(record.get("tool") or "") for record in self._records]
+
+    def tools_started(self) -> list[str]:
+        """Tool names that began and have not finished yet."""
+        with self._lock:
+            return [str(name) for _started, name, _safe in self._starts.values()]
+
     def drain(self) -> list[dict[str, Any]]:
         """Return completed events exactly once; unfinished calls are discarded."""
         with self._lock:

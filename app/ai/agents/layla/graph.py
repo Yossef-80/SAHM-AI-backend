@@ -11,6 +11,7 @@ from langgraph.prebuilt import ToolNode
 from app.ai.agents.layla.schema import CreativeBrief
 from app.ai.agents.layla.state import LaylaState
 from app.ai.providers.llm import get_llm
+from app.ai.providers.llm.agent_llm import agent_llm_for_graph
 from app.ai.settings import get_ai_settings
 from app.ai.tools import get_brand_context_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
@@ -22,6 +23,9 @@ def submit_creative_brief(**kwargs) -> str:
     """Submit Layla's structured copy, script, creative brief, or prompt."""
     return "REPORT_SUBMITTED_SUCCESSFULLY"
 
+
+#: Every tool in this graph that produces a paid picture.
+_IMAGE_TOOL_NAMES = frozenset({"generate_image", "generate_image_draft_tool"})
 
 LAYLA_TOOLS = [
     *persist_ai_tools([get_brand_context_tool]),
@@ -86,24 +90,64 @@ def call_model(state: LaylaState, config: RunnableConfig) -> dict:
         for message in messages
     ):
         messages = [SystemMessage(content=LAYLA_PROMPT)] + messages
-    llm_handle = get_llm(provider=get_ai_settings().llm_provider)
+    llm_handle = agent_llm_for_graph(
+        "layla", config, builder=get_llm, settings=get_ai_settings()
+    )
     prompt_only_workflow = any(
         isinstance(message, SystemMessage)
         and "[CREATIVE_PROMPT_WORKFLOW]" in str(message.content)
         for message in messages
     )
     configurable = (config.get("configurable") if isinstance(config, dict) else getattr(config, "configurable", None)) or {}
+    voice_examples = configurable.get("voice_examples") or []
+    if voice_examples:
+        # The learning loop's payoff, injected as its own system message so it
+        # sits next to the brand context rather than inside the frozen prompt.
+        # Idempotent: brain rebuilds `configurable` per turn, and this message is
+        # only added when the current state does not already carry it.
+        from app.ai.agents.layla.learning import format_examples_block
+
+        block = format_examples_block(list(voice_examples))
+        if block and not any(
+            isinstance(message, SystemMessage) and "[VOICE_EXAMPLES]" in str(message.content)
+            for message in messages
+        ):
+            messages = messages + [SystemMessage(content=f"[VOICE_EXAMPLES]\n{block}")]
     allow_image = configurable.get("allow_image_generation", False)
+    # Both image tools count, not only Layla's own: the workspace tool behind the
+    # core bridge is the one that actually ran in the live log, and it could be
+    # called again after the first picture -- a second generation the user never
+    # asked for and would be charged for.
     already_attempted_image = any(
-        getattr(m, "name", None) == "generate_image_draft_tool"
-        for m in messages
+        getattr(m, "name", None) in _IMAGE_TOOL_NAMES for m in messages
     )
     should_allow_image = allow_image and not already_attempted_image
+    # A prompt interview that carries a reference picture still has to be able to
+    # *read* it: the structured StyleSpec from analyze_reference_creative is what
+    # the final prompt is built on. Hiding the analysis tool along with the
+    # generation tools meant an attached reference could not be examined at all,
+    # and the interview either ignored the picture or asked the user for an
+    # upload id. Only media generation stays blocked while the workflow is
+    # prompt-only -- the rule the gate in core_bridge also enforces.
+    reference_attached = bool(
+        (configurable.get("user_supplied") or {}).get("has_reference_attachment")
+    )
+    blocked_in_prompt_only = {"generate_image", "generate_image_draft_tool"}
+    if not reference_attached:
+        blocked_in_prompt_only.add("analyze_reference_creative")
 
     available_tools = [
         tool for tool in LAYLA_TOOLS
-        if not (prompt_only_workflow and tool.name in {"generate_image", "generate_image_draft_tool", "analyze_reference_creative"})
+        if not (prompt_only_workflow and tool.name in blocked_in_prompt_only)
+        # Layla's own draft tool follows the intent switch, as before. The
+        # workspace tool stays available for the explicit UI mode
+        # (``creative_mode: "design"``) even when the wording does not match the
+        # regex -- the bridge is what decides there, and hiding it here would
+        # remove the only way that path can ever generate.
         and not (tool.name == "generate_image_draft_tool" and not should_allow_image)
+        # Second guard, both tools: once a picture was produced this turn, no
+        # image tool is offered again.
+        and not (already_attempted_image and tool.name in _IMAGE_TOOL_NAMES)
     ]
     response = llm_handle.chat.bind_tools(available_tools).invoke(messages, config)
     return {"messages": [response]}

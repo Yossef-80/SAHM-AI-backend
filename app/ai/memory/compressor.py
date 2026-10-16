@@ -31,9 +31,47 @@ def _message_to_text(msg: Any) -> str:
 
 
 
+#: Resolved tiktoken encoder, or ``False`` once we know tiktoken is unusable.
+#: ``tiktoken.get_encoding`` is not free the way it looks: it re-enters the
+#: registry, re-validates the BPE files and can re-import the Rust extension.
+#: This is called once per message per turn, so it is resolved once per process.
+_ENCODER: Any = None
+_ENCODER_RESOLVED = False
+
+#: message id + content length -> measured tokens. Tokenizing a conversation on
+#: every turn was pure repetition: old messages do not change, so their counts
+#: are cached. Length is part of the key so an edited message re-measures.
+_TOKEN_COUNT_CACHE: dict[tuple[str, int], int] = {}
+_TOKEN_COUNT_CACHE_MAX = 4096
+
+
+def _get_encoder() -> Any:
+    global _ENCODER, _ENCODER_RESOLVED
+    if _ENCODER_RESOLVED:
+        return _ENCODER
+    _ENCODER_RESOLVED = True
+    try:
+        import tiktoken
+
+        _ENCODER = tiktoken.get_encoding("cl100k_base")
+    except Exception:
+        _ENCODER = None
+    return _ENCODER
+
+
+def _approximate_tokens(text: str) -> int:
+    """Language-aware fallback: Arabic ~1.8 chars/token, Latin ~3.5.
+
+    Never uses a flat chars/3.5 across Arabic text.
+    """
+    arabic_chars = sum(1 for c in text if "\u0600" <= c <= "\u06ff")
+    other_chars = len(text) - arabic_chars
+    return max(1, int((arabic_chars / 1.8) + (other_chars / 3.5)))
+
+
 def count_tokens(text: str) -> int:
-    """Measure real tokens using tiktoken (cl100k_base).
-    
+    """Measure real tokens using tiktoken (cl100k_base), cached encoder.
+
     If tiktoken is unavailable, uses a language-aware approximation:
     - Arabic characters (\u0600-\u06FF): ~1.8 characters per token.
     - Other/Latin characters: ~3.5 characters per token.
@@ -41,13 +79,27 @@ def count_tokens(text: str) -> int:
     """
     if not text:
         return 0
-    try:
-        import tiktoken
-        enc = tiktoken.get_encoding("cl100k_base")
-        return len(enc.encode(text))
-    except Exception:
-        pass
-    
+    encoder = _get_encoder()
+    if encoder is not None:
+        try:
+            return len(encoder.encode(text))
+        except Exception:
+            pass
+    return _approximate_tokens(text)
+
+
+def count_tokens_cached(message_key: str, text: str) -> int:
+    """``count_tokens`` memoised per (message, length)."""
+    key = (message_key, len(text))
+    cached = _TOKEN_COUNT_CACHE.get(key)
+    if cached is not None:
+        return cached
+    value = count_tokens(text)
+    if len(_TOKEN_COUNT_CACHE) >= _TOKEN_COUNT_CACHE_MAX:
+        _TOKEN_COUNT_CACHE.clear()
+    _TOKEN_COUNT_CACHE[key] = value
+    return value
+
     # Language-aware fallback
     arabic_chars = sum(1 for c in text if "\u0600" <= c <= "\u06ff")
     other_chars = len(text) - arabic_chars
@@ -553,11 +605,20 @@ class IntelligentMemoryCompressor:
 
 
 class MemoryDebouncer:
+    """Manages configurable inactivity debounce timers per business.
+
+    Every new message resets the countdown timer. When the user is inactive for
+    the duration, the background compressor fires automatically.
+
+    Lifecycle notes (this is where the old implementation leaked): a timer task
+    was created per business and only removed when it *completed*, so a business
+    whose timer was still counting down at shutdown kept a task alive forever,
+    and nothing ever cancelled them -- ``asyncio`` then logged "Task was
+    destroyed but it is pending" and the LTM compressor could still be running
+    after the app was supposed to be down. Timers are now tracked, cancelled and
+    awaited in :meth:`shutdown`, which the app lifespan calls.
     """
-    Manages configurable inactivity debounce timers per business.
-    Every new message resets the countdown timer. When the user is inactive for the duration,
-    the background compressor fires automatically.
-    """
+
     def __init__(self, delay_seconds: int | None = None):
         if delay_seconds is None:
             try:
@@ -567,17 +628,33 @@ class MemoryDebouncer:
                 delay_seconds = 180
         self.delay_seconds = delay_seconds
         self._timers: dict[str, asyncio.Task[None]] = {}
+        self._closed = False
         self.compressor = IntelligentMemoryCompressor()
+
+    @property
+    def pending(self) -> int:
+        """Number of live timers (used by health checks and tests)."""
+        return sum(1 for task in self._timers.values() if not task.done())
 
     def schedule_ltm_update(self, business_id: str):
         """Schedule or reset the inactivity timer."""
+        if self._closed:
+            return
         # Cancel any existing active timer for this business
         existing_task = self._timers.get(business_id)
         if existing_task and not existing_task.done():
             existing_task.cancel()
+            # Detach so a cancelled task can never re-register itself.
+            self._timers.pop(business_id, None)
+
+        # Drop bookkeeping for finished businesses as we go: the dict otherwise
+        # keeps one entry per business that ever chatted.
+        for key in [k for k, task in self._timers.items() if task.done()]:
+            self._timers.pop(key, None)
 
         # Start a new countdown task
         task = asyncio.create_task(self._countdown_and_execute(business_id))
+        task.add_done_callback(lambda _t: None)  # keep a strong ref in _timers
         self._timers[business_id] = task
 
     async def _countdown_and_execute(self, business_id: str):
@@ -594,9 +671,29 @@ class MemoryDebouncer:
             if self._timers.get(business_id) is asyncio.current_task():
                 self._timers.pop(business_id, None)
 
+    async def shutdown(self) -> None:
+        """Cancel every pending timer and wait for them to unwind."""
+        self._closed = True
+        tasks = [task for task in self._timers.values() if not task.done()]
+        self._timers.clear()
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001 - shutting down
+                pass
+        if tasks:
+            logger.info("ltm_debouncer_shutdown", extra={"cancelled": len(tasks)})
+
 
 # Process-wide singleton debouncer
 memory_debouncer = MemoryDebouncer()
+
+
+#: Upper bound on messages inspected per turn when deciding whether to compact.
+#: The newest turns are the ones that decide it; older ones live in the summary.
+MAX_MESSAGES_SCANNED = 400
 
 
 async def manage_session_memory_with_token_cap(
@@ -627,10 +724,25 @@ async def manage_session_memory_with_token_cap(
         retain_count = 2
 
     valid_msgs = [m for m in messages if m.role in ("user", "assistant") and (getattr(m, "content", None) or _message_to_text(m)).strip()]
+
+    # Bound the scan: the turn only needs the tail of the conversation plus the
+    # running summary token count. Scanning every message ever written made the
+    # cost of a turn grow with the age of the chat.
+    if len(valid_msgs) > MAX_MESSAGES_SCANNED:
+        valid_msgs = valid_msgs[-MAX_MESSAGES_SCANNED:]
+        logger.info(
+            "session_memory_scan_capped",
+            extra={"conversation_id": conversation.id, "scanned": len(valid_msgs)},
+        )
+
     safe_content = {id(m): str(redact_sensitive_data(getattr(m, "content", None) or _message_to_text(m))) for m in valid_msgs}
-    
-    # Calculate measured tokens using real tokenizer
-    total_tokens = sum(count_tokens(safe_content[id(m)]) for m in valid_msgs)
+
+    # Measured tokens, memoised per message so a stable history costs nothing to
+    # re-measure on the next turn.
+    total_tokens = sum(
+        count_tokens_cached(str(getattr(m, "id", "") or id(m)), safe_content[id(m)])
+        for m in valid_msgs
+    )
 
     # 1. Normal mode: below max_tokens
     if total_tokens < max_tokens:

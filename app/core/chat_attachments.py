@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.core.errors import ValidationFailed
 from app.core.logging import get_logger
-from app.core.tools.media import persist_inline_reference_image
+from app.core.tools.media import persist_inline_reference_image_async
 from app.db.models import BrandMemoryItem
 
 _logger = get_logger(__name__)
@@ -43,8 +43,8 @@ MAX_ATTACHMENTS_PER_TURN = 4
 MAX_INLINE_CHARS = 4_000_000
 
 
-def _decode(data_url: str) -> tuple[str, str]:
-    """Validate the browser payload and return ``(file_id, mime)``."""
+async def _decode(data_url: str) -> tuple[str, str]:
+    """Validate the browser payload, store it (disk + storage mirror), return ids."""
     mime = ""
     head = data_url.strip()[:64].lower()
     for candidate in ("image/png", "image/jpeg", "image/webp"):
@@ -57,7 +57,7 @@ def _decode(data_url: str) -> tuple[str, str]:
             detail={"supported": ["image/png", "image/jpeg", "image/webp"]},
         )
     try:
-        file_id = persist_inline_reference_image(data_url, get_settings())
+        file_id = await persist_inline_reference_image_async(data_url, get_settings())
     except Exception as exc:
         raise ValidationFailed(f"attachment could not be stored: {exc}") from exc
     return file_id, mime
@@ -71,7 +71,7 @@ async def store_chat_attachment(
     source_name: str | None = None,
 ) -> dict[str, Any]:
     """Validate, store and register one chat attachment."""
-    file_id, mime = _decode(image_data or "")
+    file_id, mime = await _decode(image_data or "")
     name = (source_name or "attachment").strip()[:160] or "attachment"
     attachment_id = f"att_{uuid4().hex[:20]}"
     row = BrandMemoryItem(
@@ -98,16 +98,26 @@ async def store_chat_attachment(
     }
 
 
-def _read_file(file_id: str) -> str | None:
-    """Read the stored private file back as a data URL, or None."""
+async def _read_file(file_id: str) -> str | None:
+    """Read the stored private file back as a data URL, or None.
+
+    Local disk first, then the Supabase Storage mirror: attachments uploaded
+    before a redeploy only exist in the mirror.
+    """
     settings = get_settings()
     root = Path(settings.upload_dir).resolve()
     target = (root / file_id).resolve()
-    if root not in target.parents or not target.is_file():
-        return None
-    try:
-        raw = target.read_bytes()
-    except OSError:
+    raw: bytes | None = None
+    if root in target.parents and target.is_file():
+        try:
+            raw = target.read_bytes()
+        except OSError:
+            raw = None
+    if raw is None:
+        from app.core.storage import fetch_private_asset
+
+        raw = await fetch_private_asset(settings, file_id)
+    if raw is None:
         return None
     if not raw or len(raw) > int(settings.website_max_bytes):
         return None
@@ -156,7 +166,7 @@ async def load_chat_attachments(
         if row is None:
             continue
         metadata = row.metadata_ or {}
-        data_url = _read_file(str(metadata.get("file_id") or ""))
+        data_url = await _read_file(str(metadata.get("file_id") or ""))
         if data_url is None:
             _logger.warning(
                 "chat_attachment_unreadable", extra={"attachment_id": attachment_id}
@@ -168,6 +178,13 @@ async def load_chat_attachments(
                 "name": str(metadata.get("source_name") or row.text or "attachment")[:160],
                 "mime": str(metadata.get("mime") or "image/png"),
                 "data_url": data_url,
+                # The stored private file id, which is exactly the `upload_id`
+                # `analyze_reference_creative` accepts (the tool resolves it under
+                # `upload_dir`). Without it the model can *see* the attached picture
+                # but cannot act on it: it has no id to hand to the analysis tool,
+                # so it asks the user for one the user cannot know -- which is how
+                # "make a design like this image" ended in "send me the upload_id".
+                "upload_id": str(metadata.get("file_id") or ""),
             }
         )
     return payloads

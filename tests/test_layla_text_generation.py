@@ -25,9 +25,13 @@ class FakeLLMHandle:
     def __init__(self, result: CreativeBrief) -> None:
         self.runnable = FakeStructuredRunnable(result)
         self.schema: type[Any] | None = None
+        #: Every schema asked for, in order: the writing call first, then the
+        #: review pass's verdict schema.
+        self.schemas: list[type[Any]] = []
 
     def structured(self, schema: type[Any]) -> FakeStructuredRunnable:
         self.schema = schema
+        self.schemas.append(schema)
         return self.runnable
 
 
@@ -57,8 +61,20 @@ async def test_layla_generation_uses_app_ai_and_shapes_ad_variations(monkeypatch
         brand_context={"brand_voice": "warm", "target_audience": "busy professionals"},
     )
 
-    assert requested_provider == [{"provider": LLMProvider.MOCK}]
-    assert handle.schema is CreativeBrief
+    # The provider still comes from settings, but the *role* now decides the
+    # sampling: ad variations are creative work, so the handle is built with the
+    # creative temperature instead of the process-wide AI_LLM_TEMPERATURE -- and
+    # a second, colder handle is built for the review pass that runs before the
+    # draft is handed back.
+    from app.ai.roles import resolve_role
+
+    assert len(requested_provider) == 2
+    assert requested_provider[0]["provider"] == LLMProvider.MOCK
+    assert requested_provider[0]["temperature"] == resolve_role("creative_copy").temperature
+    assert requested_provider[1]["temperature"] == resolve_role("critique").temperature
+    assert requested_provider[1]["temperature"] < requested_provider[0]["temperature"]
+    assert handle.schemas[0] is CreativeBrief
+    assert "verdict" in handle.schema.model_fields  # the review pass's schema
     assert "Arabic (ar)" in handle.runnable.messages[1].content
     assert "Brand voice: warm" in handle.runnable.messages[1].content
     assert output["variations"][0]["angle"] == "Convenience"

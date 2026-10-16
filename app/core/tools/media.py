@@ -13,6 +13,7 @@ composition, typography, tone, layout pattern and hook type survive intact.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -72,7 +73,17 @@ async def _load_reference_image(
         if upload_root not in path.parents:
             raise ToolUnavailable("reference upload id is invalid")
         if not path.is_file():
-            raise ToolUnavailable(f"upload '{payload.upload_id}' was not found")
+            # Local disk is wiped on every deploy; the mirrored copy is what
+            # keeps an attachment usable without asking the user to re-upload.
+            from app.core.storage import fetch_private_asset
+
+            mirrored = await fetch_private_asset(cfg, str(payload.upload_id))
+            if mirrored is None:
+                raise ToolUnavailable(f"upload '{payload.upload_id}' was not found")
+            mime = _sniff_image_mime(mirrored)
+            if mime not in {"image/png", "image/jpeg", "image/webp"}:
+                raise ToolUnavailable("reference upload is not a supported image")
+            return mime, base64.b64encode(mirrored).decode(), f"upload:{payload.upload_id}"
         if path.stat().st_size > cfg.website_max_bytes:
             raise ToolUnavailable("reference image exceeds the size cap")
         declared_mime = _guess_mime(path.name)
@@ -141,12 +152,22 @@ def _persist_private_reference_image(data: bytes, mime: str, cfg: Any) -> str:
     return file_id
 
 
-def persist_inline_reference_image(data_url: str, cfg: Any) -> str:
-    """Validate and retain a small browser-uploaded data URL as a private file.
+async def mirror_uploaded_reference(file_id: str, data: bytes, mime: str, cfg: Any) -> None:
+    """Mirror a locally stored upload into Supabase Storage (best effort).
 
-    The browser sends only a data URL, never a user-controlled filesystem path.
-    The returned opaque filename is later consumed by ``_load_reference_image``.
+    Never raises: the file is already on local disk at this point, so a storage
+    outage must not turn a successful upload into an error for the user.
     """
+    try:
+        from app.core.storage import mirror_private_asset
+
+        await mirror_private_asset(cfg, file_id, data, mime)
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("upload_mirror_failed", extra={"error": str(exc)})
+
+
+def _decode_inline_image(data_url: str, cfg: Any) -> tuple[bytes, str]:
+    """Validate a browser data URL and return ``(bytes, mime)``."""
     match = re.fullmatch(
         r"data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})",
         data_url.strip(),
@@ -168,7 +189,29 @@ def persist_inline_reference_image(data_url: str, cfg: Any) -> str:
         raise ToolUnavailable("reference image is empty or exceeds the size cap")
     if _sniff_image_mime(data) != declared_mime:
         raise ToolUnavailable("reference image content does not match its declared file type")
+    return data, declared_mime
+
+
+def persist_inline_reference_image(data_url: str, cfg: Any) -> str:
+    """Validate and retain a small browser-uploaded data URL as a private file.
+
+    The browser sends only a data URL, never a user-controlled filesystem path.
+    The returned opaque filename is later consumed by ``_load_reference_image``.
+    """
+    data, declared_mime = _decode_inline_image(data_url, cfg)
     return _persist_private_reference_image(data, declared_mime, cfg)
+
+
+async def persist_inline_reference_image_async(data_url: str, cfg: Any) -> str:
+    """``persist_inline_reference_image`` plus the Supabase Storage mirror.
+
+    Prefer this from request handlers: it is the version that survives a deploy,
+    because the local copy under ``upload_dir`` does not.
+    """
+    data, declared_mime = _decode_inline_image(data_url, cfg)
+    file_id = _persist_private_reference_image(data, declared_mime, cfg)
+    await mirror_uploaded_reference(file_id, data, declared_mime, cfg)
+    return file_id
 
 
 MAX_UPLOADED_CREATIVE_BYTES = 10 * 1024 * 1024
@@ -377,6 +420,11 @@ analyze_reference_creative_tool = Tool(
 # ================================================== 12. generate_image
 
 
+#: The placeholder model id ``config.py`` ships as a default. Sending it to a
+#: real provider is always a configuration mistake, never an intent.
+_MOCK_MODEL = "mock-image-1"
+
+
 def _mock_asset(prompt: str, aspect_ratio: str, index: int) -> GeneratedAssetRecord:
     """Deterministic offline asset: a labelled SVG data URL."""
     digest = hashlib.sha256(f"{prompt}|{index}".encode()).hexdigest()[:10]
@@ -403,6 +451,106 @@ def _mock_asset(prompt: str, aspect_ratio: str, index: int) -> GeneratedAssetRec
     )
 
 
+#: The render ceiling for one provider call. 120s was *below* the provider's
+#: observed worst case for a large, high-quality edit (over two minutes), so a
+#: render that was about to succeed was cut off -- and still billed.
+_DEFAULT_IMAGE_TIMEOUT_SECONDS = 300.0
+
+#: A retry is only paid for when the request provably did not run: a rate limit,
+#: a 5xx, or a connection that never opened. A *timeout* is deliberately not
+#: retried -- the render may still be completing and billing -- so it is
+#: surfaced instead of repeated.
+_IMAGE_RETRY_ATTEMPTS = 3
+
+
+def _image_timeout_seconds(cfg: Any) -> float:
+    """How long one provider call may take, from ``IMAGE_TIMEOUT_SECONDS``."""
+    try:
+        value = float(getattr(cfg, "image_timeout_seconds", None))
+    except (TypeError, ValueError):
+        value = 0.0
+    return value if value >= 30.0 else _DEFAULT_IMAGE_TIMEOUT_SECONDS
+
+
+def _image_retry_delay(response: "httpx.Response | None", attempt: int) -> float:
+    """Seconds to wait before the next attempt: the provider's own hint first."""
+    header = ""
+    if response is not None:
+        header = response.headers.get("retry-after", "") or ""
+    try:
+        hinted = float(header)
+    except ValueError:
+        hinted = 0.0
+    if hinted > 0:
+        return min(hinted, 30.0)
+    return float(min(2 ** (attempt - 1), 8))
+
+
+def _provider_error_reason(response: "httpx.Response") -> str:
+    """One actionable sentence for a failed provider call.
+
+    The only useful explanation lives in the provider's JSON body
+    (``error.code`` / ``error.message``): a safety-filter rejection and a
+    misspelled ``size`` are both HTTP 400. ``raise_for_status`` threw that away
+    and surfaced ``Client error '400 Bad Request'``, which told the user nothing
+    and the operator less.
+    """
+    status = response.status_code
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    error = (body or {}).get("error") if isinstance(body, dict) else None
+    error = error if isinstance(error, dict) else {}
+    code = str(error.get("code") or "").strip()
+    message = " ".join(str(error.get("message") or "").split())[:300]
+    haystack = f"{code} {message}".lower()
+
+    if status in (401, 403):
+        return (
+            "The image provider rejected the configured API key; check the image "
+            "credentials in Settings -> Connectors."
+        )
+    if status == 429:
+        return (
+            "The image provider is rate-limiting this key; the request was not "
+            "charged. Try again in a moment."
+        )
+    if "moderation" in haystack or "content_policy" in haystack or "safety" in haystack:
+        return "The image provider's safety filter rejected this prompt; rephrase it and try again."
+    if status == 404:
+        suffix = f": {message}" if message else ""
+        return f"The image provider does not recognise the configured model{suffix}; check IMAGE_MODEL."
+    if 500 <= status <= 599:
+        return f"The image provider had a temporary failure (HTTP {status}); try again shortly."
+    if message:
+        return f"The image provider rejected the request: {message}"
+    return f"The image provider rejected the request (HTTP {status})."
+
+
+def _usage_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    """Token accounting for one image call, when the provider reports it.
+
+    OpenAI's image models report ``usage`` (text tokens, image tokens, output
+    tokens) and this was dropped on the floor, so the usage screen could only
+    ever account for text calls. Flattened, because this feeds a log line.
+    """
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return {}
+    summary: dict[str, Any] = {}
+    for key, value in usage.items():
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            summary[str(key)] = value
+        elif isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                if isinstance(sub_value, (int, float)) and not isinstance(sub_value, bool):
+                    summary[f"{key}_{sub_key}"] = sub_value
+    return summary
+
+
 async def _generate_openai_image(
     prompt: str,
     aspect_ratio: str,
@@ -412,6 +560,10 @@ async def _generate_openai_image(
     base_url: str | None = None,
     reference_image: tuple[str, bytes] | None = None,
     quality: str | None = None,
+    count: int = 1,
+    timeout: float | None = None,
+    attempts: int = _IMAGE_RETRY_ATTEMPTS,
+    sleep: Any | None = None,
 ) -> list[GeneratedAssetRecord]:
     """Call the configured OpenAI-compatible generation or image-edit endpoint.
 
@@ -427,8 +579,29 @@ async def _generate_openai_image(
     ``1536x1024`` and ``1024x1536``. ``quality`` was never sent at all, which
     silently bought the provider default -- ``high`` on GPT Image, the expensive
     one -- for every workspace.
+
+    ``n`` is the resolved ``count``, clamped to what the model accepts
+    (``dall-e-3`` is ``n=1``). It previously sent a hardcoded ``1`` while the
+    schema and the UI offered up to four, so a request for four renders returned
+    one and reported nothing. The product now renders a single image, and that
+    decision is enforced in :func:`generate_creative_assets` -- the one place
+    that can spend money -- so the number sent and the number promised come from
+    the same value.
+
+    ``input_fidelity`` is deliberately **not** sent. The provider default is
+    ``low``; ``high`` adds a per-image charge for copying faces and logo detail,
+    which has to be an explicit product decision rather than a silent default.
+
+    Failures that provably never ran (429, 5xx, refused connection) are retried;
+    anything else is raised as :class:`ToolUnavailable` carrying the provider's
+    own explanation.
     """
-    from app.core.llm.model_compat import image_quality_for_model, image_size_for_model
+    from app.core.llm.base import is_retryable_status
+    from app.core.llm.model_compat import (
+        bare_model_name,
+        image_quality_for_model,
+        image_size_for_model,
+    )
 
     size = image_size_for_model(aspect_ratio, model)
     resolved_quality = image_quality_for_model(quality, model)
@@ -436,24 +609,95 @@ async def _generate_openai_image(
     url = (base_url or "https://api.openai.com/v1").rstrip("/") + endpoint
     headers = {"authorization": f"Bearer {api_key}"}
     optional: dict[str, object] = {"quality": resolved_quality} if resolved_quality else {}
-    async with httpx.AsyncClient(timeout=120.0, trust_env=False) as client:
-        if reference_image:
-            mime, image_bytes = reference_image
-            extension = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}.get(mime, "png")
-            resp = await client.post(
-                url,
-                headers=headers,
-                data={"model": model, "prompt": prompt, "size": size, "n": "1", **optional},
-                files={"image": (f"reference.{extension}", image_bytes, mime)},
-            )
-        else:
-            resp = await client.post(
-                url,
-                headers=headers,
-                json={"model": model, "prompt": prompt, "size": size, "n": 1, **optional},
-            )
-        resp.raise_for_status()
-        data = resp.json().get("data", [])
+    wanted = 1 if bare_model_name(model).startswith("dall-e-3") else max(1, min(int(count or 1), 10))
+    pause = sleep or asyncio.sleep
+    # A dead host fails in seconds; only the render itself gets the long ceiling.
+    client_timeout = httpx.Timeout(float(timeout or _DEFAULT_IMAGE_TIMEOUT_SECONDS), connect=15.0)
+    tries = max(1, int(attempts))
+
+    async with httpx.AsyncClient(timeout=client_timeout, trust_env=False) as client:
+        response: httpx.Response | None = None
+        for attempt in range(1, tries + 1):
+            try:
+                if reference_image:
+                    mime, image_bytes = reference_image
+                    extension = {
+                        "image/png": "png",
+                        "image/jpeg": "jpg",
+                        "image/webp": "webp",
+                    }.get(mime, "png")
+                    response = await client.post(
+                        url,
+                        headers=headers,
+                        data={
+                            "model": model,
+                            "prompt": prompt,
+                            "size": size,
+                            "n": str(wanted),
+                            **optional,
+                        },
+                        files={"image": (f"reference.{extension}", image_bytes, mime)},
+                    )
+                else:
+                    response = await client.post(
+                        url,
+                        headers=headers,
+                        json={"model": model, "prompt": prompt, "size": size, "n": wanted, **optional},
+                    )
+            except httpx.TimeoutException as exc:
+                # Not retried on purpose: the render may still be completing and
+                # billing, and a second request would be paid for twice.
+                raise ToolUnavailable(
+                    "The image provider did not answer in time; the image may still be "
+                    "rendering on their side, so no second attempt was made."
+                ) from exc
+            except httpx.ConnectError as exc:
+                if attempt >= tries:
+                    raise ToolUnavailable(
+                        "Could not reach the image provider; check the network and the "
+                        "configured image base URL."
+                    ) from exc
+                delay = _image_retry_delay(None, attempt)
+                _logger.warning(
+                    "image_generation_retry",
+                    extra={"attempt": attempt, "reason": type(exc).__name__, "delay": delay},
+                )
+                await pause(delay)
+                continue
+            except httpx.HTTPError as exc:
+                raise ToolUnavailable(f"The image provider call failed: {type(exc).__name__}.") from exc
+
+            if response.status_code < 400:
+                break
+            if is_retryable_status(response.status_code) and attempt < tries:
+                delay = _image_retry_delay(response, attempt)
+                _logger.warning(
+                    "image_generation_retry",
+                    extra={
+                        "attempt": attempt,
+                        "status": response.status_code,
+                        "delay": delay,
+                    },
+                )
+                await pause(delay)
+                continue
+            raise ToolUnavailable(_provider_error_reason(response))
+
+    if response is None:  # pragma: no cover - the loop always assigns or raises
+        raise ToolUnavailable("The image provider was never called.")
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        # A gateway or proxy answering with HTML instead of JSON used to escape
+        # as an unhandled ValueError and become a 500 on the success path.
+        raise ToolUnavailable(
+            "The image provider returned a response that is not JSON; no image was created."
+        ) from exc
+    if not isinstance(payload, dict):
+        raise ToolUnavailable("The image provider returned an unexpected payload; no image was created.")
+
+    data = payload.get("data", [])
     assets: list[GeneratedAssetRecord] = []
     for item in data if isinstance(data, list) else []:
         if not isinstance(item, dict):
@@ -472,55 +716,268 @@ async def _generate_openai_image(
                 model=model,
             )
         )
+
+    summary = _usage_summary(payload)
+    if summary:
+        _logger.info(
+            "image_generation_usage",
+            extra={
+                "provider": "openai",
+                "model": model,
+                "size": size,
+                "quality": resolved_quality,
+                "assets": len(assets),
+                **summary,
+            },
+        )
     return assets
 
 
-def _persist_generated_data_url(data_url: str, cfg: Any) -> str:
-    """Validate file bytes and save a provider-returned image without AI analysis."""
+def _is_durable_asset_url(url: str, cfg: Any) -> bool:
+    """True when this URL is already hosted on our own storage (no re-upload needed)."""
+    from app.core.storage import DEFAULT_BUCKET, _supabase_url
+
+    base = _supabase_url(cfg)
+    if base and f"/storage/v1/object/public/{DEFAULT_BUCKET}/" in url:
+        return True
+    asset_base = str(getattr(cfg, "public_asset_base_url", "") or "").strip().rstrip("/")
+    return bool(asset_base) and url.startswith(f"{asset_base}/")
+
+
+async def _persist_generated_asset(asset: GeneratedAssetRecord, cfg: Any) -> str:
+    """Move a generated image out of the provider response and into our storage.
+
+    Provider URLs are temporary (OpenAI's expire in about an hour) and base64
+    data URLs are megabytes of text: neither belongs in a database row. This
+    hands the bytes to ``app.core.storage`` (Supabase Storage, local fallback)
+    and returns the durable public URL to store instead.
+    """
+    from app.ai.marketing.meta_ads import validate_creative_image_url
+    from app.core.storage import DEFAULT_BUCKET, _supabase_url, persist_image_asset
+
+    if asset.provider != "mock" and asset.url.startswith("https://"):
+        base = _supabase_url(cfg)
+        if base and asset.url.startswith(base):
+            return asset.url
+        if not validate_creative_image_url(asset.url):
+            raise ToolUnavailable(
+                "The image provider returned a non-HTTPS asset URL; it cannot be used for a Meta ad."
+            )
+
+    url, error = await persist_image_asset(
+        cfg,
+        asset_url=asset.url,
+        path_prefix=f"generated/{asset.provider or 'unknown'}",
+        bucket=DEFAULT_BUCKET,
+    )
+    if not url:
+        raise ToolUnavailable(error or "The generated image could not be persisted.")
+    return url
+
+
+async def generate_creative_assets(
+    *,
+    cfg: Any,
+    prompt: str,
+    aspect_ratio: str,
+    num_images: int = 1,
+    style: dict[str, Any] | None = None,
+    reference_image: tuple[str, bytes] | None = None,
+    provider: str,
+    api_key: str | None,
+    model: str | None,
+    base_url: str | None = None,
+    quality: str | None = None,
+    allow_mock_assets: bool = False,
+    image_call: Any | None = None,
+) -> tuple[list[GeneratedAssetRecord], str | None]:
+    """The single image-generation entry point for the whole app.
+
+    Every caller -- the ``/creatives`` HTTP route, Layla's chat tool and the
+    marketing pipeline -- goes through here so that:
+
+    * the provider call happens exactly once, in one place;
+    * every returned ``url`` is already durable (Supabase Storage), because
+      provider URLs expire (OpenAI's in about an hour) and base64 data URLs are
+      megabytes of text that must never reach a database row;
+    * ``mock`` assets are only produced when a workspace explicitly allows them;
+    * **one** real image is rendered per request: ``num_images`` still describes
+      what a caller may ask for (and drives the offline mock, which is free), but
+      a paid render is capped to a single asset here, with a log line when a
+      larger number was requested. The count is enforced at the only point that
+      can spend money rather than in each caller.
+
+    Returns ``(assets, reason)``; ``reason`` is set and ``assets`` empty when the
+    request could not be fulfilled. Provider failures never raise out of here: a
+    surprise from the provider becomes a reason, because a 500 after the user has
+    waited a minute is the least useful outcome.
+    """
     from app.ai.marketing.meta_ads import validate_creative_image_url
 
-    header, separator, encoded = data_url.partition(",")
-    if not separator or not header.startswith("data:image/") or ";base64" not in header:
-        raise ToolUnavailable("The image provider returned an unsupported image format.")
-    declared_mime = header[5:].split(";", 1)[0].lower()
-    if declared_mime not in {"image/png", "image/jpeg", "image/webp"}:
-        raise ToolUnavailable("Only PNG, JPEG, or WebP final images can be saved for Meta.")
-    try:
-        content = base64.b64decode(encoded, validate=True)
-    except Exception as exc:
-        raise ToolUnavailable("The image provider returned invalid image bytes.") from exc
-    if not content or len(content) > cfg.upload_max_bytes:
-        raise ToolUnavailable("The generated final image is empty or exceeds the configured size limit.")
-    sniffed = _sniff_image_mime(content)
-    if sniffed != declared_mime:
-        raise ToolUnavailable("Generated image bytes do not match their declared file type.")
+    style = dict(style or {})
+    effective_prompt = _compose_image_prompt(
+        prompt, style, has_reference=reference_image is not None
+    )
 
-    base = str(cfg.public_asset_base_url or "").strip()
-    parsed = urlparse(base)
-    if (
-        not validate_creative_image_url(base)
-        or parsed.path not in ("", "/")
-        or parsed.query
-        or parsed.fragment
-    ):
-        raise ToolUnavailable(
-            "A public HTTPS asset origin is not configured. Set PUBLIC_ASSET_BASE_URL; "
-            "no final image was persisted."
+    assets: list[GeneratedAssetRecord] = []
+    try:
+        if provider == "openai" and api_key:
+            if not model or model == _MOCK_MODEL:
+                return [], "The configuration matched a placeholder image model; set IMAGE_MODEL."
+            if int(num_images or 1) > 1:
+                _logger.info(
+                    "image_count_capped",
+                    extra={"requested": int(num_images), "generated": 1, "provider": provider},
+                )
+            # ``image_call`` is the provider seam: the chat tool passes its own
+            # module-level reference so the call can be stubbed in tests without
+            # a second copy of this logic existing anywhere.
+            call = image_call or _generate_openai_image
+            assets = await call(
+                effective_prompt,
+                aspect_ratio,
+                api_key=api_key,
+                model=model,
+                base_url=base_url,
+                reference_image=reference_image,
+                quality=quality,
+                count=1,
+                timeout=_image_timeout_seconds(cfg),
+            )
+            # A gateway (or a provider that ignores ``n``) can return more items
+            # than were asked for. One paid render must not become four persisted
+            # creatives, so the response is capped to what this call requested.
+            if len(assets) > 1:
+                _logger.info(
+                    "image_assets_truncated",
+                    extra={"returned": len(assets), "kept": 1, "model": model},
+                )
+                assets = assets[:1]
+        elif reference_image is not None:
+            return [], (
+                "The configured image provider does not support reference-conditioned edits "
+                "in this build. No text-only substitute was generated."
+            )
+        elif provider == "stability":
+            return [], (
+                "The stability image provider is configured but not wired up in this "
+                "build. Select a supported image provider; no placeholder was created."
+            )
+        elif provider == "mock":
+            if not (getattr(cfg, "image_allow_mock_assets", False) or allow_mock_assets):
+                return [], (
+                    "Mock placeholder images are disabled by default. Configure a real "
+                    "image provider, or explicitly enable mock assets for a test workspace."
+                )
+            assets = [
+                _mock_asset(effective_prompt, aspect_ratio, i)
+                for i in range(max(1, num_images))
+            ]
+        else:
+            return [], "No supported image provider with credentials is configured; no image was created."
+    except httpx.HTTPError as exc:
+        return [], f"image generation failed: {exc}"
+    except ToolUnavailable as exc:
+        return [], exc.message
+    except Exception as exc:  # noqa: BLE001 - a provider surprise must not become a 500
+        # Anything the provider layer did not anticipate (a malformed body, a
+        # library-level error) still leaves the request answered, with a reason
+        # the UI can show, instead of a stack trace after a minute of waiting.
+        _logger.warning(
+            "image_generation_unhandled",
+            extra={"provider": provider, "error": type(exc).__name__},
         )
+        return [], f"image generation failed ({type(exc).__name__}); no image was created."
 
-    extension = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}[declared_mime]
-    asset_id = f"asset_{uuid.uuid4().hex}"
-    root = (Path(cfg.upload_dir).resolve() / "public_assets").resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    target = (root / f"{asset_id}.{extension}").resolve()
-    if root not in target.parents:
-        raise ToolUnavailable("The generated image destination is invalid.")
-    try:
-        with target.open("xb") as handle:
-            handle.write(content)
-    except OSError as exc:
-        raise ToolUnavailable("The generated image could not be saved safely.") from exc
-    return f"{base.rstrip('/')}{cfg.api_prefix}/media/public-assets/{asset_id}.{extension}"
+    if not assets:
+        return [], "The image provider returned no final asset."
+
+    for asset in assets:
+        asset.style_spec = style
+        if _is_durable_asset_url(asset.url, cfg) and not asset.url.startswith("data:"):
+            continue
+        try:
+            asset.url = await _persist_generated_asset(asset, cfg)
+        except ToolUnavailable as exc:
+            # Storage is a deployment concern, not a reason to lose the image the
+            # user just paid for. The asset keeps whatever URL the provider gave
+            # us and is flagged as not storage-hosted, so the write path can
+            # refuse to put a megabyte of base64 into a database row while a
+            # plain URL (or a dev-only mock placeholder) still gets stored.
+            asset.durable = False
+            _logger.warning(
+                "generated_asset_not_persisted",
+                extra={"provider": asset.provider, "reason": exc.message},
+            )
+            if asset.provider != "mock" and not asset.url.startswith("https://"):
+                # An inline payload we cannot re-host is not a usable creative:
+                # it cannot be attached to a Meta ad and must not reach a row.
+                return [], exc.message
+            continue
+        if asset.provider != "mock" and not (
+            validate_creative_image_url(asset.url) or _is_durable_asset_url(asset.url, cfg)
+        ):
+            # ``_is_durable_asset_url`` covers the local-disk fallback: on a
+            # developer machine the asset lives on this very server over
+            # ``http://localhost``, which is perfectly displayable in the app even
+            # though Meta would refuse it -- and Meta's own gate still runs when
+            # an ad is actually submitted.
+            return [], (
+                "The final image is not available at a public HTTPS URL; "
+                "it cannot be safely attached to a Meta ad."
+            )
+    return assets, None
+
+
+async def persist_creative_assets(
+    db: Any,
+    *,
+    business_id: str,
+    assets: list[GeneratedAssetRecord],
+    campaign_id: str | None = None,
+    persona_id: str | None = None,
+    style: dict[str, Any] | None = None,
+    reference_analysis_id: str | None = None,
+    task_name: str = "generate_image",
+    status: str = "ok",
+) -> list[GeneratedAssetRecord]:
+    """Write one ``Creative`` row per asset. Only the durable URL is stored.
+
+    An asset whose bytes never reached storage keeps its place in the gallery but
+    is written with an empty ``url`` and ``status="unpersisted"``: storing the
+    provider's temporary link would rot, and storing its base64 is what made this
+    table slow in the first place.
+    """
+    for asset in assets:
+        asset.style_spec = style or {}
+        # Rule: never write an inline payload into a row. A plain URL is fine
+        # even when it is not storage-hosted (it is a short string, and the row
+        # still points at the image); a data URL is what made this table slow.
+        stored_url = "" if asset.url.startswith("data:") else asset.url
+        stored_status = status if (stored_url or not asset.url) else "unpersisted"
+        try:
+            db.add(
+                Creative(
+                    id=asset.id,
+                    business_id=business_id,
+                    campaign_id=campaign_id,
+                    persona_id=persona_id,
+                    task_name=task_name,
+                    kind="image",
+                    url=stored_url,
+                    prompt=asset.prompt,
+                    aspect_ratio=asset.aspect_ratio,
+                    provider=asset.provider,
+                    model=asset.model,
+                    style_spec=style or None,
+                    reference_analysis_id=reference_analysis_id,
+                    status=stored_status,
+                )
+            )
+            await db.flush()
+        except Exception as exc:  # pragma: no cover - never fail the generation on a row write
+            _logger.warning("creative_persist_failed", extra={"error": str(exc)})
+    return assets
 
 
 async def generate_image_for_workspace(
@@ -535,14 +992,15 @@ async def generate_image_for_workspace(
 ) -> GenerateImageOutput:
     """Generate/persist a creative using explicit API/storage dependencies.
 
-    This is the HTTP bridge used by /creatives; unlike the tool adapter below it
-    does not construct or require a core ToolContext.
+    This is the HTTP bridge used by /creatives. Provider access and durable
+    storage live in :func:`generate_creative_assets`, which the chat path uses
+    too -- this function only resolves workspace settings and references.
     """
     from app.core.tools.settings import load_connector_settings
 
     cfg = settings
     tools_cfg = await load_connector_settings(db, business_id, cfg)
-    image_provider = tools_cfg.image_provider or cfg.image_provider
+    image_provider = str(tools_cfg.image_provider or cfg.image_provider or "mock").strip().lower()
     image_key = tools_cfg.image_api_key or cfg.image_api_key
     image_model = tools_cfg.image_model or cfg.image_model
     image_base = tools_cfg.image_base_url or cfg.image_base_url
@@ -553,9 +1011,9 @@ async def generate_image_for_workspace(
     image_quality = getattr(tools_cfg, "image_quality", None)
     source = f"generate_image:{image_provider}"
 
-    style = dict(payload.style_spec or {})
+    style = dict(getattr(payload, "style_spec", None) or {})
     reference_image: tuple[str, bytes] | None = None
-    if payload.reference_analysis_id or payload.reference_image_url:
+    if getattr(payload, "reference_analysis_id", None) or getattr(payload, "reference_image_url", None):
         try:
             style, reference_image = await _reference_material(
                 payload,
@@ -577,110 +1035,34 @@ async def generate_image_for_workspace(
                 reason="The reference image is unavailable; no text-only substitute was generated.",
             )
 
-    effective_prompt = _compose_image_prompt(
-        payload.prompt, style, has_reference=reference_image is not None
+    assets, reason = await generate_creative_assets(
+        cfg=cfg,
+        prompt=payload.prompt,
+        aspect_ratio=payload.aspect_ratio,
+        # getattr: hand-built payloads (tests, the VLM bridge) carry only the
+        # fields they care about; a missing count means "one image".
+        num_images=int(getattr(payload, "num_images", 1) or 1),
+        style=style,
+        reference_image=reference_image,
+        provider=image_provider,
+        api_key=image_key,
+        model=image_model,
+        base_url=image_base,
+        quality=image_quality,
+        allow_mock_assets=allow_mock_assets,
     )
+    if reason:
+        return GenerateImageOutput.unavailable(source=source, reason=reason)
 
-    try:
-        if image_provider == "openai" and image_key:
-            assets = await _generate_openai_image(
-                effective_prompt,
-                payload.aspect_ratio,
-                api_key=image_key,
-                model=image_model,
-                base_url=image_base,
-                reference_image=reference_image,
-                quality=image_quality,
-            )
-        elif reference_image is not None:
-            return GenerateImageOutput.unavailable(
-                source=source,
-                reason=(
-                    "The configured image provider does not support reference-conditioned edits "
-                    "in this build. No text-only substitute was generated."
-                ),
-            )
-        elif image_provider == "stability":
-            return GenerateImageOutput.unavailable(
-                source=source,
-                reason=(
-                    "The stability image provider is configured but not wired up in "
-                    "this build. Select a supported image provider; no placeholder was created."
-                ),
-            )
-        elif image_provider == "mock":
-            if not cfg.image_allow_mock_assets and not allow_mock_assets:
-                return GenerateImageOutput.unavailable(
-                    source=source,
-                    reason=(
-                        "Mock placeholder images are disabled by default. Configure a real "
-                        "image provider, or explicitly enable mock assets for a test workspace."
-                    ),
-                )
-            assets = [
-                _mock_asset(effective_prompt, payload.aspect_ratio, i)
-                for i in range(payload.num_images)
-            ]
-        else:
-            return GenerateImageOutput.unavailable(
-                source=source,
-                reason="No supported image provider with credentials is configured; no image was created.",
-            )
-    except httpx.HTTPError as exc:
-        return GenerateImageOutput.unavailable(
-            source=source, reason=f"image generation failed: {exc}"
-        )
-    except ToolUnavailable as exc:
-        return GenerateImageOutput.unavailable(source=source, reason=exc.message)
-
-    if not assets:
-        return GenerateImageOutput.unavailable(
-            source=source, reason="The image provider returned no final asset."
-        )
-
-    from app.ai.marketing.meta_ads import validate_creative_image_url
-
-    for asset in assets:
-        if asset.provider == "mock":
-            continue
-        if asset.url.startswith("data:image/"):
-            try:
-                asset.url = _persist_generated_data_url(asset.url, cfg)
-            except ToolUnavailable as exc:
-                return GenerateImageOutput.unavailable(source=source, reason=exc.message)
-        if not validate_creative_image_url(asset.url):
-            return GenerateImageOutput.unavailable(
-                source=source,
-                reason="The final image is not available at a public HTTPS URL; it cannot be safely attached to a Meta ad.",
-            )
-
-    persisted: list[GeneratedAssetRecord] = []
-    for asset in assets:
-        asset.style_spec = style
-        try:
-            db.add(
-                Creative(
-                    id=asset.id,
-                    business_id=business_id,
-                    campaign_id=payload.campaign_id or campaign_id,
-                    persona_id=persona_id,
-                    task_name="generate_image",
-                    kind="image",
-                    url=asset.url,
-                    prompt=asset.prompt,
-                    aspect_ratio=asset.aspect_ratio,
-                    provider=asset.provider,
-                    model=asset.model,
-                    style_spec=style or None,
-                    reference_analysis_id=payload.reference_analysis_id,
-                    status="ok",
-                )
-            )
-            await db.flush()
-        except Exception as exc:  # pragma: no cover
-            _logger.warning("creative_persist_failed", extra={"error": str(exc)})
-        persisted.append(asset)
-
+    persisted = await persist_creative_assets(
+        db,
+        business_id=business_id,
+        assets=assets,
+        campaign_id=getattr(payload, "campaign_id", None) or campaign_id,
+        persona_id=persona_id,
+        style=style,
+        reference_analysis_id=getattr(payload, "reference_analysis_id", None),
+    )
     return GenerateImageOutput(assets=persisted, status="ok", source=source)
 
 

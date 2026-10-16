@@ -913,13 +913,16 @@ async def test_base64_image_storage_is_file_checked_and_served_without_network(
     tmp_path: Any, test_settings: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.api import media_assets
-    from app.core.tools.media import _persist_generated_data_url
+    from app.core.storage import persist_image_asset
 
     test_settings.upload_dir = str(tmp_path)
     test_settings.public_asset_base_url = "https://assets.example.com"
     content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 12
     encoded = base64.b64encode(content).decode()
-    url = _persist_generated_data_url(f"data:image/png;base64,{encoded}", test_settings)
+    url, _error = await persist_image_asset(
+        test_settings, asset_url=f"data:image/png;base64,{encoded}"
+    )
+    assert url is not None and not _error
     assert url.startswith("https://assets.example.com/api/v1/media/public-assets/asset_")
     filename = url.rsplit("/", 1)[-1]
     monkeypatch.setattr(media_assets, "get_settings", lambda: test_settings)
@@ -1116,8 +1119,7 @@ async def test_reference_analysis_id_restores_uploaded_image_and_fails_closed_wh
 async def test_public_asset_requires_https_origin_and_valid_raster_type_and_size(
     tmp_path: Any, test_settings: Any
 ) -> None:
-    from app.core.errors import ToolUnavailable
-    from app.core.tools.media import _persist_generated_data_url
+    from app.core.storage import persist_image_asset
 
     test_settings.upload_dir = str(tmp_path)
     content = b"\x89PNG\r\n\x1a\n" + b"\x33" * 16
@@ -1125,19 +1127,25 @@ async def test_public_asset_requires_https_origin_and_valid_raster_type_and_size
     data_url = f"data:image/png;base64,{encoded}"
 
     test_settings.public_asset_base_url = None
-    with pytest.raises(ToolUnavailable, match="PUBLIC_ASSET_BASE_URL"):
-        _persist_generated_data_url(data_url, test_settings)
+    url, error = await persist_image_asset(test_settings, asset_url=data_url)
+    assert url is None and error and "PUBLIC_ASSET_BASE_URL" in error
     assert not (tmp_path / "public_assets").exists()
 
     test_settings.public_asset_base_url = "http://assets.example.com"
-    with pytest.raises(ToolUnavailable, match="public HTTPS"):
-        _persist_generated_data_url(data_url, test_settings)
+    url, error = await persist_image_asset(test_settings, asset_url=data_url)
+    assert url is None and error and "public HTTPS" in error
+
     test_settings.public_asset_base_url = "https://assets.example.com"
-    with pytest.raises(ToolUnavailable, match="PNG, JPEG, or WebP"):
-        _persist_generated_data_url("data:image/svg+xml;base64,PHN2Zz4=", test_settings)
+    url, error = await persist_image_asset(
+        test_settings, asset_url="data:image/svg+xml;base64,PHN2Zz4="
+    )
+    # SVG only ever reaches storage as a dev-only mock placeholder; the public
+    # asset route Meta reads accepts raster formats only.
+    assert url is None and error and "PNG, JPEG, or WebP" in error
+
     test_settings.upload_max_bytes = len(content) - 1
-    with pytest.raises(ToolUnavailable, match="exceeds"):
-        _persist_generated_data_url(data_url, test_settings)
+    url, error = await persist_image_asset(test_settings, asset_url=data_url)
+    assert url is None and error and "exceeds" in error
     assert not (tmp_path / "public_assets").exists()
 
 

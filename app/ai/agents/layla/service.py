@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from app.ai.agents.layla.schema import CreativeBrief
 from app.ai.providers.llm import get_llm
+from app.ai.providers.llm.agent_llm import process_handle
 from app.ai.settings import get_ai_settings
 
 LaylaTextTool = Literal[
@@ -24,6 +25,26 @@ LaylaTextTool = Literal[
     "generate_ad_copy",
     "generate_ad_variations",
 ]
+
+#: Which *kind of work* each UI action is. Ad copy is the one place in the
+#: product where near-duplicate output is a defect, so copy and variations ask
+#: for the creative tier and a high temperature, while a brief or a production
+#: prompt is a specification and stays cooler. Without this every action went
+#: through `AI_LLM_TEMPERATURE` (default 0.2) on the smallest model.
+ROLE_FOR_TOOL: dict[str, str] = {
+    "generate_ad_copy": "creative_copy",
+    "generate_ad_variations": "creative_copy",
+    "generate_commercial_script": "creative_script",
+    "generate_creative_brief": "creative_brief",
+    "generate_image_prompt": "creative_brief",
+    "generate_video_prompt": "creative_brief",
+}
+
+
+def role_for_text_tool(tool: str) -> str:
+    """The role a text tool runs as; analysis is the safe default."""
+    return ROLE_FOR_TOOL.get(tool, "analysis")
+
 
 _TOOL_DELIVERABLE: dict[str, str] = {
     "generate_creative_brief": "creative_brief",
@@ -214,10 +235,29 @@ async def generate_layla_text(
     brief: str,
     language: Literal["en", "ar"],
     brand_context: dict[str, Any] | None = None,
+    brand_context_text: str | None = None,
+    llm: Any | None = None,
+    critique_llm: Any | None = None,
+    critique: bool | None = None,
 ) -> dict[str, Any]:
-    """Generate one structured Layla deliverable through the app.ai provider."""
+    """Generate one structured Layla deliverable through the app.ai provider.
+
+    ``brand_context_text`` is a pre-rendered, semantically retrieved brand block
+    (``format_context_for_prompt``) and takes precedence over the four profile
+    fields in ``brand_context``. The caller builds it because only the caller has
+    the database session; this module stays a pure prompt + provider step.
+
+    ``llm`` lets the caller inject the workspace-resolved handle for this tool's
+    role. When it is omitted -- scripts, tests, direct calls -- the role's tier
+    model is resolved from process settings instead.
+
+    ``critique`` runs one review pass over the finished deliverable (see
+    ``app.ai.agents.layla.critique``): unsupported claims removed, duplicate
+    angles re-cut, language checked. It is on by default and controlled by
+    ``AI_LAYLA_SELF_CRITIQUE``; a failed review always leaves the draft intact.
+    """
     deliverable = _TOOL_DELIVERABLE[tool]
-    workspace_context = _brand_context_text(brand_context)
+    workspace_context = (brand_context_text or "").strip() or _brand_context_text(brand_context)
     request = (
         f"Requested tool: {tool}\n"
         f"Required deliverable_type: {deliverable}\n"
@@ -227,8 +267,10 @@ async def generate_layla_text(
     if workspace_context:
         request += f"\n\nWorkspace brand context (facts only):\n{workspace_context}"
 
-    llm = get_llm(provider=get_ai_settings().llm_provider)
-    structured = llm.structured(CreativeBrief)
+    handle = llm if llm is not None else process_handle(
+        role_for_text_tool(tool), builder=get_llm, settings=get_ai_settings()
+    )
+    structured = handle.structured(CreativeBrief)
     response = await structured.ainvoke(
         [SystemMessage(content=LAYLA_TEXT_SYSTEM), HumanMessage(content=request)]
     )
@@ -241,7 +283,75 @@ async def generate_layla_text(
     # incorrect deliverable_type; the actual output still has to validate above.
     if parsed.deliverable_type != deliverable:
         parsed = parsed.model_copy(update={"deliverable_type": deliverable})
-    return _format_output(tool, parsed)
+
+    parsed, critique_notes = await _review_deliverable(
+        parsed,
+        tool=tool,
+        request=request,
+        brand_context_text=workspace_context,
+        language=language,
+        critique_llm=critique_llm,
+        critique=critique,
+    )
+
+    output = _format_output(tool, parsed)
+    if critique_notes:
+        # Surfaced, not swallowed: the user is told what the review changed.
+        existing = str(output.get("notes") or "").strip()
+        output["notes"] = "\n".join(
+            part for part in [existing, "\n".join(critique_notes)] if part
+        )
+    return output
 
 
-__all__ = ["LAYLA_TEXT_SYSTEM", "LaylaTextTool", "generate_layla_text"]
+async def _review_deliverable(
+    parsed: CreativeBrief,
+    *,
+    tool: LaylaTextTool,
+    request: str,
+    brand_context_text: str,
+    language: Literal["en", "ar"],
+    critique_llm: Any | None,
+    critique: bool | None,
+) -> tuple[CreativeBrief, list[str]]:
+    """One review pass over the draft. Returns the deliverable and any notes."""
+
+    settings = get_ai_settings()
+    from app.ai.agents.layla.critique import (
+        apply_verdict,
+        critique_deliverable,
+        critique_enabled,
+        critique_schema,
+    )
+
+    enabled = critique_enabled(settings) if critique is None else critique
+    if not enabled:
+        return parsed, []
+
+    if critique_llm is None:
+        critique_llm = process_handle(
+            "critique", builder=get_llm, settings=settings
+        )
+    verdict = await critique_deliverable(
+        critique_llm,
+        brief=request,
+        draft=parsed.model_dump(),
+        brand_context_text=brand_context_text,
+        language=language,
+        extra_rules=LAYLA_TEXT_SYSTEM,
+        schema=critique_schema(CreativeBrief),
+    )
+    reviewed, notes = apply_verdict(parsed, verdict, schema=CreativeBrief)
+    return reviewed, notes
+
+
+
+
+
+__all__ = [
+    "LAYLA_TEXT_SYSTEM",
+    "LaylaTextTool",
+    "ROLE_FOR_TOOL",
+    "generate_layla_text",
+    "role_for_text_tool",
+]

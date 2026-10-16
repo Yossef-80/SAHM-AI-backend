@@ -11,6 +11,7 @@ from langgraph.prebuilt import ToolNode
 from app.ai.agents.salma.schema import OptimizationPlan
 from app.ai.agents.salma.state import SalmaState
 from app.ai.providers.llm import get_llm
+from app.ai.providers.llm.agent_llm import agent_llm_for_graph
 from app.ai.settings import get_ai_settings
 from app.ai.tools import get_brand_context_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
@@ -53,7 +54,9 @@ def call_model(state: SalmaState, config: RunnableConfig) -> dict:
         for message in messages
     ):
         messages = [SystemMessage(content=SALMA_PROMPT)] + messages
-    llm_handle = get_llm(provider=get_ai_settings().llm_provider)
+    llm_handle = agent_llm_for_graph(
+        "salma", config, builder=get_llm, settings=get_ai_settings()
+    )
     response = llm_handle.chat.bind_tools(SALMA_TOOLS).invoke(messages, config)
     return {"messages": [response]}
 

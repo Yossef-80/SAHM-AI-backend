@@ -44,8 +44,18 @@ class ClaudeClient(BaseLLMClient):
         base_delay: float = 0.5,
         base_url: str = API_URL,
         client: httpx.AsyncClient | None = None,
+        # Workspace sampling defaults (Settings -> LLM). See BaseLLMClient.
+        default_temperature: float | None = None,
+        default_max_tokens: int | None = None,
     ) -> None:
-        super().__init__(model=model, timeout=timeout, max_retries=max_retries, base_delay=base_delay)
+        super().__init__(
+            model=model,
+            timeout=timeout,
+            max_retries=max_retries,
+            base_delay=base_delay,
+            default_temperature=default_temperature,
+            default_max_tokens=default_max_tokens,
+        )
         self.api_key = api_key
         self.base_url = base_url
         self._client = client

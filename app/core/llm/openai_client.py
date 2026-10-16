@@ -58,8 +58,18 @@ class OpenAIClient(BaseLLMClient):
         extra_headers: dict[str, str] | None = None,
         client: httpx.AsyncClient | None = None,
         reasoning_effort: str | None = None,
+        # Workspace sampling defaults (Settings -> LLM). See BaseLLMClient.
+        default_temperature: float | None = None,
+        default_max_tokens: int | None = None,
     ) -> None:
-        super().__init__(model=model, timeout=timeout, max_retries=max_retries, base_delay=base_delay)
+        super().__init__(
+            model=model,
+            timeout=timeout,
+            max_retries=max_retries,
+            base_delay=base_delay,
+            default_temperature=default_temperature,
+            default_max_tokens=default_max_tokens,
+        )
         self.api_key = api_key
         self.base_url = base_url
         self.extra_headers: dict[str, str] = dict(extra_headers or {})

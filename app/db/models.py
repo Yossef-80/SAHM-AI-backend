@@ -299,11 +299,17 @@ class Conversation(Base, TimestampMixin):
     context: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict)
     summary: Mapped[str | None] = mapped_column(Text)
 
+    # ``lazy="raise"`` is deliberate. With ``selectin`` every read of a
+    # conversation -- including the list endpoint and ``db.get`` in the chat
+    # loop -- silently issued a second query that loaded the *entire* message
+    # history of every row it touched. Message history is now loaded only where
+    # it is actually serialized (``get_conversation``, paginated), or through an
+    # explicit ``selectinload``/``select``.
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",
         cascade="all, delete-orphan",
         order_by="Message.created_at, desc(Message.role)",
-        lazy="selectin",
+        lazy="raise",
     )
 
 

@@ -497,6 +497,10 @@ async def _execute(
                 business_id=ctx.business_id,
                 scope=MemoryScope(query=user_message or task_name, top_k=6),
                 task_name=task_name,
+                # The campaign the conversation is about, when there is one: it
+                # pulls that campaign's research and learnings ahead of generic
+                # workspace memory instead of leaving them buried in the pile.
+                campaign_id=getattr(ctx, "campaign_id", None),
             )
             yield AgentEvent(
                 type="tool_result",

@@ -310,6 +310,11 @@ class GeneratedAssetRecord(BaseModel):
     model: str = ""
     style_spec: dict[str, object] = Field(default_factory=dict)
     reference_analysis_id: str | None = None
+    #: False when the URL could not be moved into durable storage and is only
+    #: valid for this response (a provider URL that will expire, or an inline
+    #: data URL). Callers must not write such a URL into a row: that is exactly
+    #: how the creatives table accumulated megabytes of base64.
+    durable: bool = True
 
 
 class GenerateImageOutput(ToolOutput):

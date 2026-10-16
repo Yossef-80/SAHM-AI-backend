@@ -43,7 +43,11 @@ OPENAI_COMPATIBLE_URLS = {
 }
 
 #: Credentials are included only as a one-way digest, never logged.
-_ClientKey = tuple[str, str, str, str, tuple[tuple[str, str], ...], str, str]
+#: Identity of a cached client: the 7 fields above, then the two sampling values
+#: as strings ("" means "the workspace had no opinion").
+_ClientKey = tuple[
+    str, str, str, str, tuple[tuple[str, str], ...], str, str, str, str
+]
 
 _clients: dict[_ClientKey, LLMClient] = {}
 
@@ -75,6 +79,15 @@ def build_client(
     cfg = settings or get_settings()
     provider = cfg.provider_for_tier[tier]
     model = cfg.model_for_tier[tier]
+    # Sampling defaults for this client. `get_workspace_llm` copies the
+    # workspace row's values onto `cfg`; when the row is silent these stay None
+    # and the client keeps its historical 0.4 / 2000. Without this the values a
+    # user typed into Settings -> LLM were read, validated, stored -- and then
+    # dropped on the floor before any request was built.
+    sampling = {
+        "default_temperature": cfg.llm_temperature,
+        "default_max_tokens": cfg.llm_max_tokens,
+    }
     # The endpoint and the extra headers are part of the identity of an
     # OpenAI-compatible client: changing LLM_BASE_URL / LLM_EXTRA_HEADERS must
     # build a new client instead of silently reusing a stale one.
@@ -99,6 +112,13 @@ def build_client(
         header_fp,
         credential_fp,
         reasoning_effort or "",
+    )
+    # Sampling is part of a client's identity too: two workspaces on the same
+    # model with different temperatures must not share the cached instance.
+    key = (
+        *key,
+        f"t={sampling['default_temperature']}",
+        f"m={sampling['default_max_tokens']}",
     )
 
     cached = _clients.get(key)
@@ -127,6 +147,7 @@ def build_client(
             max_retries=cfg.llm_max_retries,
             base_delay=cfg.llm_retry_base_delay,
             base_url=base_url,
+            **sampling,
         )
     elif provider in OPENAI_COMPATIBLE_URLS:
         client = OpenAIClient(
@@ -138,6 +159,7 @@ def build_client(
             base_url=base_url,
             extra_headers=cfg.llm_extra_headers,
             reasoning_effort=reasoning_effort,
+            **sampling,
         )
     else:  # pragma: no cover - Literal makes this unreachable via config
         raise LLMNotConfiguredError(f"unknown llm provider '{provider}'")
@@ -150,6 +172,8 @@ def build_client(
             "provider": provider,
             "model": model,
             "base_url_configured": bool(cfg.llm_base_url),
+            "temperature": sampling["default_temperature"],
+            "max_tokens": sampling["default_max_tokens"],
             # Header names only: values may be credentials.
             "extra_header_names": [name for name, _ in header_fp],
         },
@@ -240,6 +264,10 @@ async def get_workspace_llm(
         "llm_base_url": values["base_url"],
         "llm_extra_headers": values["extra_headers"],
     }
+    if values.get("temperature") is not None:
+        updates["llm_temperature"] = values["temperature"]
+    if values.get("max_tokens") is not None:
+        updates["llm_max_tokens"] = values["max_tokens"]
     if values["provider"] == "openai":
         updates["openai_api_key"] = values["api_key"]
     elif values["provider"] == "claude":

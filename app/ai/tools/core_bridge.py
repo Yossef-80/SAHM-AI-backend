@@ -16,8 +16,12 @@ from langchain_core.runnables.config import RunnableConfig
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel
 
+from app.ai.loggers.callbacks import AIToolAuditCallback
 from app.ai.security import redact_credential_text, redact_sensitive_data
+from app.core.logging import get_logger
 from app.schemas.common import ToolSideEffect
+
+_logger = get_logger(__name__)
 
 # Keep this allowlist explicit. It mirrors the supported read/draft capabilities
 # for each conversation agent and deliberately excludes every external-write tool.
@@ -33,14 +37,42 @@ _REFERENCE_INTENT = re.compile(
     r"مرجع|كمرجع|استلهام|إلهام|زي\s+الصورة|مثل\s+الصورة|على\s+نمط)"
 )
 _GENERATE_INTENT = re.compile(
+    # English imperatives, then the Arabic forms people actually type. The Arabic
+    # side is deliberately broad about clitics -- "اعملي الصورة", "صمميلي صورة",
+    # "صمميها", "طلّعيها" are all one request -- because a miss here is expensive:
+    # the image tool silently refuses, and the user pays for a prompt they already
+    # approved instead of getting the picture. The noun list is what stops this
+    # from firing on an unrelated "اعملي حملة".
     r"(?i)(?:\bgenerate\s+(?:an?\s+)?image\b|\bcreate\s+(?:an?\s+)?image\b|"
     r"\brender\s+(?:an?\s+)?image\b|\bmake\s+(?:an?\s+)?image\b|"
-    r"انشئ\s+صورة|أنشئ\s+صورة|ولّد\s+صورة|ولد\s+صورة|اعمل\s+صورة|طلع\s+الصورة)"
+    r"\b(?:generate|create|make|produce)\s+(?:the\s+)?(?:picture|design)\b|"
+    # Masdar/verbal-noun phrasing ("توليد صورة", "إنشاء صورة", "تصميم صورة") has no
+    # imperative verb for the branch below to latch onto, and it is how a brief is
+    # usually titled.
+    r"(?:توليد|انتاج|إنتاج|إنشاء|انشاء|صياغة|صناعة)\s*(?:ال)?"
+    r"(?:صور(?:ة|تين)?|تصميم|بوستر|بنر|بانر|إعلان|اعلان|كرييتف|كرياتيف)|"
+    r"(?:اعمل|أعمل|إعمل|اعملى|صمم|صمّم|صممى|نفذ|نفّذ|ولد|ولّد|انشئ|أنشئ|انشاء|اطلع|طلّع|طلع|سوي|سوّي|رندر|حوّل|حول)"
+    r"(?:يها|ها|يه|ه|ي|لي|لى|لنا|لهم|وها)?"
+    r"\s*(?:لي\s*)?(?:ال)?"
+    r"(?:صور(?:ة|ه|تين)?|تصميم|ديزاين|بوست(?:ر)?|بنر|بانر|إعلان|اعلان|أعلان|كرييتف|كرياتيف|فيزوال|فيسوال)"
+    r"|"
+    # Bare object-pronoun form: "صمميها" / "اعمليها" / "نفذيها". The thing being
+    # referred to is the deliverable already on the table, so the verb alone
+    # carries the intent -- unless the object is spelled out as something that is
+    # explicitly not an image.
+    # The trailing ``\b`` is load-bearing: without it the engine can satisfy the
+    # pronoun with the lone ``ه`` of "اعملها" and then the lookahead inspects the
+    # leftover "ا حملة" -- which is not the blocked word, so "اعملها حملة" used to
+    # read as an image request.
+    r"(?:صمم|صمّم|نفذ|نفّذ|ولد|ولّد|اعمل|سوي|سوّي|طلع|طلّع|اطلع)(?:يها|ها|يه|ه)\b"
+    r"(?!\s*(?:حملة|حمله|استراتيجية|إستراتيجية|تقرير|خطة|نص|كوبي|كابشن|ايميل|إيميل|سكريبت|جدول|بريف|برومبت|فيديو|ريل|موشن|انيميشن|أنيميشن|صوت|موسيقى))"
+    r")"
 )
 _PROMPT_ONLY = re.compile(
     r"(?i)(?:\bprompt\s+only\b|\bwrite\s+(?:me\s+)?a\s+prompt\b|"
     r"\bimage\s+prompt\b|\bvideo\s+prompt\b|اكتب\s+(?:لي\s+)?(?:برومبت|prompt)|"
-    r"برومبت\s+فقط|صياغة\s+البرومبت)"
+    r"برومبت\s+فقط|برومبت\s+بس|صياغة\s+البرومبت|"
+    r"من\s+غير\s+(?:ما\s+)?(?:صورة|تصميم|تولّد|تولد|تعمل)|من\s+دون\s+(?:صورة|تصميم))"
 )
 
 
@@ -58,6 +90,78 @@ def _unavailable(tool: Any, reason: str) -> str:
         reason=reason,
     )
     return json.dumps(output.model_dump(mode="json"), ensure_ascii=False)
+
+
+#: Words that send the user back to the picture they already chose: "اعمل تصميم
+#: زي ده بالظبط" is about the active reference. A request for something new
+#: ("من الأول", "فكرة تانية") is not, and must never inherit it silently.
+_DEICTIC_REFERENCE = re.compile(
+    r"(?:ز[يى]|ذ[يى])\s*(?:ده|دا|دي|دى|كده|كدا)"
+    r"|(?:ز[يى]|على\s*غرار|نفس)\s*(?:الصورة|التصميم|الشكل|الستايل|اللوجو|الهوية)"
+    r"|ز[يى]\s*اللي\s*(?:بعتته|فوق|تحت|عجبك|عملته)"
+    r"|\b(?:like|same as|similar to|based on)\s+(?:this|that|the\s+(?:above|reference|image|design|one))\b",
+    re.IGNORECASE,
+)
+
+
+#: Tools that produce a paid picture. One per turn is the product rule ("كفاية
+#: نسخة واحدة"): the user asked for an image, not for a bill for two.
+_IMAGE_TOOLS = frozenset({"generate_image", "generate_image_draft_tool"})
+
+
+def _image_already_produced(config: Any) -> bool:
+    """Whether this very run already generated a picture.
+
+    Asked of the run's tool audit, which is one object for the whole graph run --
+    including the second attempt after a provider refusal. Only *completed* calls
+    count: the call asking this question has already started, so a started-set
+    check would refuse every first image.
+    """
+    callbacks = (config or {}).get("callbacks")
+    if isinstance(callbacks, (list, tuple)):
+        handlers = list(callbacks)
+    else:
+        handlers = list(getattr(callbacks, "handlers", []) or [])
+    for handler in handlers:
+        if not isinstance(handler, AIToolAuditCallback):
+            continue
+        if set(handler.tools_completed()) & _IMAGE_TOOLS:
+            return True
+    return False
+
+
+def _context_reference_default(name: str, payload: Any, context: Any) -> Any:
+    """Give ``generate_image`` the conversation's reference when the model forgot it.
+
+    The model is told the active ``reference_analysis_id`` in its prompt, but a
+    small model does occasionally drop it. Dropping it silently produced a
+    from-scratch image the user immediately rejected as "مش زي اللي بعتّه" --
+    a wrong picture is worse than a missing one, so this fills the gap only when
+    all three of these hold: the tool is ``generate_image``, the model passed no
+    reference at all, and the user's own words point back at the picture.
+    """
+    if name != "generate_image" or payload is None:
+        return payload
+    if getattr(payload, "reference_analysis_id", None) or getattr(
+        payload, "reference_image_url", None
+    ):
+        return payload
+    supplied = getattr(context, "user_supplied", {}) or {}
+    if not isinstance(supplied, dict):
+        return payload
+    reference_id = str(supplied.get("reference_analysis_id") or "").strip()
+    latest = str(supplied.get("latest_user_message") or "")
+    if not reference_id or not _DEICTIC_REFERENCE.search(latest):
+        return payload
+    try:
+        payload = payload.model_copy(update={"reference_analysis_id": reference_id})
+    except Exception:  # noqa: BLE001 - an unexpected payload shape stays untouched
+        return payload
+    _logger.info(
+        "generate_image_reference_defaulted",
+        extra={"reference_analysis_id": reference_id},
+    )
+    return payload
 
 
 def _validate_explicit_intent(name: str, context: Any) -> str | None:
@@ -107,8 +211,16 @@ async def _validate_tool_action(name: str, payload: BaseModel, context: Any) -> 
 
     if name == "analyze_reference_creative":
         upload_id = getattr(payload, "upload_id", None)
-        if upload_id and not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", str(upload_id)):
-            return "The reference upload id is invalid; no file was opened."
+        if upload_id:
+            # The allow-list has to accept a dot: a stored reference carries its
+            # extension (`reference_<hex>.png`). Without it the id this codebase
+            # itself hands out was rejected as "invalid" before the file was even
+            # opened -- so a perfectly good reference could never be analysed.
+            # Traversal is still refused here as well as in the tool, which
+            # resolves the path and re-checks the upload root.
+            candidate = str(upload_id)
+            if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", candidate) or ".." in candidate:
+                return "The reference upload id is invalid; no file was opened."
         if not upload_id and not getattr(payload, "image_url", None):
             return "Provide a reference upload or public image URL explicitly."
 
@@ -219,6 +331,21 @@ def _make_langchain_tool(core_tool: Any) -> StructuredTool:
         error_text: str | None = None
         try:
             payload = core_tool.input_model.model_validate(kwargs)
+            # One image per turn. A second call in the same run is refused *before*
+            # the provider is reached, so a duplicate can never be billed.
+            if core_tool.name in _IMAGE_TOOLS and _image_already_produced(config):
+                _logger.info(
+                    "image_generation_duplicate_refused",
+                    extra={"tool": core_tool.name, "reason": "one image per turn"},
+                )
+                return _unavailable(
+                    core_tool,
+                    "An image was already generated in this turn. Refer to that one "
+                    "instead of generating another; do not call this tool again.",
+                )
+            # The conversation's reference is a default, not an override: an
+            # explicit choice by the model always wins.
+            payload = _context_reference_default(core_tool.name, payload, context)
             policy_reason = await _validate_tool_action(core_tool.name, payload, context)
             if policy_reason:
                 result = core_tool.output_model.unavailable(

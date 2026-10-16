@@ -27,7 +27,12 @@ async def _handle_save_learning(payload: SaveLearningInput, ctx: ToolContext) ->
     whether the write is committed for this run.
     """
     store = BrandMemoryStore(ctx.db)
-    return await store.save_learning(business_id=ctx.business_id, payload=payload)
+    return await store.save_learning(
+        business_id=ctx.business_id,
+        payload=payload,
+        conversation_id=getattr(ctx, "conversation_id", None),
+        persona_id=getattr(ctx, "persona_id", None),
+    )
 
 
 get_brand_context_tool = Tool(

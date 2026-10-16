@@ -27,11 +27,14 @@ from app.core.tools.media import (
     encode_uploaded_creative_image,
     generate_image_for_workspace,
     persist_inline_reference_image,
+    persist_inline_reference_image_async,
 )
 from app.db.models import BrandMemoryItem, BrandProfile, Creative
 from app.schemas.common import ToolStatus
 from app.schemas.creatives import (
     AnalyzeReferenceRequest,
+    SaveTextCreativeRequest,
+    UpdateTextCreativeRequest,
     CreativeReferenceItem,
     CreativeReferenceUpdate,
     GenerateCreativeRequest,
@@ -131,7 +134,7 @@ async def analyze_reference(
     upload_id = payload.upload_id
     if payload.image_data:
         try:
-            upload_id = persist_inline_reference_image(payload.image_data, settings)
+            upload_id = await persist_inline_reference_image_async(payload.image_data, settings)
         except ToolUnavailable as exc:
             return ReferenceAnalysis.unavailable(
                 source="analyze_reference_creative:upload", reason=exc.message
@@ -292,6 +295,18 @@ async def generate_creative(
     )
 
 
+def _brand_context_token_estimate(brand_context_text: str) -> int | None:
+    """Rough size of the brand block that was sent, for the UI's debug view.
+
+    Uses the same 4-chars-per-token estimate as the memory store; None when no
+    context was attached at all.
+    """
+    text = (brand_context_text or "").strip()
+    if not text:
+        return None
+    return max(1, len(text) // 4)
+
+
 @router.post("/generate-text", response_model=GenerateLaylaTextResponse)
 async def generate_layla_text(
     payload: GenerateLaylaTextRequest,
@@ -312,8 +327,9 @@ async def generate_layla_text(
     profile = await db.scalar(
         select(BrandProfile).where(BrandProfile.business_id == ws.business_id).limit(1)
     )
-    # visual_style is intentionally excluded: the frontend only appends it to
-    # the brief when the user explicitly enables the saved-style toggle.
+    # visual_style is intentionally excluded from the *field* fallback: the
+    # frontend only appends it to the brief when the user explicitly enables the
+    # saved-style toggle.
     brand_context = {
         "brand_voice": profile.brand_voice if profile else None,
         "target_audience": profile.target_audience if profile else None,
@@ -321,7 +337,84 @@ async def generate_layla_text(
         "goals": profile.goals if profile else [],
     }
 
-    from app.ai.agents.layla.service import generate_layla_text as run_layla_text
+    # The semantic brand memory, not just four profile columns. This is the
+    # difference between generic strong-tier copy and copy that sounds like this
+    # business: past approved examples, offers, audience notes, competitor
+    # observations and campaign learnings, retrieved against the user's own
+    # brief. A failure here degrades to the profile fields above -- a broken
+    # embedding provider must not cost the user their ad copy.
+    brand_context_text = ""
+    try:
+        from app.core.memory.store import (
+            CREATIVE_BRAND_CONTEXT_TOKEN_CAP,
+            BrandMemoryStore,
+            format_context_for_prompt,
+        )
+        from app.schemas.tools import MemoryScope
+
+        memory_context = await BrandMemoryStore(db).build_context(
+            business_id=ws.business_id,
+            scope=MemoryScope(
+                query=(payload.brief or profile.brand_voice or "advertising creative")[:500],
+                top_k=8,
+                include_learnings=True,
+                max_learnings=4,
+            ),
+            campaign_id=payload.campaign_id,
+            token_cap=CREATIVE_BRAND_CONTEXT_TOKEN_CAP,
+        )
+        brand_context_text = format_context_for_prompt(
+            memory_context, token_cap=CREATIVE_BRAND_CONTEXT_TOKEN_CAP
+        )
+    except Exception as exc:  # pragma: no cover - degraded, still useful
+        _logger.warning(
+            "Layla text generation is running without semantic brand memory",
+            extra={"workspace_id": ws.business_id, "reason": type(exc).__name__},
+        )
+
+    from app.ai.agents.layla.service import (
+        generate_layla_text as run_layla_text,
+        role_for_text_tool,
+    )
+    from app.ai.providers.llm import get_workspace_chat_llm
+    from app.ai.settings import get_ai_settings
+
+    # Ad copy is creative work, not extraction: it gets the workspace's strong
+    # tier at the creative role's temperature instead of the process-wide model
+    # at `AI_LLM_TEMPERATURE`.
+    role = role_for_text_tool(payload.tool)
+    spec = get_ai_settings().role_spec(role)
+    creative_llm: Any | None = None
+    try:
+        creative_llm = await get_workspace_chat_llm(
+            db=db,
+            business_id=ws.business_id,
+            tier=spec.tier,
+            default_temperature=spec.temperature,
+            default_max_tokens=spec.max_tokens,
+        )
+    except Exception as exc:  # pragma: no cover - falls back to process settings
+        _logger.warning(
+            "Layla text generation fell back to process LLM settings",
+            extra={"workspace_id": ws.business_id, "reason": type(exc).__name__},
+        )
+
+    # The review pass runs on its own handle: cold (see `critique` in app.ai.roles)
+    # and, like the writer, resolved from the workspace's own provider settings.
+    critique_llm: Any | None = None
+    review_spec = get_ai_settings().role_spec("critique")
+    try:
+        critique_llm = await get_workspace_chat_llm(
+            db=db,
+            business_id=ws.business_id,
+            tier=review_spec.tier,
+            default_temperature=review_spec.temperature,
+        )
+    except Exception as exc:  # pragma: no cover - the service resolves its own
+        _logger.warning(
+            "Self-critique fell back to process LLM settings",
+            extra={"workspace_id": ws.business_id, "reason": type(exc).__name__},
+        )
 
     try:
         output = await run_layla_text(
@@ -329,6 +422,9 @@ async def generate_layla_text(
             brief=payload.brief,
             language=payload.language,
             brand_context=brand_context,
+            brand_context_text=brand_context_text,
+            llm=creative_llm,
+            critique_llm=critique_llm,
         )
     except ProviderError as exc:
         # Keep missing keys, missing optional packages and provider HTTP errors
@@ -342,7 +438,149 @@ async def generate_layla_text(
         tool=payload.tool,
         output=output,
         created_at=datetime.now(UTC),
+        role=role,
+        model=getattr(creative_llm, "model_name", None) if creative_llm else None,
+        brand_context_tokens=_brand_context_token_estimate(brand_context_text),
     )
+
+
+@router.post("/text", response_model=GeneratedAsset)
+async def save_text_creative(
+    payload: SaveTextCreativeRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+) -> GeneratedAsset:
+    """Save approved Layla copy as a creative, and learn the user's taste from it.
+
+    Two signals arrive here, and they are different lessons:
+
+    * the text is kept as Layla wrote it -> a **positive example** (this is what
+      "on brand" looks like, in this workspace, today);
+    * the user rewrote it before saving -> a **before/after pair**, which is worth
+      more than any description of the brand voice.
+
+    Both land in brand memory as ``voice_example`` items and both are retrieved
+    into later prompts as few-shot examples.
+    """
+    await assert_campaign_owned(db, payload.campaign_id, ws)
+    if payload.creative_id:
+        assert_owned(await db.get(Creative, payload.creative_id), ws, entity="creative")
+
+    from app.ai.marketing.assets import persist_prompt_creative
+
+    final_text = payload.text.strip()
+    record = await persist_prompt_creative(
+        db,
+        business_id=ws.business_id,
+        campaign_id=payload.campaign_id,
+        kind="copy",
+        title=payload.title.strip(),
+        prompt=final_text,
+        aspect_ratio="1:1",
+        provider="layla_text",
+        model=payload.model,
+        # The row's `prompt` is the deliverable itself, not a captioned one.
+        include_title=False,
+    )
+    await _learn_from_saved_copy(
+        db,
+        business_id=ws.business_id,
+        final_text=final_text,
+        original_text=(payload.original_text or "").strip(),
+        brief=payload.brief,
+        campaign_id=payload.campaign_id,
+    )
+    await db.commit()
+    return GeneratedAsset(
+        id=record.id,
+        url="",
+        prompt=final_text,
+        aspect_ratio="1:1",
+        provider="layla_text",
+        model=record.model or "",
+        created_at=datetime.now(UTC),
+    )
+
+
+@router.patch("/{creative_id}/text", response_model=GeneratedAsset)
+async def update_text_creative(
+    creative_id: str,
+    payload: UpdateTextCreativeRequest,
+    ws: WorkspaceDep,
+    db: SessionDep,
+) -> GeneratedAsset:
+    """Edit a saved text creative's copy; the edit becomes brand-voice memory.
+
+    This is the second half of the learning loop's manual-edit hook: the user
+    fixes a line, and the difference between what Layla wrote and what they
+    wanted is stored as an example for the next request.
+    """
+    creative = assert_owned(await db.get(Creative, creative_id), ws, entity="creative")
+
+    previous = creative.prompt or ""
+    revised = payload.text.strip()
+    creative.prompt = revised
+    creative.status = "ready"
+    await db.flush()
+
+    await _learn_from_saved_copy(
+        db,
+        business_id=ws.business_id,
+        final_text=revised,
+        original_text=previous,
+        brief="",
+        campaign_id=creative.campaign_id,
+    )
+    await db.commit()
+    await db.refresh(creative)
+    return GeneratedAsset(
+        id=creative.id,
+        url=creative.url or "",
+        prompt=creative.prompt,
+        aspect_ratio=creative.aspect_ratio,
+        provider=creative.provider or "",
+        model=creative.model or "",
+        created_at=creative.created_at,
+    )
+
+
+async def _learn_from_saved_copy(
+    db: Any,
+    *,
+    business_id: str,
+    final_text: str,
+    original_text: str,
+    brief: str,
+    campaign_id: str | None,
+) -> None:
+    """Record an approval or an edit as ``voice_example`` memory. Never raises."""
+    from app.ai.agents.layla.learning import learn_from_approval, learn_from_edit
+    from app.core.memory.store import BrandMemoryStore
+
+    store = BrandMemoryStore(db)
+    try:
+        if not await learn_from_edit(
+            store,
+            business_id=business_id,
+            original=original_text,
+            revised=final_text,
+            context=brief,
+            campaign_id=campaign_id,
+        ):
+            # No previous text, or an edit too small to read as intent (a comma,
+            # an exclamation mark): the copy itself is still a positive example.
+            await learn_from_approval(
+                store,
+                business_id=business_id,
+                text=final_text,
+                brief=brief,
+                campaign_id=campaign_id,
+            )
+    except Exception as exc:  # pragma: no cover - a memory write must not fail the save
+        _logger.warning(
+            "voice example could not be stored for a saved creative",
+            extra={"workspace_id": business_id, "reason": type(exc).__name__},
+        )
 
 
 @router.post("/upload", response_model=GeneratedAsset)
@@ -417,6 +655,11 @@ async def list_creatives(
             "id": c.id,
             "url": c.url,
             "prompt": c.prompt,
+            # Without `kind` the client had to assume every row was an image, so a
+            # saved ad-copy creative rendered as a broken thumbnail.
+            "kind": c.kind,
+            "status": c.status,
+            "model": c.model,
             "aspectRatio": c.aspect_ratio,
             "provider": c.provider,
             "campaignId": c.campaign_id,
@@ -428,6 +671,8 @@ async def list_creatives(
 
 __all__ = [
     "analyze_reference",
+    "save_text_creative",
+    "update_text_creative",
     "generate_creative",
     "generate_layla_text",
     "list_creative_references",

@@ -11,6 +11,7 @@ from langgraph.prebuilt import ToolNode
 from app.ai.agents.nour.schema import MarketResearchReport
 from app.ai.agents.nour.state import NourState
 from app.ai.providers.llm import get_llm
+from app.ai.providers.llm.agent_llm import agent_llm_for_graph
 from app.ai.settings import get_ai_settings
 from app.ai.tools import (
     analyze_website_tool,
@@ -79,7 +80,9 @@ def call_model(state: NourState, config: RunnableConfig) -> dict:
     messages = list(state["messages"])
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [SystemMessage(content=NOUR_PROMPT)] + messages
-    llm_handle = get_llm(provider=get_ai_settings().llm_provider)
+    llm_handle = agent_llm_for_graph(
+        "nour", config, builder=get_llm, settings=get_ai_settings()
+    )
     response = llm_handle.chat.bind_tools(NOUR_TOOLS).invoke(messages, config)
     return {"messages": [response]}
 

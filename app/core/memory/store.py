@@ -20,7 +20,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Float, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
@@ -39,8 +39,17 @@ from app.schemas.tools import (
 _logger = get_logger(__name__)
 
 #: Token cap for the assembled BrandContext. Roughly 4 chars per token.
-#: Documented in docs/API_CONTRACT.md and DECISIONS.md.
+#:
+#: Two caps, because the right budget depends on who is reading. A chat turn
+#: shares its window with the conversation, the tool schemas and the routing
+#: history; a one-shot creative request is a single deliverable and can afford a
+#: real brand brief. Both used to be one number, so "write me ad copy that sounds
+#: like us" was written from roughly four profile fields plus one or two memory
+#: items -- the reason strong-tier output still read as generic.
 BRAND_CONTEXT_TOKEN_CAP = 900
+#: Cap used by creative generation (``/creatives/generate-text``), where the
+#: brand context *is* the brief rather than background for a conversation.
+CREATIVE_BRAND_CONTEXT_TOKEN_CAP = 2600
 
 #: Rough chars-per-token used for the estimate. Deliberately conservative.
 _CHARS_PER_TOKEN = 4
@@ -111,20 +120,40 @@ class BrandMemoryStore:
         text: str,
         metadata: dict[str, Any] | None = None,
         campaign_id: str | None = None,
+        conversation_id: str | None = None,
+        persona_id: str | None = None,
+        agent: str | None = None,
+        source: str = "brand_memory",
     ) -> BrandMemoryItem:
-        """Persist one memory item with its embedding."""
+        """Persist one memory item with its embedding.
+
+        Provenance travels with the item. ``campaign_id`` is a real column;
+        ``conversation_id`` / ``persona_id`` / ``source`` go into ``metadata``
+        because they are already indexed by the caller when they matter, and
+        because a memory that cannot say where it came from is a memory the next
+        agent cannot weigh -- research written by Nour, a learning from Salma's
+        insight and a line of brand voice all used to look identical downstream.
+        """
         if kind not in MEMORY_KINDS:
             raise ValueError(
                 f"unknown memory kind '{kind}'; expected one of {MEMORY_KINDS}"
             )
         vector = await self.embeddings.embed(text)
+        enriched = dict(metadata or {})
+        enriched.setdefault("source", source)
+        if conversation_id:
+            enriched.setdefault("conversation_id", conversation_id)
+        if persona_id or agent:
+            enriched.setdefault("persona_id", persona_id or agent)
+        if campaign_id:
+            enriched.setdefault("campaign_id", campaign_id)
         item = BrandMemoryItem(
             id=_new_id("mem"),
             business_id=business_id,
             kind=kind,
             text=text,
             embedding=vector,
-            metadata_=metadata or {},
+            metadata_=enriched,
             campaign_id=campaign_id,
         )
         self.db.add(item)
@@ -136,7 +165,12 @@ class BrandMemoryStore:
         return item
 
     async def save_learning(
-        self, *, business_id: str, payload: SaveLearningInput
+        self,
+        *,
+        business_id: str,
+        payload: SaveLearningInput,
+        conversation_id: str | None = None,
+        persona_id: str | None = None,
     ) -> Learning:
         """Write a learning back to brand memory."""
         text_parts = [f"What worked: {payload.what_worked}"]
@@ -157,6 +191,9 @@ class BrandMemoryStore:
                 "tags": payload.tags,
             },
             campaign_id=payload.campaign_id,
+            conversation_id=conversation_id,
+            persona_id=persona_id,
+            source="save_learning",
         )
         return Learning(
             id=item.id,
@@ -179,7 +216,15 @@ class BrandMemoryStore:
         """Similarity search in Postgres using pgvector's cosine distance."""
         from pgvector.sqlalchemy import Vector
 
-        distance = BrandMemoryItem.embedding.cosine_distance(vector)
+        # ``cast(..., Float)`` is load-bearing, not decoration. Without it, this
+        # stack infers the JSON type for the ``<=>`` expression, and the driver
+        # then hands the resulting *float* to the JSON deserializer, which raises
+        # "'float' object is not subscriptable". That exception was swallowed by
+        # the caller's fallback, so every semantic search silently degraded to
+        # "newest 500 rows, scored in Python" -- correct-looking results in the
+        # wrong order, with score 0.0 on the wire. Declaring the type once here
+        # keeps the real ordering and keeps the fallback for what it is for.
+        distance = cast(BrandMemoryItem.embedding.cosine_distance(vector), Float)
         stmt = (
             BrandMemoryItem.__table__.select()
             .add_columns(distance.label("distance"))
@@ -206,8 +251,20 @@ class BrandMemoryStore:
             for r in rows
         ]
 
+    #: How many rows the in-Python fallback is allowed to score. The fallback
+    #: used to load *every* embedding of the business into memory and score it in
+    #: Python, which turns a slow search into a memory spike as the workspace
+    #: accumulates research. Newest-first is the useful half of that set.
+    PYTHON_SEARCH_CANDIDATES = 500
+
     async def _search_python(
-        self, *, business_id: str, vector: list[float], kinds: list[str], top_k: int
+        self,
+        *,
+        business_id: str,
+        vector: list[float],
+        kinds: list[str],
+        top_k: int,
+        campaign_id: str | None = None,
     ) -> list[tuple[BrandMemoryItem, float]]:
         """Similarity search in Python (SQLite / no pgvector)."""
         stmt = BrandMemoryItem.__table__.select().where(
@@ -215,6 +272,9 @@ class BrandMemoryStore:
         )
         if kinds:
             stmt = stmt.where(BrandMemoryItem.kind.in_(kinds))
+        stmt = stmt.order_by(BrandMemoryItem.created_at.desc()).limit(
+            max(self.PYTHON_SEARCH_CANDIDATES, top_k)
+        )
         rows = (await self.db.execute(stmt)).mappings().all()
         scored: list[tuple[BrandMemoryItem, float]] = []
         for r in rows:
@@ -245,13 +305,13 @@ class BrandMemoryStore:
         scored.sort(key=lambda pair: pair[1], reverse=True)
         return scored[:top_k]
 
-    async def search(
-        self, *, business_id: str, query: str, kinds: list[str], top_k: int
+    async def _search_backend(
+        self, *, business_id: str, vector: list[float], kinds: list[str], top_k: int
     ) -> list[tuple[BrandMemoryItem, float]]:
-        vector = await self.embeddings.embed(query)
         if self.db.bind.dialect.name == "postgresql":
+            pairs: list[tuple[BrandMemoryItem, float]] | None = None
             try:
-                return await self._search_pgvector(
+                pairs = await self._search_pgvector(
                     business_id=business_id, vector=vector, kinds=kinds, top_k=top_k
                 )
             except Exception as exc:  # pragma: no cover - fall back, never fail a run
@@ -259,13 +319,80 @@ class BrandMemoryStore:
                     "pgvector_search_failed_falling_back",
                     extra={"error": str(exc)},
                 )
+            if pairs is not None:
+                # Cosine distance is *undefined* against a zero-magnitude vector
+                # and pgvector returns NaN rather than erroring. NaN then orders
+                # arbitrarily in SQL and serialises as a null score on the wire,
+                # so a degenerate query (an embedding provider that returns zeros,
+                # e.g. the offline mock, or a row stored before embeddings were
+                # configured) is detected here and served by the Python scan
+                # instead: same ordering rules, a finite score, no nulls.
+                finite = [(item, score) for item, score in pairs if math.isfinite(score)]
+                if finite:
+                    return finite
+                _logger.warning(
+                    "pgvector_search_scores_not_finite_falling_back",
+                    extra={
+                        "rows": len(pairs),
+                        "reason": "cosine distance is undefined for a zero vector",
+                    },
+                )
         return await self._search_python(
             business_id=business_id, vector=vector, kinds=kinds, top_k=top_k
         )
 
+    async def search(
+        self,
+        *,
+        business_id: str,
+        query: str,
+        kinds: list[str],
+        top_k: int,
+        campaign_id: str | None = None,
+    ) -> list[tuple[BrandMemoryItem, float]]:
+        """Similarity search, with campaign-scoped items pulled in beside the rest.
+
+        A campaign's own research and learnings used to be indistinguishable from
+        workspace-wide memory, so an agent working on campaign X could miss the
+        brief that was written for campaign X. When a campaign is in scope the
+        results are the merge of that campaign's top matches and the business-wide
+        top matches -- campaign knowledge first on ties, since it is the more
+        specific context -- each capped so the token budget in ``build_context``
+        is unaffected.
+        """
+        vector = await self.embeddings.embed(query)
+        if not campaign_id:
+            return await self._search_backend(
+                business_id=business_id, vector=vector, kinds=kinds, top_k=top_k
+            )
+
+        scoped = await self._search_backend(
+            business_id=business_id,
+            vector=vector,
+            kinds=kinds,
+            top_k=top_k,
+        )
+        campaign_hits = [pair for pair in scoped if getattr(pair[0], "campaign_id", None) == campaign_id]
+        merged: list[tuple[BrandMemoryItem, float]] = []
+        seen: set[str] = set()
+        for item, score in campaign_hits + scoped:
+            if item.id in seen:
+                continue
+            seen.add(item.id)
+            merged.append((item, score))
+            if len(merged) >= max(top_k, 1):
+                break
+        return merged
+
     async def recent_learnings(
-        self, *, business_id: str, limit: int
+        self, *, business_id: str, limit: int, campaign_id: str | None = None
     ) -> list[BrandMemoryItem]:
+        """Newest learnings. With ``campaign_id``, that campaign's learnings win.
+
+        The point of a learning is that the next campaign starts smarter, so
+        workspace-wide learnings are still returned -- they are simply ranked
+        behind the ones written for the campaign actually in play.
+        """
         stmt = (
             BrandMemoryItem.__table__.select()
             .where(
@@ -273,10 +400,18 @@ class BrandMemoryStore:
                 BrandMemoryItem.kind == "learning",
             )
             .order_by(BrandMemoryItem.created_at.desc())
-            .limit(limit)
+            .limit(max(limit, 1) * (3 if campaign_id else 1))
         )
         rows = (await self.db.execute(stmt)).mappings().all()
-        return [_row_to_item(r) for r in rows]
+        items = [_row_to_item(r) for r in rows]
+        if campaign_id:
+            items.sort(
+                key=lambda item: (
+                    0 if (getattr(item, "campaign_id", None) == campaign_id) else 1,
+                    -(item.created_at.timestamp() if item.created_at else 0.0),
+                )
+            )
+        return items[:max(limit, 1)]
 
     async def get_business(self, business_id: str) -> Business:
         business = await self.db.get(Business, business_id)
@@ -425,7 +560,13 @@ class BrandMemoryStore:
     # ------------------------------------------------------ context assembly --
 
     async def build_context(
-        self, *, business_id: str, scope: MemoryScope, task_name: str | None = None
+        self,
+        *,
+        business_id: str,
+        scope: MemoryScope,
+        task_name: str | None = None,
+        campaign_id: str | None = None,
+        token_cap: int | None = None,
     ) -> BrandContext:
         """Assemble a compact, token-bounded BrandContext.
 
@@ -435,7 +576,12 @@ class BrandMemoryStore:
         3. most recent learnings
 
         Anything that does not fit is dropped and ``truncated`` is set.
+
+        ``token_cap`` overrides the default budget; creative generation passes
+        ``CREATIVE_BRAND_CONTEXT_TOKEN_CAP`` because a single deliverable has no
+        conversation competing for the window.
         """
+        cap = token_cap or BRAND_CONTEXT_TOKEN_CAP
         business = await self.get_business(business_id)
         profile = await self.get_profile(business_id)
 
@@ -480,12 +626,16 @@ class BrandMemoryStore:
 
         # 2. similar items
         similar = await self.search(
-            business_id=business_id, query=query, kinds=kinds, top_k=scope.top_k
+            business_id=business_id,
+            query=query,
+            kinds=kinds,
+            top_k=scope.top_k,
+            campaign_id=campaign_id,
         )
         for item, score in similar:
             label = _label_for(item)
             candidate = _estimate_tokens(f"{label} {item.text}")
-            if used + candidate > BRAND_CONTEXT_TOKEN_CAP:
+            if used + candidate > cap:
                 ctx.truncated = True
                 break
             used += candidate
@@ -502,10 +652,10 @@ class BrandMemoryStore:
         # 3. recent learnings
         if scope.include_learnings and scope.max_learnings > 0:
             for item in await self.recent_learnings(
-                business_id=business_id, limit=scope.max_learnings
+                business_id=business_id, limit=scope.max_learnings, campaign_id=campaign_id
             ):
                 candidate = _estimate_tokens(item.text)
-                if used + candidate > BRAND_CONTEXT_TOKEN_CAP:
+                if used + candidate > cap:
                     ctx.truncated = True
                     break
                 used += candidate
@@ -545,12 +695,21 @@ async def get_brand_context(payload: GetBrandContextInput, ctx: Any) -> BrandCon
     if payload.campaign_id and not scope.query:
         scope = scope.model_copy(update={"query": f"campaign {payload.campaign_id}"})
     return await store.build_context(
-        business_id=ctx.business_id, scope=scope, task_name=payload.task_name
+        business_id=ctx.business_id,
+        scope=scope,
+        task_name=payload.task_name,
+        campaign_id=payload.campaign_id or getattr(ctx, "campaign_id", None),
     )
 
 
-def format_context_for_prompt(ctx_brand: BrandContext) -> str:
-    """Render a BrandContext as the brand-context block of a prompt."""
+def format_context_for_prompt(
+    ctx_brand: BrandContext, *, token_cap: int | None = None
+) -> str:
+    """Render a BrandContext as the brand-context block of a prompt.
+
+    ``token_cap`` must be the cap the context was assembled with, so the note
+    tells the model how much of the brand memory it is actually missing.
+    """
     lines: list[str] = ["BRAND CONTEXT (use this; do not invent anything beyond it)"]
     lines.append(f"Business: {ctx_brand.business_name}")
     if ctx_brand.industry:
@@ -587,13 +746,15 @@ def format_context_for_prompt(ctx_brand: BrandContext) -> str:
     if ctx_brand.truncated:
         lines.append("")
         lines.append(
-            f"(brand context was truncated to stay under {BRAND_CONTEXT_TOKEN_CAP} tokens)"
+            "(brand context was truncated to stay under "
+            f"{(token_cap or BRAND_CONTEXT_TOKEN_CAP)} tokens)"
         )
     return "\n".join(lines)
 
 
 __all__ = [
     "BRAND_CONTEXT_TOKEN_CAP",
+    "CREATIVE_BRAND_CONTEXT_TOKEN_CAP",
     "BrandMemoryStore",
     "MEMORY_KINDS",
     "format_context_for_prompt",

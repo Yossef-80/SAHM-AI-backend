@@ -4,6 +4,15 @@ This adapter deliberately uses only server-side image settings and does not
 construct a ToolContext. The tool is guarded by a server-set RunnableConfig
 flag so it is callable only when the user explicitly asks for an in-app draft.
 
+Single generation path
+----------------------
+Generation, durable storage and the ``Creative`` row all happen inside
+``app.core.tools.media.generate_creative_assets`` -- the same function the
+``/creatives`` screen uses. This module only resolves the workspace's image
+configuration and shapes the tool result, so the chat and the creatives screen
+can never drift apart again (they used to: chat returned the provider's
+expiring URL and stored no creative at all).
+
 Credential resolution
 ---------------------
 When the run carries a ``tool_context`` (the normal chat path) the workspace
@@ -27,11 +36,19 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
-from app.core.tools.media import _compose_image_prompt, _generate_openai_image, _mock_asset
+from app.core.tools.media import (
+    _generate_openai_image,
+    generate_creative_assets,
+    persist_creative_assets,
+)
 
-#: The placeholder model id ``config.py`` ships as a default. Sending it to a real
-#: provider is always a configuration mistake, never an intent.
-_MOCK_MODEL = "mock-image-1"
+__all__ = ["LaylaImageGenerationInput", "generate_image_draft_tool", "_generate_openai_image"]
+
+
+async def _provider_call(prompt: str, aspect_ratio: str, **kwargs: Any) -> list[Any]:
+    """Indirection so monkeypatching ``_generate_openai_image`` on this module
+    (tests, and anyone embedding the tool) still intercepts the real call."""
+    return await _generate_openai_image(prompt, aspect_ratio, **kwargs)
 
 
 class LaylaImageGenerationInput(BaseModel):
@@ -115,47 +132,66 @@ async def generate_image_draft_tool(
     provider, api_key, model, base_url, quality, allow_mock = await _resolve_image_configuration(
         configurable
     )
+    settings = get_settings()
     style = dict(style_spec or {})
-    effective_prompt = _compose_image_prompt(prompt[:4000], style)
 
-    try:
-        if provider == "mock":
-            if not allow_mock:
-                # Never hand back a placeholder as if it were the requested image:
-                # a workspace with a real provider configured must fail loudly here
-                # instead of quietly returning an SVG labelled "MOCK ASSET".
-                return _result(
-                    "unavailable",
-                    reason=(
-                        "No real image provider is configured for this workspace. Select an "
-                        "image provider in Settings -> Connectors; no placeholder was created."
-                    ),
-                )
-            asset = _mock_asset(effective_prompt, aspect_ratio, 0)
-        elif provider == "openai":
-            if not api_key or not model or model == _MOCK_MODEL:
-                return _result(
-                    "unavailable",
-                    reason="Configure IMAGE_API_KEY and IMAGE_MODEL for the selected image provider.",
-                )
-            assets = await _generate_openai_image(
-                effective_prompt,
-                aspect_ratio,
-                api_key=api_key,
-                model=model,
-                base_url=base_url,
-                quality=quality,
-            )
-            asset = next((item for item in assets if item.url), None)
-            if asset is None:
-                return _result("unavailable", reason="The image provider returned no preview URL.")
-        else:
-            return _result(
-                "unavailable",
-                reason="The configured image provider is not supported by this Layla adapter.",
-            )
-    except Exception as exc:  # noqa: BLE001 - never include provider URLs or secrets in the tool result.
-        return _result("unavailable", reason=f"Image generation failed ({type(exc).__name__}).")
+    if provider == "mock" and not allow_mock:
+        # Never hand back a placeholder as if it were the requested image:
+        # a workspace with a real provider configured must fail loudly here
+        # instead of quietly returning an SVG labelled "MOCK ASSET".
+        return _result(
+            "unavailable",
+            reason=(
+                "No real image provider is configured for this workspace. Select an "
+                "image provider in Settings -> Connectors; no placeholder was created."
+            ),
+        )
+    if provider not in {"openai", "mock"}:
+        return _result(
+            "unavailable",
+            reason="The configured image provider is not supported by this Layla adapter.",
+        )
+    if provider == "openai" and (not api_key or not model):
+        return _result(
+            "unavailable",
+            reason="Configure IMAGE_API_KEY and IMAGE_MODEL for the selected image provider.",
+        )
+
+    assets, reason = await generate_creative_assets(
+        cfg=settings,
+        prompt=prompt[:4000],
+        aspect_ratio=aspect_ratio,
+        num_images=1,
+        style=style,
+        provider=provider,
+        api_key=api_key,
+        model=model,
+        base_url=base_url,
+        quality=quality,
+        allow_mock_assets=allow_mock,
+        image_call=_provider_call,
+    )
+    if reason or not assets:
+        return _result("unavailable", reason=reason or "The image provider returned no preview URL.")
+    asset = assets[0]
+
+    # The same durable creative the /creatives screen would create, so the chat
+    # draft shows up in the gallery and can be attached to a campaign later.
+    context = configurable.get("tool_context")
+    db = configurable.get("tool_db") or getattr(context, "db", None)
+    business_id = str(
+        configurable.get("business_id") or getattr(context, "business_id", "") or ""
+    )
+    if db is not None and business_id:
+        await persist_creative_assets(
+            db,
+            business_id=business_id,
+            assets=[asset],
+            campaign_id=str(configurable.get("campaign_id") or "") or getattr(context, "campaign_id", None),
+            persona_id=str(configurable.get("agent") or "layla"),
+            style=style,
+            task_name="generate_image_draft",
+        )
 
     return _result("ok", asset=asset)
 

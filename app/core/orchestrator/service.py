@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.security import redact_sensitive_data
@@ -45,6 +46,9 @@ from app.schemas.blocks import Message as MessageSchema
 from app.schemas.common import StepStatus, TaskStatus
 
 _logger = get_logger(__name__)
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.schemas.assistant import AssistantAnswer
 
 
 def _now() -> datetime:
@@ -239,7 +243,14 @@ async def _resolve_answer_selection(
     return chosen.get("payload") or {}
 
 
-async def list_conversations(db: AsyncSession, business_id: str) -> list[ConversationSummary]:
+#: Upper bound for the sidebar list. Without it the query returns every
+#: conversation the workspace ever had, each with two correlated subqueries.
+MAX_CONVERSATIONS_LISTED = 200
+
+
+async def list_conversations(
+    db: AsyncSession, business_id: str, *, limit: int = MAX_CONVERSATIONS_LISTED
+) -> list[ConversationSummary]:
     last_msg_subquery = (
         select(Message.content)
         .where(Message.conversation_id == Conversation.id)
@@ -267,6 +278,7 @@ async def list_conversations(db: AsyncSession, business_id: str) -> list[Convers
         )
         .where(Conversation.business_id == business_id)
         .order_by(Conversation.updated_at.desc())
+        .limit(max(1, min(int(limit or MAX_CONVERSATIONS_LISTED), MAX_CONVERSATIONS_LISTED)))
     )
     rows = (await db.execute(stmt)).all()
     out: list[ConversationSummary] = []
@@ -299,14 +311,56 @@ def _message_schema(row: Message) -> MessageSchema:
     )
 
 
+def _message_time_expr(db: AsyncSession) -> Any:
+    """A timestamp expression that compares correctly on both backends.
+
+    SQLite stores ``DateTime`` as text and compares it lexicographically, so a
+    row written with the database default ('2026-01-01 10:00:00') and one written
+    by Python ('2026-01-01 10:00:00.123456') are neither equal nor ordered the way
+    a caller expects -- which made a cursor page silently return the newest page
+    again. ``datetime()`` normalises any accepted SQLite format to whole seconds
+    before comparison. Postgres stores real timestamps and needs no help.
+    """
+    bind = getattr(db, "bind", None)
+    if bind is not None and bind.dialect.name == "sqlite":
+        return func.datetime(Message.created_at)
+    return Message.created_at
+
+
+def _cursor_time_literal(db: AsyncSession, value: datetime) -> Any:
+    """The cursor side of the comparison, in the same format the expression uses."""
+    bind = getattr(db, "bind", None)
+    if bind is not None and bind.dialect.name == "sqlite":
+        moment = value.astimezone(timezone.utc) if value.tzinfo else value
+        return moment.strftime("%Y-%m-%d %H:%M:%S")
+    return value
+
+
+#: Messages returned by default when a client opens a conversation. A long chat
+#: used to load *every* message, every time, including the ones carrying
+#: attachment blocks -- which is what made opening a conversation feel slow.
+DEFAULT_MESSAGE_PAGE_SIZE = 50
+MAX_MESSAGE_PAGE_SIZE = 200
+
+
 async def get_conversation(
-    db: AsyncSession, conversation_id: str, *, business_id: str | None = None
+    db: AsyncSession,
+    conversation_id: str,
+    *,
+    business_id: str | None = None,
+    limit: int = DEFAULT_MESSAGE_PAGE_SIZE,
+    before: str | None = None,
 ) -> ConversationDetail:
-    """One conversation.
+    """One conversation, newest page of messages first-class.
 
     ``business_id`` scopes the read to one workspace. A conversation owned by
     another workspace raises ``NotFoundError`` -- 404, never 403, because a 403
     would confirm the id exists to a stranger.
+
+    Pagination is newest-first with a ``message_id`` cursor (``before``): the
+    returned ``messages`` list is still chronological, so every existing client
+    keeps working, it is simply bounded now. Clients that want the whole history
+    page backwards with the oldest returned message as the next cursor.
     """
     stmt = select(Conversation).where(Conversation.id == conversation_id)
     if business_id is not None:
@@ -314,19 +368,46 @@ async def get_conversation(
     conversation = await db.scalar(stmt)
     if conversation is None:
         raise NotFoundError(f"conversation '{conversation_id}' not found")
-    def _msg_sort_key(m: Message) -> tuple[float, int]:
+
+    page_size = max(1, min(int(limit or DEFAULT_MESSAGE_PAGE_SIZE), MAX_MESSAGE_PAGE_SIZE))
+    # One total order for both the query and the response: (created_at, id).
+    # ``id`` is not decoration: messages written in the same transaction share a
+    # timestamp, and without a deterministic tiebreaker the newest page and the
+    # cursor page could overlap or skip rows.
+    ts = _message_time_expr(db)
+    messages_stmt = (
+        select(Message)
+        .where(Message.conversation_id == conversation.id)
+        .order_by(ts.desc(), Message.id.desc())
+        .limit(page_size)
+    )
+    if before:
+        cursor_row = await db.get(Message, before)
+        if cursor_row is not None and cursor_row.conversation_id == conversation.id:
+            if cursor_row.created_at is None:
+                # ``server_default`` timestamps are only populated on load; a row
+                # held in the session can still be None. Refreshing beats silently
+                # ignoring the cursor and re-serving the newest page.
+                await db.refresh(cursor_row)
+        if cursor_row is not None and cursor_row.conversation_id == conversation.id and cursor_row.created_at:
+            cursor_time = _cursor_time_literal(db, cursor_row.created_at)
+            messages_stmt = messages_stmt.where(
+                or_(
+                    ts < cursor_time,
+                    and_(ts == cursor_time, Message.id < cursor_row.id),
+                )
+            )
+    rows = list((await db.execute(messages_stmt)).scalars().all())
+
+    def _msg_sort_key(m: Message) -> tuple[float, str]:
         t = m.created_at
         if t is None:
-            return (0.0, 0 if m.role == "user" else 1)
+            return (0.0, m.id)
         if t.tzinfo is None:
             t = t.replace(tzinfo=timezone.utc)
-        return (t.timestamp(), 0 if m.role == "user" else 1)
+        return (t.timestamp(), m.id)
 
-    sorted_messages = sorted(
-        conversation.messages,
-        key=_msg_sort_key,
-    )
-    messages = [_message_schema(row) for row in sorted_messages]
+    messages = [_message_schema(row) for row in sorted(rows, key=_msg_sort_key)]
     ctx = conversation.context or {}
     return ConversationDetail(
         id=conversation.id,
@@ -337,6 +418,46 @@ async def get_conversation(
         context=MessageContext(**{k: v for k, v in ctx.items()
                                   if k in MessageContext.model_fields}),
     )
+
+
+#: A single message row may hold at most this much text. Chat content is prose
+#: and UI blocks; anything larger is almost always a base64 payload that should
+#: have been uploaded to storage and referenced by URL.
+MAX_MESSAGE_CONTENT_CHARS = 32_000
+MAX_MESSAGE_BLOCK_CHARS = 200_000
+
+
+def _strip_inline_blobs(value: Any, *, limit: int) -> tuple[Any, int]:
+    """Replace oversized inline data URLs with a short marker; return (value, removed).
+
+    Defence in depth: image bytes now go to Supabase Storage, so nothing in a
+    well-behaved turn hits this. But one base64 data URL stored in a message row
+    costs the row -- and every read of it -- hundreds of kilobytes, which is
+    exactly how the database got slow, so the write path refuses to be the place
+    it happens again.
+    """
+    if isinstance(value, str):
+        if len(value) > limit and "base64," in value[:120]:
+            return f"[inline asset removed from history: {len(value)} chars]", len(value)
+        if len(value) > limit:
+            return value[:limit], len(value) - limit
+        return value, 0
+    if isinstance(value, dict):
+        removed = 0
+        out: dict[Any, Any] = {}
+        for key, item in value.items():
+            out[key], dropped = _strip_inline_blobs(item, limit=limit)
+            removed += dropped
+        return out, removed
+    if isinstance(value, list):
+        removed = 0
+        out_list = []
+        for item in value:
+            cleaned, dropped = _strip_inline_blobs(item, limit=limit)
+            removed += dropped
+            out_list.append(cleaned)
+        return out_list, removed
+    return value, 0
 
 
 async def _persist_message(
@@ -350,12 +471,22 @@ async def _persist_message(
     persona_id: str | None = None,
     created_at: datetime | None = None,
 ) -> Message:
+    safe_blocks, removed_chars = _strip_inline_blobs(blocks, limit=MAX_MESSAGE_BLOCK_CHARS)
+    if removed_chars:
+        _logger.warning(
+            "message_payload_trimmed",
+            extra={"conversation_id": conversation_id, "removed_chars": removed_chars},
+        )
+    safe_content = content or ""
+    if len(safe_content) > MAX_MESSAGE_CONTENT_CHARS:
+        safe_content = safe_content[:MAX_MESSAGE_CONTENT_CHARS]
+
     message = Message(
         id=_new_id("msg"),
         conversation_id=conversation_id,
         role=role,
-        content=content,
-        blocks=blocks,
+        content=safe_content,
+        blocks=safe_blocks,
         task_id=task_id,
         persona_id=persona_id,
         created_at=created_at or _now(),
@@ -411,6 +542,20 @@ async def handle_message(
         await event_queue.put(
             {"type": "conversation_started", "conversationId": conversation.id}
         )
+
+    turn_started = time.monotonic()
+    # The HTTP log is written when the SSE *headers* go out, so everything after
+    # this point used to be invisible: a turn that hung for minutes looked exactly
+    # like a turn that answered. These two lines are what make the difference.
+    _logger.info(
+        "assistant_turn_started",
+        extra={
+            "conversation_id": conversation.id,
+            "persona": request.persona_id,
+            "message_chars": len(request.message or ""),
+            "has_context": bool(request.context),
+        },
+    )
 
     # Merge sticky context. Reference identity and workflow metadata are persisted;
     # image bytes and the full VLM payload are deliberately loaded only for this turn.
@@ -627,6 +772,18 @@ async def handle_message(
             ad_flow_selection=ad_flow_selection,
             ad_tool_context_factory=_ad_tool_context_factory,
         )
+    # A reference the user attached in chat is analysed during the run; the AI
+    # layer hands back its memory id, and it belongs on the conversation. Without
+    # this the reference was understood only on the turn the picture arrived: the
+    # next turn ("خليها أحمر") had no analysis to apply, and the assistant had to
+    # ask for the picture again even though it had already read it.
+    analysed_reference_id = (
+        getattr(final_gui, "reference_analysis_id", None) if final_gui else None
+    )
+    if isinstance(analysed_reference_id, str) and analysed_reference_id.strip():
+        context["reference_analysis_id"] = analysed_reference_id.strip()
+        conversation.context = dict(context)
+
     next_prompt_stage = getattr(final_gui, "creative_prompt_stage", None) if final_gui else None
     if final_gui and getattr(final_gui, "creative_prompt_workflow", False):
         context["workflow"] = "creative_prompt"
@@ -634,6 +791,33 @@ async def handle_message(
         if prompt_type in {"image", "video"}:
             context["prompt_type"] = prompt_type
         context["persona_id"] = "layla"
+    elif (
+        final_gui is not None
+        and context.get("workflow") == "creative_prompt"
+        and getattr(final_gui, "creative_prompt_workflow", None) is False
+    ):
+        # The turn ran and the AI layer says this was NOT a prompt-interview turn,
+        # so the interview is over -- the user switched modes, or asked for the
+        # image itself (see `_exit_creative_prompt_workflow_for_generation`).
+        # Clearing here is what ends it: while these keys survive on the
+        # conversation row, this endpoint re-sends `workflow: creative_prompt` on
+        # top of every later turn, the AI layer files it back into prompt-only
+        # mode, and the conversation answers "the approved prompt is still in the
+        # previous message" forever -- which is exactly what happened after the
+        # user moved the composer to «تصميم».
+        for key in (
+            "workflow",
+            "prompt_type",
+            "creative_prompt_stage",
+            "creative_prompt_user_facts",
+            "creative_prompt_confirmed_facts",
+            "creative_prompt_reference_shown_key",
+            "creative_prompt_unresolved_fields",
+            "creative_prompt_answer",
+        ):
+            context.pop(key, None)
+        context["persona_id"] = "layla"
+        conversation.context = dict(context)
     if context.get("workflow") == "creative_prompt":
         if next_prompt_stage:
             context["creative_prompt_stage"] = next_prompt_stage
@@ -736,6 +920,21 @@ async def handle_message(
             memory_debouncer.schedule_ltm_update(business.id)
         except Exception as exc:
             _logger.warning("ltm_debouncer_schedule_failed", extra={"error": str(exc)})
+    _logger.info(
+        "assistant_turn_finished",
+        extra={
+            "conversation_id": conversation.id,
+            "persona": persona_id,
+            "duration_ms": int((time.monotonic() - turn_started) * 1000),
+            "block_types": sorted(
+                {
+                    str(getattr(block, "type", None) or (block.get("type") if isinstance(block, dict) else "?"))
+                    for block in (blocks or [])
+                }
+            ),
+            "answer_chars": len(str(getattr(assistant_message, "content", "") or "")),
+        },
+    )
     return AssistantMessageResponse(
         message=assistant_message,
         user_message=user_message,

@@ -16,6 +16,7 @@ from app.ai.agents.omar.tools import (
     generate_marketing_strategy,
 )
 from app.ai.providers.llm import get_llm
+from app.ai.providers.llm.agent_llm import agent_llm_for_graph
 from app.ai.settings import get_ai_settings
 from app.ai.tools import get_brand_context_tool, save_learning_tool, web_search_tool
 from app.ai.tools.core_bridge import persist_ai_tools
@@ -94,8 +95,9 @@ def call_model(state: OmarState, config: RunnableConfig) -> dict[str, Any]:
     ):
         messages = [SystemMessage(content=OMAR_PROMPT)] + messages
 
-    ai_settings = get_ai_settings()
-    llm_handle = get_llm(provider=ai_settings.llm_provider)
+    llm_handle = agent_llm_for_graph(
+        "omar", config, builder=get_llm, settings=get_ai_settings()
+    )
     response = llm_handle.chat.bind_tools(OMAR_TOOLS).invoke(messages, config)
     return {"messages": [response]}
 

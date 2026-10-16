@@ -15,9 +15,10 @@ Provider-specific model defaults live in ``app.ai.config``; environment variable
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import AliasChoices, Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.ai.config import (
     DEFAULT_ANTHROPIC_MODEL,
@@ -65,6 +66,44 @@ class AISettings(BaseSettings):
     #: ``None`` = use the provider's own best default (see providers/llm/*.py).
     structured_output_method: StructuredOutputMethod | None = Field(
         None, validation_alias=_env("AI_STRUCTURED_OUTPUT_METHOD")
+    )
+
+    # ============================================================ TIERS ====
+    # Two tiers existed in ``app/config.py`` (and in the workspace settings API
+    # and table) since the beginning, but every agent graph read
+    # ``AI_LLM_PROVIDER`` directly -- so a workspace could pick a strong model in
+    # Settings -> LLM and Layla would keep writing on the process default. These
+    # two pairs are the missing half of that wiring.
+    #
+    # ``None`` means "same as ``AI_LLM_PROVIDER`` / ``AI_LLM_MODEL``", so an
+    # unchanged .env behaves exactly as before.
+    llm_provider_strong: LLMProvider | None = Field(
+        None, validation_alias=_env("LLM_PROVIDER_STRONG")
+    )
+    llm_model_strong: str | None = Field(None, validation_alias=_env("LLM_MODEL_STRONG"))
+    llm_provider_fast: LLMProvider | None = Field(
+        None, validation_alias=_env("LLM_PROVIDER_FAST")
+    )
+    llm_model_fast: str | None = Field(None, validation_alias=_env("LLM_MODEL_FAST"))
+
+    # ============================================== ROLE SAMPLING ==========
+    #: Per-role temperature overrides, e.g. ``LLM_TEMPERATURE_CREATIVE=0.9``.
+    #: Reading the process default (0.2) for ad copy is why every "variation"
+    #: came back as the same sentence with the words shuffled.
+    # ``NoDecode`` keeps the raw env string intact: pydantic-settings would
+    # otherwise JSON-decode any dict-typed field before the validator runs, so
+    # the friendly ``creative_copy=0.9,critique=0.1`` form (and an empty value)
+    # would blow up at import time instead of being parsed by our validator.
+    llm_temperature_overrides: Annotated[dict[str, float], NoDecode] = Field(
+        default_factory=dict,
+        validation_alias=_env("LLM_TEMPERATURE_OVERRIDES"),
+    )
+
+    #: Layla reviews a creative deliverable once before submitting it (see
+    #: ``app.ai.agents.layla.critique``). One extra strong-tier call per
+    #: deliverable; set ``AI_LAYLA_SELF_CRITIQUE=0`` to spend it elsewhere.
+    layla_self_critique: bool = Field(
+        True, validation_alias=_env("AI_LAYLA_SELF_CRITIQUE")
     )
 
     # ===================================================== LLM (generic) ====
@@ -198,11 +237,40 @@ class AISettings(BaseSettings):
     log_max_bytes: int = Field(5_000_000, gt=0, validation_alias=_env("AI_LOG_MAX_BYTES"))
     log_backup_count: int = Field(3, ge=0, validation_alias=_env("AI_LOG_BACKUP_COUNT"))
 
+    @field_validator("llm_temperature_overrides", mode="before")
+    @classmethod
+    def _parse_temperature_overrides(cls, v: object) -> object:
+        """Accept ``LLM_TEMPERATURE_OVERRIDES=creative_copy=0.9,routing=0.1``."""
+        from app.ai.roles import parse_temperature_overrides
+
+        if v is None:
+            return {}
+        if isinstance(v, str):
+            return parse_temperature_overrides(v)
+        return v
+
     @field_validator("ollama_base_url", "ads_vlm_base_url", mode="after")
     @classmethod
     def _strip_url(cls, v: str | None) -> str | None:
         """Ngrok URLs are often pasted with a trailing slash or spaces."""
         return v.strip().rstrip("/") if v else v
+
+    # --------------------------------------------------------- tiers ------
+
+    def provider_for_tier(self, tier: str) -> LLMProvider:
+        """The provider for ``fast``/``strong``, falling back to the global one."""
+        value = getattr(self, f"llm_provider_{tier}", None)
+        return value or self.llm_provider
+
+    def model_for_tier(self, tier: str) -> str | None:
+        """The model for ``fast``/``strong``, or None to keep the provider default."""
+        return getattr(self, f"llm_model_{tier}", None) or self.llm_model
+
+    def role_spec(self, role: str):
+        """The tier/temperature/max-tokens profile for one kind of work."""
+        from app.ai.roles import resolve_role
+
+        return resolve_role(role, self.llm_temperature_overrides)
 
 
 @lru_cache

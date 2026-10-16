@@ -679,3 +679,339 @@
 2026-10-14 12:50:19 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
 2026-10-14 12:50:23 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
 2026-10-14 12:53:18 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 22:35:25 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 22:35:25 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=5
+2026-10-15 22:35:26 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1285 input_tokens=1281 output_tokens=149 tool_calls=1
+2026-10-15 22:35:26 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 22:35:27 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=5
+2026-10-15 22:35:33 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=5723 input_tokens=3145 output_tokens=1970 tool_calls=0
+2026-10-15 22:35:53 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 22:35:59 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 22:38:51 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:29:28 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:29:28 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=7
+2026-10-15 23:29:29 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=966 input_tokens=1432 output_tokens=147 tool_calls=1
+2026-10-15 23:29:29 | INFO    | provider.llm | llm_started | agent='chat' model='ChatGroq' node=None messages=7
+2026-10-15 23:29:31 | INFO    | provider.llm | llm_finished | agent='chat' model='ChatGroq' duration_ms=2252 input_tokens=1061 output_tokens=853 tool_calls=0
+2026-10-15 23:29:31 | INFO    | provider.llm | llm_started | agent='formatting' model='ChatGroq' node=None messages=2
+2026-10-15 23:29:34 | ERROR   | provider.llm | llm_failed | agent='formatting' model='ChatGroq' duration_ms=3276 error='BadRequestError: Error code: 400 - {\'error\': {\'message\': "Tool call validation failed: tool call validation failed: parameters for tool MessageWithBlocks did not match schema: errors: [`/blocks/0`: \'oneOf\' failed, subschemas 0, 1 matched, `/blocks/1`: \'oneOf\' failed, subschemas 0, 1 matched, `/blocks/2`: \'oneOf\' failed, subschemas 0, 1 matched, `/blocks/3`: \'oneOf\' failed, subschemas 0, 1 matched, `/blocks/4`: \'oneOf\' failed, subschemas 0, 1 matched, `/blocks/5`: \'oneOf\' failed, subschemas 0, 1 matched, `/blocks/6`: \'oneOf\' failed, subschemas 0, 1 matched]", \'type\': \'invalid_request_error\', \'code\': \'tool_use_failed\', \'failed_generation\': \'{"name": "MessageWithBlocks", "arguments": {\\n  "blocks": [\\n    {\\n      "id": "summary",\\n      "text": "ملخص الطلب: إنشاء برومبت لتصميم صورة عرض صيانة الميكاترونيك لعلامة\\u202fMG Corner بأسلوب “Hero Product” مع عنوان هوك كرييتف بارز داخل الصورة."\\n    },\\n    {\\n      "id": "updates",\\n      "text": "تحديثات حقول البرومبت: لا توجد تحديثات جديدة؛ جميع الحقول مطابقة للمعايير السابقة."\\n    },\\n    {\\n      "id": "image_prompt_heading",\\n      "text": "برومبت الصورة (image_prompt):"\\n    },\\n    {\\n      "id": "image_prompt",\\n      "text": "A high‑contrast cinematic studio lighting scene featuring a MG Corner service bay, technical grid background, centered hero product (MG vehicle’s mechatronics system) highlighted, bold Arabic/Latin typography reading \\\\"صيانة الميكاترونيك – جودة لا تقارن\\\\" with a creative hook headline, color palette #8...(+1454 chars)'
+2026-10-15 23:29:54 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:29:59 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:30:40 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:30:40 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=9
+2026-10-15 23:30:42 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1133 input_tokens=2037 output_tokens=190 tool_calls=1
+2026-10-15 23:30:42 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:30:42 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=9
+2026-10-15 23:30:45 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2939 input_tokens=3901 output_tokens=922 tool_calls=1
+2026-10-15 23:30:46 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:31:17 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:31:24 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:32:51 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:32:51 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=11
+2026-10-15 23:32:52 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=847 input_tokens=2464 output_tokens=159 tool_calls=1
+2026-10-15 23:32:52 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:32:52 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=11
+2026-10-15 23:32:55 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2673 input_tokens=4327 output_tokens=830 tool_calls=1
+2026-10-15 23:32:55 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:33:37 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:33:42 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:36:33 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:42:04 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:42:04 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=13
+2026-10-15 23:42:05 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1588 input_tokens=2318 output_tokens=250 tool_calls=1
+2026-10-15 23:42:05 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-15 23:42:06 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=13
+2026-10-15 23:42:08 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2167 input_tokens=4181 output_tokens=647 tool_calls=1
+2026-10-15 23:42:22 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=15
+2026-10-15 23:42:40 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=17498 input_tokens=4430 output_tokens=470 tool_calls=0
+2026-10-15 23:42:59 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-15 23:43:04 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:16:22 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:16:22 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=15
+2026-10-16 00:16:23 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1245 input_tokens=2375 output_tokens=213 tool_calls=1
+2026-10-16 00:16:23 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:16:24 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=15
+2026-10-16 00:16:26 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2185 input_tokens=4369 output_tokens=549 tool_calls=1
+2026-10-16 00:16:38 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=17
+2026-10-16 00:17:00 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=21899 input_tokens=4875 output_tokens=382 tool_calls=0
+2026-10-16 00:17:22 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:17:27 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:44:04 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:44:04 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=5
+2026-10-16 00:44:05 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1238 input_tokens=1789 output_tokens=141 tool_calls=1
+2026-10-16 00:44:06 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:44:06 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=6
+2026-10-16 00:44:07 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=1295 input_tokens=3864 output_tokens=307 tool_calls=0
+2026-10-16 00:44:28 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:44:33 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:46:08 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:46:08 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=7
+2026-10-16 00:46:09 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1163 input_tokens=2030 output_tokens=223 tool_calls=1
+2026-10-16 00:46:09 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:46:10 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=7
+2026-10-16 00:46:13 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=3158 input_tokens=3892 output_tokens=1045 tool_calls=1
+2026-10-16 00:46:14 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:46:38 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:46:43 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:47:18 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:47:18 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=9
+2026-10-16 00:47:19 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1162 input_tokens=2468 output_tokens=188 tool_calls=1
+2026-10-16 00:47:19 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:47:19 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=9
+2026-10-16 00:47:22 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2483 input_tokens=4331 output_tokens=856 tool_calls=1
+2026-10-16 00:47:22 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:48:00 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:48:05 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:48:22 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:48:22 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=11
+2026-10-16 00:48:23 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=868 input_tokens=2845 output_tokens=146 tool_calls=1
+2026-10-16 00:48:23 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:48:23 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=11
+2026-10-16 00:48:45 | ERROR   | provider.llm | llm_failed | agent='layla' model='ChatGroq' duration_ms=21482 error='BadRequestError: Error code: 400 - {\'error\': {\'message\': "Tool call validation failed: tool call validation failed: parameters for tool submit_creative_brief did not match schema: errors: [`/prompt_fact_updates/0/field`: value must be one of \'subject\', \'objective\', \'audience\', \'specific_platform\', \'broad_platform\', \'format\', \'copy\', \'offer\', \'cta\', \'style\', \'palette\', \'avoid\', \'reference\', \'duration\', \'shots\', \'audio\']", \'type\': \'invalid_request_error\', \'code\': \'tool_use_failed\', \'failed_generation\': \'{"name": "submit_creative_brief", "arguments": {\\n  "deliverable_type": "image_prompt",\\n  "description": "تصميم إعلاني ببطاقة \\\\"Hero Product\\\\" يركز على محرك MG مع عنوان قوي وعناصر جرافيك تقنية، موجه لمالكي سيارات MG على فيسبوك.",\\n  "headline": "قوة الموتور تتجدد الآن – صيانة احترافية بلمسة تقنية",\\n  "primary_text": "صيانة عمرة الموتور بتقنية دقيقة وشفافة – احجز فحصك الآن",\\n  "call_to_action": "احجز فحصك الآن",\\n  "aspect_ratio": "1:1",\\n  "image_prompt": "تصميم إعلاني 1:1 بأسلوب \\\\"Hero Product\\\\" لعلامة MG Corner. محرك MG يبرز في مركز الإطار بإضاءة سينمائية عالية التباين، أضواء سبوت مركزة على تفاصيل الموتور (الأسطوانة، المكابس، التروس). خلفية شبكة تقنية داكنة اللون #1E293B مع لمسات من الأحمر الداكن #8B0000. شعار MG Corner في الزاوية العليا اليسرى (أبيض على خلفية شفافة). نص كبير بالخط الغامق الأبيض فوق الصورة: \\\\"قوة الموتور تتجدد الآن – صيانة احترافية بلمسة تقنية\\\\"، ونص فرعي بالخط الأصغر الأحمر #E60000 أسفل النص الرئيسي: \\\\"احجز فحصك الآن\\\\". عناصر جرافيك إضافية: أيقونات...(+791 chars)'
+2026-10-16 00:49:04 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:49:13 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:49:42 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:49:42 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=13
+2026-10-16 00:49:43 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1506 input_tokens=2847 output_tokens=199 tool_calls=1
+2026-10-16 00:49:43 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:49:44 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=13
+2026-10-16 00:49:49 | ERROR   | provider.llm | llm_failed | agent='layla' model='ChatGroq' duration_ms=5722 error='BadRequestError: Error code: 400 - {\'error\': {\'message\': "Tool call validation failed: tool call validation failed: parameters for tool submit_creative_brief did not match schema: errors: [`/prompt_fact_updates/0/field`: value must be one of \'subject\', \'objective\', \'audience\', \'specific_platform\', \'broad_platform\', \'format\', \'copy\', \'offer\', \'cta\', \'style\', \'palette\', \'avoid\', \'reference\', \'duration\', \'shots\', \'audio\']", \'type\': \'invalid_request_error\', \'code\': \'tool_use_failed\', \'failed_generation\': \'{"name": "submit_creative_brief", "arguments": {\\n  "deliverable_type": "image_prompt",\\n  "aspect_ratio": "1:1",\\n  "headline": "عمرة الموتور شاملة الضمان",\\n  "primary_text": "صيانة دقيقة مع ضمان شامل من MG Corner",\\n  "call_to_action": "احجز فحصك الآن",\\n  "image_prompt": "تصميم إعلاني 1:1 بأسلوب \\\\"Hero Product\\\\" لعلامة MG Corner. محرك MG يبرز في مركز الإطار، إضاءة سينمائية عالية التباين مع أضواء سبوت مركزة على تفاصيل الموتور (الأسطوانة، المكابس، التروس). خلفية شبكة تقنية باللون الداكن #1E293B مع لمسات من الأحمر الداكن #8B0000. شعار MG Corner في الزاوية العليا اليسرى (أبيض على خلفية شفافة). نص كبير بالخط الغامق الأبيض فوق الصورة: \\\\"عمرة الموتور شاملة الضمان\\\\"، ونص فرعي بالخط الأصغر الأحمر #E60000 أسفل النص الرئيسي: \\\\"احجز فحصك الآن\\\\". عناصر جرافيك إضافية: أيقونات صغيرة لقطع الميكانيك (تروس، أسلاك) بظل فضي #D0D0D0، خطوط رفيعة تشبه الدوائر التقنية تمتد من زوايا الإطار إلى المركز لإضفاء إحساس بالاحترافية.",\\n  "negative_prompt": "blurred, low-resolution, generic car photos...(+486 chars)'
+2026-10-16 00:50:09 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:50:14 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:50:43 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:50:43 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=15
+2026-10-16 00:50:44 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1215 input_tokens=2936 output_tokens=128 tool_calls=1
+2026-10-16 00:50:45 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:50:45 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=15
+2026-10-16 00:50:56 | ERROR   | provider.llm | llm_failed | agent='layla' model='ChatGroq' duration_ms=10869 error='BadRequestError: Error code: 400 - {\'error\': {\'message\': "Tool call validation failed: tool call validation failed: parameters for tool submit_creative_brief did not match schema: errors: [`/prompt_fact_updates/0/field`: value must be one of \'subject\', \'objective\', \'audience\', \'specific_platform\', \'broad_platform\', \'format\', \'copy\', \'offer\', \'cta\', \'style\', \'palette\', \'avoid\', \'reference\', \'duration\', \'shots\', \'audio\']", \'type\': \'invalid_request_error\', \'code\': \'tool_use_failed\', \'failed_generation\': \'{"name": "submit_creative_brief", "arguments": {\\n  "aspect_ratio": "1:1",\\n  "headline": "عمرة الموتور شاملة الضمان",\\n  "primary_text": "صيانة دقيقة ومحترفة لمحرك سيارتك MG – جودة معتمدة وضمان شامل. احجز الآن",\\n  "call_to_action": "احجز فحصك الآن",\\n  "image_prompt": "تصميم إعلاني 1:1 بأسلوب \\\\"Hero Product\\\\" لعلامة MG Corner. محرك MG يبرز في مركز الإطار مع إضاءة سينمائية عالية التباين، أضواء سبوت مركزة على تفاصيل الموتور (الأسطوانة، المكابس، التروس). خلفية شبكة تقنية باللون الداكن #1E293B مع لمسات من الأحمر الداكن #8B0000. شعار MG Corner في الزاوية العليا اليسرى (أبيض على خلفية شفافة). نص كبير بالخط الغامق الأبيض فوق الصورة: \\\\"عمرة الموتور شاملة الضمان\\\\"، ونص فرعي بالخط الأصغر الأحمر #E60000 أسفل النص الرئيسي: \\\\"احجز فحصك الآن\\\\". عناصر جرافيك إضافية: أيقونات صغيرة لقطع الميكانيك (تروس، أسلاك) بظل فضي #D0D0D0، خطوط رفيعة تشبه الدوائر التقنية تمتد من زوايا الإطار إلى المركز لإضفاء إحساس بالاحترافية.",\\n  "negative_prompt": "blurred, low-resolution, generic car photos, car...(+855 chars)'
+2026-10-16 00:51:18 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:51:23 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:54:14 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 00:59:43 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:59:43 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=17
+2026-10-16 00:59:44 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1135 input_tokens=2253 output_tokens=156 tool_calls=1
+2026-10-16 00:59:44 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 00:59:45 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=17
+2026-10-16 00:59:47 | ERROR   | provider.llm | llm_failed | agent='layla' model='ChatGroq' duration_ms=2704 error='BadRequestError: Error code: 400 - {\'error\': {\'message\': "Tool call validation failed: tool call validation failed: parameters for tool submit_creative_brief did not match schema: errors: [`/prompt_fact_updates/0/field`: value must be one of \'subject\', \'objective\', \'audience\', \'specific_platform\', \'broad_platform\', \'format\', \'copy\', \'offer\', \'cta\', \'style\', \'palette\', \'avoid\', \'reference\', \'duration\', \'shots\', \'audio\']", \'type\': \'invalid_request_error\', \'code\': \'tool_use_failed\', \'failed_generation\': \'{"name": "submit_creative_brief", "arguments": {\\n  "aspect_ratio": "1:1",\\n  "headline": "عمرة الموتور شاملة الضمان",\\n  "primary_text": "صيانة احترافية للموتور مع ضمان قطع أصلية – احجز فحصك الآن",\\n  "call_to_action": "احجز الآن",\\n  "deliverable_type": "image_prompt",\\n  "description": "تصميم إعلاني يركز على محرك MG مع هوك قوي وعناصر جرافيك، يلتزم بهوية MG Corner.",\\n  "image_prompt": "تصميم إعلاني 1:1 بأسلوب \\\\"Hero Product\\\\" لعلامة MG Corner. محرك MG يبرز في مركز الإطار، إضاءة سينمائية عالية التباين مع أضواء سبوت مركزة على تفاصيل الموتور (الأسطوانة، المكابس، التروس). خلفية شبكة تقنية باللون الداكن #1E293B مع لمسات من الأحمر الداكن #8B0000. شعار MG Corner في الزاوية العليا اليسرى (أبيض على خلفية شفافة). نص كبير بالخط الغامق الأبيض فوق الصورة: \\\\"عمرة الموتور شاملة الضمان\\\\"، ونص فرعي بالخط الأصغر الأحمر #E60000 أسفل النص الرئيسي: \\\\"احجز الآن\\\\". عناصر جرافيك إضافية: أيقونات صغيرة لقطع الميكانيك (تروس، أسلاك) بظل فضي #D0D0D0، خطوط رفيعة تشبه الدوائر التقنية تمتد من زوايا ال...(+376 chars)'
+2026-10-16 01:00:07 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:00:26 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:12:54 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:12:54 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:12:54 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=6
+2026-10-16 01:12:57 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2452 input_tokens=3483 output_tokens=776 tool_calls=1
+2026-10-16 01:12:58 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:13:20 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:13:25 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:13:48 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:13:48 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:13:48 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=9
+2026-10-16 01:13:51 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=3143 input_tokens=4261 output_tokens=1150 tool_calls=1
+2026-10-16 01:13:52 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:14:15 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:14:20 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:15:09 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:15:09 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:15:09 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=11
+2026-10-16 01:15:11 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2207 input_tokens=4366 output_tokens=571 tool_calls=1
+2026-10-16 01:15:12 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:15:35 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:15:40 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:16:07 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:16:08 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:16:08 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=13
+2026-10-16 01:16:10 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=1653 input_tokens=4518 output_tokens=377 tool_calls=0
+2026-10-16 01:16:29 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:16:33 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:16:43 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:16:43 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:16:43 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=15
+2026-10-16 01:16:47 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=3379 input_tokens=4589 output_tokens=1120 tool_calls=1
+2026-10-16 01:16:47 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:17:11 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:17:15 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:32:06 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:32:06 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:32:07 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=17
+2026-10-16 01:32:09 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2417 input_tokens=4000 output_tokens=499 tool_calls=0
+2026-10-16 01:32:29 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:32:33 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:33:45 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:33:45 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=5
+2026-10-16 01:33:45 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=731 input_tokens=1727 output_tokens=121 tool_calls=1
+2026-10-16 01:33:45 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:33:46 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=5
+2026-10-16 01:33:48 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=1834 input_tokens=3722 output_tokens=575 tool_calls=0
+2026-10-16 01:34:08 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:34:12 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:35:44 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:35:44 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=7
+2026-10-16 01:35:45 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=881 input_tokens=2141 output_tokens=166 tool_calls=1
+2026-10-16 01:35:45 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:35:45 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=7
+2026-10-16 01:35:47 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=1396 input_tokens=4005 output_tokens=362 tool_calls=1
+2026-10-16 01:35:47 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=9
+2026-10-16 01:36:12 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=25333 input_tokens=4217 output_tokens=155 tool_calls=0
+2026-10-16 01:36:32 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:36:37 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:36:47 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:36:47 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=9
+2026-10-16 01:36:48 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1004 input_tokens=2316 output_tokens=229 tool_calls=1
+2026-10-16 01:36:48 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 01:36:49 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=9
+2026-10-16 01:37:04 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=15188 input_tokens=4178 output_tokens=507 tool_calls=1
+2026-10-16 01:37:04 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=11
+2026-10-16 01:37:40 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=36056 input_tokens=4376 output_tokens=452 tool_calls=1
+2026-10-16 01:37:40 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=13
+2026-10-16 01:38:18 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=37751 input_tokens=4569 output_tokens=405 tool_calls=0
+2026-10-16 01:38:38 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:38:43 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 01:41:35 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:07:37 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:07:37 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=11
+2026-10-16 02:07:38 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=908 input_tokens=1679 output_tokens=146 tool_calls=1
+2026-10-16 02:07:38 | INFO    | provider.llm | llm_started | agent='chat' model='ChatGroq' node=None messages=11
+2026-10-16 02:07:38 | INFO    | provider.llm | llm_finished | agent='chat' model='ChatGroq' duration_ms=726 input_tokens=1308 output_tokens=106 tool_calls=0
+2026-10-16 02:07:38 | INFO    | provider.llm | llm_started | agent='formatting' model='ChatGroq' node=None messages=2
+2026-10-16 02:07:40 | INFO    | provider.llm | llm_finished | agent='formatting' model='ChatGroq' duration_ms=2042 input_tokens=2843 output_tokens=788 tool_calls=1
+2026-10-16 02:07:59 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:08:04 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:08:55 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:08:55 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=13
+2026-10-16 02:08:56 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=905 input_tokens=2439 output_tokens=120 tool_calls=1
+2026-10-16 02:08:56 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:08:57 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=13
+2026-10-16 02:08:59 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=2345 input_tokens=4301 output_tokens=762 tool_calls=1
+2026-10-16 02:09:00 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:09:28 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:09:32 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:11:58 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:11:58 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=15
+2026-10-16 02:11:59 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1174 input_tokens=2626 output_tokens=178 tool_calls=1
+2026-10-16 02:12:00 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:12:00 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=15
+2026-10-16 02:12:01 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=1745 input_tokens=4620 output_tokens=512 tool_calls=0
+2026-10-16 02:12:21 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:12:25 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:15:20 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:15:58 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:15:58 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=17
+2026-10-16 02:15:59 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=1083 input_tokens=2247 output_tokens=113 tool_calls=1
+2026-10-16 02:15:59 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:15:59 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=17
+2026-10-16 02:16:01 | INFO    | provider.llm | llm_finished | agent='layla' model='ChatGroq' duration_ms=1651 input_tokens=4109 output_tokens=361 tool_calls=0
+2026-10-16 02:16:20 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:16:25 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:20:12 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:20:12 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=19
+2026-10-16 02:20:13 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=920 input_tokens=2296 output_tokens=195 tool_calls=1
+2026-10-16 02:20:13 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:20:13 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=19
+2026-10-16 02:20:14 | ERROR   | provider.llm | llm_failed | agent='layla' model='ChatGroq' duration_ms=404 error="RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01m1xb9mzte7mssdfkjn9z37wj` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 195277, Requested 4920. Please try again in 1m25.104s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+2026-10-16 02:20:33 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:20:37 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:21:26 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:21:26 | INFO    | provider.llm | llm_started | agent='orchestrator' model='ChatGroq' node=None messages=5
+2026-10-16 02:21:27 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='ChatGroq' duration_ms=990 input_tokens=1768 output_tokens=184 tool_calls=1
+2026-10-16 02:21:27 | INFO    | provider.llm | llm_built | provider='groq' model='openai/gpt-oss-120b' structured_method='function_calling'
+2026-10-16 02:21:27 | INFO    | provider.llm | llm_started | agent='layla' model='ChatGroq' node='agent' messages=5
+2026-10-16 02:21:28 | ERROR   | provider.llm | llm_failed | agent='layla' model='ChatGroq' duration_ms=376 error="RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01m1xb9mzte7mssdfkjn9z37wj` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 197058, Requested 3826. Please try again in 6m21.888s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+2026-10-16 02:21:47 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:21:54 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:27:51 | INFO    | provider.llm | llm_built | provider='openrouter' model='thinkingmachines/inkling:free' structured_method='json_schema'
+2026-10-16 02:27:51 | INFO    | provider.llm | llm_started | agent='orchestrator' model='thinkingmachines/inkling:free' node=None messages=7
+2026-10-16 02:27:52 | ERROR   | provider.llm | llm_failed | agent='orchestrator' model='thinkingmachines/inkling:free' duration_ms=590 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:27:52 | INFO    | provider.llm | llm_started | agent='chat' model='thinkingmachines/inkling:free' node=None messages=7
+2026-10-16 02:27:52 | ERROR   | provider.llm | llm_failed | agent='chat' model='thinkingmachines/inkling:free' duration_ms=135 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:27:52 | INFO    | provider.llm | llm_started | agent='formatting' model='thinkingmachines/inkling:free' node=None messages=2
+2026-10-16 02:27:52 | ERROR   | provider.llm | llm_failed | agent='formatting' model='thinkingmachines/inkling:free' duration_ms=183 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:27:52 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:27:52 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.1-flash-lite' node=None messages=2
+2026-10-16 02:27:59 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.1-flash-lite' duration_ms=7005 input_tokens=237 output_tokens=97 tool_calls=1
+2026-10-16 02:28:11 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:28:15 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:40:13 | INFO    | provider.llm | llm_built | provider='openrouter' model='thinkingmachines/inkling:free' structured_method='json_schema'
+2026-10-16 02:40:13 | INFO    | provider.llm | llm_started | agent='orchestrator' model='thinkingmachines/inkling:free' node=None messages=9
+2026-10-16 02:40:14 | ERROR   | provider.llm | llm_failed | agent='orchestrator' model='thinkingmachines/inkling:free' duration_ms=429 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:40:14 | INFO    | provider.llm | llm_started | agent='chat' model='thinkingmachines/inkling:free' node=None messages=9
+2026-10-16 02:40:14 | ERROR   | provider.llm | llm_failed | agent='chat' model='thinkingmachines/inkling:free' duration_ms=103 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:40:14 | INFO    | provider.llm | llm_started | agent='formatting' model='thinkingmachines/inkling:free' node=None messages=2
+2026-10-16 02:40:14 | ERROR   | provider.llm | llm_failed | agent='formatting' model='thinkingmachines/inkling:free' duration_ms=182 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:40:14 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:40:14 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.1-flash-lite' node=None messages=2
+2026-10-16 02:40:15 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.1-flash-lite' duration_ms=1138 input_tokens=237 output_tokens=97 tool_calls=1
+2026-10-16 02:40:35 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:40:39 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:54:10 | INFO    | provider.llm | llm_built | provider='openrouter' model='thinkingmachines/inkling:free' structured_method='json_schema'
+2026-10-16 02:54:10 | INFO    | provider.llm | llm_started | agent='orchestrator' model='thinkingmachines/inkling:free' node=None messages=11
+2026-10-16 02:54:11 | ERROR   | provider.llm | llm_failed | agent='orchestrator' model='thinkingmachines/inkling:free' duration_ms=1090 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:54:12 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.6-flash' structured_method='function_calling'
+2026-10-16 02:54:12 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.6-flash' node=None messages=11
+2026-10-16 02:54:16 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.6-flash' duration_ms=3835 input_tokens=1298 output_tokens=475 tool_calls=1
+2026-10-16 02:54:16 | INFO    | provider.llm | llm_built | provider='openrouter' model='thinkingmachines/inkling:free' structured_method='json_schema'
+2026-10-16 02:54:16 | INFO    | provider.llm | llm_started | agent='layla' model='thinkingmachines/inkling:free' node='agent' messages=11
+2026-10-16 02:54:17 | ERROR   | provider.llm | llm_failed | agent='layla' model='thinkingmachines/inkling:free' duration_ms=425 error="OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps', 'code': 403, 'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 1}], 'failed_routing_step': 'Gate Free Endpoints by Agentic Harness'}}}"
+2026-10-16 02:54:17 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.6-flash' structured_method='function_calling'
+2026-10-16 02:54:17 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.6-flash' node='agent' messages=11
+2026-10-16 02:54:20 | ERROR   | provider.llm | llm_failed | agent='layla' model='gemini-3.6-flash' duration_ms=2945 error="GoogleRateLimitError: Error calling model 'gemini-3.6-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash\\nPlease retry in 5m39.604295681s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'model': 'gemini-3.6-flash', 'location': 'global'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '339s'}]}}"
+2026-10-16 02:54:39 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:54:43 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:57:30 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3-flash' structured_method='function_calling'
+2026-10-16 02:57:30 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3-flash' node=None messages=13
+2026-10-16 02:57:31 | ERROR   | provider.llm | llm_failed | agent='orchestrator' model='gemini-3-flash' duration_ms=538 error="GoogleModelNotFoundError: Error calling model 'gemini-3-flash' (NOT_FOUND): 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}"
+2026-10-16 02:57:31 | INFO    | provider.llm | llm_started | agent='chat' model='gemini-3-flash' node=None messages=13
+2026-10-16 02:57:31 | ERROR   | provider.llm | llm_failed | agent='chat' model='gemini-3-flash' duration_ms=333 error="GoogleModelNotFoundError: Error calling model 'gemini-3-flash' (NOT_FOUND): 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}"
+2026-10-16 02:57:31 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3-flash' node=None messages=2
+2026-10-16 02:57:32 | ERROR   | provider.llm | llm_failed | agent='formatting' model='gemini-3-flash' duration_ms=223 error="GoogleModelNotFoundError: Error calling model 'gemini-3-flash' (NOT_FOUND): 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}"
+2026-10-16 02:57:32 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:57:32 | INFO    | provider.llm | llm_started | agent='formatting' model='gemini-3.1-flash-lite' node=None messages=2
+2026-10-16 02:57:36 | INFO    | provider.llm | llm_finished | agent='formatting' model='gemini-3.1-flash-lite' duration_ms=4092 input_tokens=237 output_tokens=258 tool_calls=1
+2026-10-16 02:57:52 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 02:57:59 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:00:49 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:03:34 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:03:34 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.8-flash' node=None messages=15
+2026-10-16 03:05:16 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:05:16 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.8-flash' node=None messages=5
+2026-10-16 03:07:35 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.8-flash' duration_ms=139022 input_tokens=1239 output_tokens=274 tool_calls=1
+2026-10-16 03:07:35 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:07:36 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.8-flash' node='agent' messages=5
+2026-10-16 03:08:40 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.8-flash' duration_ms=63900 input_tokens=3388 output_tokens=2504 tool_calls=1
+2026-10-16 03:08:40 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:09:11 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:09:23 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:13:16 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:13:16 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.8-flash' node=None messages=7
+2026-10-16 03:26:18 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:26:18 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.8-flash' node=None messages=7
+2026-10-16 03:26:26 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.8-flash' duration_ms=7828 input_tokens=1370 output_tokens=226 tool_calls=1
+2026-10-16 03:26:26 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:26:27 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.8-flash' node='agent' messages=8
+2026-10-16 03:26:36 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.8-flash' duration_ms=9404 input_tokens=3698 output_tokens=809 tool_calls=1
+2026-10-16 03:27:04 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.8-flash' node='agent' messages=10
+2026-10-16 03:27:13 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.8-flash' duration_ms=8730 input_tokens=6319 output_tokens=1162 tool_calls=1
+2026-10-16 03:27:14 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:27:29 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:27:34 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:28:00 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:28:00 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.8-flash' node=None messages=9
+2026-10-16 03:28:03 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.8-flash' duration_ms=2934 input_tokens=2134 output_tokens=215 tool_calls=1
+2026-10-16 03:28:03 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:28:03 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.8-flash' node='agent' messages=10
+2026-10-16 03:28:11 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.8-flash' duration_ms=7793 input_tokens=4462 output_tokens=1057 tool_calls=1
+2026-10-16 03:28:38 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.8-flash' node='agent' messages=12
+2026-10-16 03:28:46 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.8-flash' duration_ms=7394 input_tokens=7393 output_tokens=1046 tool_calls=1
+2026-10-16 03:28:47 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:29:02 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:29:09 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:32:01 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:50:04 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:50:04 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gemini-3.8-flash' node=None messages=11
+2026-10-16 03:50:08 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gemini-3.8-flash' duration_ms=3695 input_tokens=1727 output_tokens=173 tool_calls=1
+2026-10-16 03:50:08 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.8-flash' structured_method='function_calling'
+2026-10-16 03:50:09 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.8-flash' node='agent' messages=12
+2026-10-16 03:50:17 | INFO    | provider.llm | llm_finished | agent='layla' model='gemini-3.8-flash' duration_ms=8256 input_tokens=4055 output_tokens=1148 tool_calls=1
+2026-10-16 03:50:33 | INFO    | provider.llm | llm_started | agent='layla' model='gemini-3.8-flash' node='agent' messages=14
+2026-10-16 03:50:36 | ERROR   | provider.llm | llm_failed | agent='layla' model='gemini-3.8-flash' duration_ms=2912 error="GoogleRateLimitError: Error calling model 'gemini-3.8-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash\\nPlease retry in 23h9m23.503964767s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-3.8-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '83363s'}]}}"
+2026-10-16 03:50:42 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:50:47 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-16 03:53:39 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'

@@ -487,6 +487,81 @@ async def update_llm_settings(
         db.add(row)
 
     cipher = TokenCipher(settings.token_encryption_key)
+
+    # Validate an explicitly chosen model against the provider's own catalog,
+    # *before* anything is written. A name that does not exist used to save fine and
+    # then kill every later turn with "404: models/gemini-3-flash is not found"
+    # (or a 403 on a free model gated to coding agents). Fails open: an unverifiable
+    # choice is the user's to make.
+    from app.core.llm.model_catalog import list_models, suggest_models
+
+    for tier, patch in patches.items():
+        if patch is None:
+            continue
+        sent = patch.model_dump(exclude_unset=True)
+        chosen = str(sent.get("model") or "").strip()
+        if not chosen:
+            continue
+        # Two settings objects carry provider keys (core `Settings` and the AI layer's
+        # `AISettings`), and neither declares all of them; a value we cannot read here
+        # must mean "no way to verify", never a 500 on save.
+        from app.ai.settings import get_ai_settings
+
+        try:
+            ai_settings = get_ai_settings()
+        except Exception:  # noqa: BLE001
+            ai_settings = None
+        provider = str(
+            sent.get("provider") or getattr(row, f"{tier}_provider", None) or ""
+        ).strip().lower()
+        if not provider:
+            resolver = getattr(ai_settings, "provider_for_tier", None)
+            if callable(resolver):
+                try:
+                    provider = str(resolver(tier) or "").strip().lower()
+                except Exception:  # noqa: BLE001
+                    provider = ""
+        provider = {"claude": "anthropic", "azure": "openai", "custom": "openai"}.get(
+            provider, provider
+        )
+        base_url = sent.get("base_url") or getattr(row, f"{tier}_base_url", None)
+        sent_key = sent.get("api_key")
+        api_key = sent_key.get_secret_value().strip() if sent_key else ""
+        if not api_key:
+            stored = getattr(row, f"{tier}_api_key_enc", None)
+            if stored:
+                try:
+                    api_key = cipher.decrypt(stored)
+                except Exception:  # noqa: BLE001 - a key we cannot read is not a verdict
+                    api_key = ""
+        if not api_key:
+            for source in (settings, ai_settings):
+                if source is None:
+                    continue
+                value = getattr(source, f"{provider}_api_key", None)
+                if value:
+                    api_key = str(value)
+                    break
+        offered = await list_models(provider, api_key, base_url=str(base_url or "") or None)
+        if offered and chosen not in offered:
+            suggestions = suggest_models(chosen, offered)
+            hint = (
+                " Did you mean: " + ", ".join(suggestions) + "?"
+                if suggestions
+                else ""
+            )
+            raise ValidationFailed(
+                f"The provider '{provider}' does not offer the model '{chosen}' for this key."
+                + hint,
+                detail={
+                    "code": "model_not_found",
+                    "field": f"{tier}.model",
+                    "provider": provider,
+                    "value": chosen,
+                    "suggestions": suggestions,
+                },
+            )
+
     for tier, patch in patches.items():
         if patch is None:
             continue

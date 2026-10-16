@@ -143,8 +143,25 @@ def _engine_kwargs(url: str, echo: bool) -> dict[str, Any]:
     return kwargs
 
 
-def _setup_db_tracing(engine: AsyncEngine) -> None:
-    """Attach SQLAlchemy event listeners to trace all database queries and execution times."""
+def _setup_db_tracing(
+    engine: AsyncEngine, *, trace_enabled: bool = False, slow_query_ms: int = 1000
+) -> None:
+    """Attach SQLAlchemy event listeners for slow-query warnings and (opt-in) tracing.
+
+    Two different concerns live here on purpose:
+
+    * **Slow queries** are always measured. The check is a monotonic timestamp
+      plus an integer compare per statement, and a query over the threshold is
+      the single most useful signal a slow app can emit.
+    * **Full tracing** (statement text, cleaned parameters, per-query DEBUG logs)
+      is opt-in behind ``DB_TRACE``. It ran unconditionally before, and the cost
+      was not the log line: every execution recursively walked every parameter,
+      JSON-parsed any string that looked like a payload, and redacted the result
+      -- per query, including inside tight loops and streaming turns.
+
+    The request-scoped counters stay on either way; they are two integer adds and
+    they are what feeds the ``X-DB-Queries`` / ``X-DB-Time`` response headers.
+    """
     sync_engine = engine.sync_engine
     if getattr(sync_engine, "_tracing_attached", False):
         return
@@ -155,52 +172,50 @@ def _setup_db_tracing(engine: AsyncEngine) -> None:
     @event.listens_for(sync_engine, "before_cursor_execute")
     def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         conn.info.setdefault("query_start_time", []).append(time.monotonic())
+        if not trace_enabled:
+            return
         stmt_clean = statement.strip()
         op = stmt_clean.split()[0].upper() if stmt_clean else "SQL"
         raw_params = dict(parameters) if isinstance(parameters, dict) else parameters
-        cleaned_params = _clean_db_trace_param(raw_params)
         db_logger.debug(
             f"[DATABASE - {op}] Executing query",
             extra={
                 "operation": op,
                 "statement": stmt_clean,
-                "parameters": redact(cleaned_params),
+                "parameters": redact(_clean_db_trace_param(raw_params)),
                 "executemany": executemany,
             },
         )
+        context._trace_op = op  # type: ignore[attr-defined]
 
     @event.listens_for(sync_engine, "after_cursor_execute")
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         start_times = conn.info.get("query_start_time", [])
         duration_ms = int((time.monotonic() - start_times.pop()) * 1000) if start_times else 0
-        stmt_clean = statement.strip()
-        op = stmt_clean.split()[0].upper() if stmt_clean else "SQL"
-        rowcount = getattr(cursor, "rowcount", -1)
 
-        # Track query count and duration in request state if active
+        # Two integer adds: always on, feeds response headers.
         metrics = _request_db_metrics.get()
         if metrics is not None:
             metrics["query_count"] += 1
             metrics["total_duration_ms"] += duration_ms
 
-        if duration_ms > 1000:
+        if duration_ms > slow_query_ms:
+            stmt_clean = statement.strip()
             db_logger.warning(
-                f"[DATABASE - SLOW QUERY] Query exceeded 1000ms threshold: {duration_ms}ms (op: {op})",
+                f"[DATABASE - SLOW QUERY] Query exceeded {slow_query_ms}ms threshold: "
+                f"{duration_ms}ms (op: {stmt_clean.split()[0].upper() if stmt_clean else 'SQL'})",
                 extra={
-                    "operation": op,
+                    "operation": stmt_clean.split()[0].upper() if stmt_clean else "SQL",
                     "duration_ms": duration_ms,
-                    "rowcount": rowcount,
+                    "rowcount": getattr(cursor, "rowcount", -1),
                     "statement": stmt_clean[:300],
                 },
             )
-        else:
+        elif trace_enabled:
             db_logger.debug(
-                f"[DATABASE - {op} RESULT] Completed in {duration_ms}ms (rows: {rowcount})",
-                extra={
-                    "operation": op,
-                    "duration_ms": duration_ms,
-                    "rowcount": rowcount,
-                },
+                f"[DATABASE - {getattr(context, '_trace_op', 'SQL')} RESULT] "
+                f"Completed in {duration_ms}ms (rows: {getattr(cursor, 'rowcount', -1)})",
+                extra={"duration_ms": duration_ms, "rowcount": getattr(cursor, "rowcount", -1)},
             )
 
     @event.listens_for(sync_engine, "handle_error")
@@ -215,12 +230,17 @@ def _setup_db_tracing(engine: AsyncEngine) -> None:
 
 
 def _make_engine(url: str, echo: bool) -> AsyncEngine:
+    settings = get_settings()
     engine = create_async_engine(
         url,
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
         **_engine_kwargs(url, echo),
     )
-    _setup_db_tracing(engine)
+    _setup_db_tracing(
+        engine,
+        trace_enabled=bool(getattr(settings, "db_trace", False)),
+        slow_query_ms=int(getattr(settings, "db_slow_query_ms", 1000) or 1000),
+    )
     return engine
 
 

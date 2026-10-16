@@ -23,7 +23,7 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel
 
 from app.ai.enums import LLMProvider, StructuredOutputMethod
-from app.ai.errors import ProviderNotConfiguredError
+from app.ai.errors import ProviderNotConfiguredError, ProviderNotInstalledError
 from app.ai.loggers.providers.llm import logger
 from app.ai.providers._loader import load_provider_module
 from app.ai.settings import AISettings, get_ai_settings
@@ -165,6 +165,8 @@ async def get_workspace_chat_llm(
     business_id: str | None,
     tier: str = "strong",
     settings: AISettings | None = None,
+    default_temperature: float | None = None,
+    default_max_tokens: int | None = None,
 ) -> LLMHandle:
     """The chat model this *workspace* selected, falling back to global config.
 
@@ -176,17 +178,35 @@ async def get_workspace_chat_llm(
 
     Everything here is best-effort: any failure, or a workspace with no override
     at all, falls back to the global settings rather than breaking the turn.
+
+    ``default_temperature`` / ``default_max_tokens`` are the caller's *role*
+    defaults (see ``app.ai.roles``). They apply only when the workspace row has
+    no opinion of its own -- an administrator who set a temperature meant it, and
+    silently replacing it with the creative default would be the same class of bug
+    this function exists to fix.
     """
     cfg = settings or get_ai_settings()
     if db is None or not business_id:
-        return get_llm(settings=cfg)
+        return get_llm(
+            provider=cfg.provider_for_tier(tier),
+            model=cfg.model_for_tier(tier),
+            temperature=default_temperature,
+            max_tokens=default_max_tokens,
+            settings=cfg,
+        )
 
     try:
         from app.core.llm.router import resolve_workspace_tier
 
         tier_state = await resolve_workspace_tier(db, business_id, tier)  # type: ignore[arg-type]
     except Exception:  # pragma: no cover - never let routing break chat
-        return get_llm(settings=cfg)
+        return get_llm(
+            provider=cfg.provider_for_tier(tier),
+            model=cfg.model_for_tier(tier),
+            temperature=default_temperature,
+            max_tokens=default_max_tokens,
+            settings=cfg,
+        )
 
     provider_value = str(
         tier_state.get("provider") or getattr(cfg.llm_provider, "value", cfg.llm_provider)
@@ -233,28 +253,79 @@ async def get_workspace_chat_llm(
         overrides["openai_base_url"] = str(base_url)
     cfg = cfg.model_copy(update=overrides)
 
+    try:
+        return _build_workspace_llm(
+            provider=choice,
+            workspace_model=workspace_model,
+            tier_state=tier_state,
+            settings=cfg,
+            default_temperature=default_temperature,
+            default_max_tokens=default_max_tokens,
+        )
+    except (ProviderNotConfiguredError, ProviderNotInstalledError) as exc:
+        # A workspace that picked a provider it has no credential for used to lose
+        # *every* turn: the settings row (or `.env`) said e.g. `openrouter`, the key
+        # was blank, and each reply became "the selected AI provider is
+        # unavailable". The process configuration is a perfectly good provider, and
+        # a chat that answers on the wrong-but-working model is strictly better
+        # than a chat that cannot answer at all -- so the workspace override is
+        # dropped for this turn, loudly.
+        fallback_provider = cfg.provider_for_tier(tier)
+        fallback_model = cfg.model_for_tier(tier)
+        if fallback_provider == choice and (workspace_model or "") == (fallback_model or ""):
+            raise
+        logger.warning(
+            "workspace_llm_unusable_falling_back_to_process_provider",
+            extra={
+                "tier": tier,
+                "workspace_provider": getattr(choice, "value", choice),
+                "workspace_model": workspace_model,
+                "process_provider": getattr(fallback_provider, "value", fallback_provider),
+                "process_model": fallback_model,
+                "reason": f"{type(exc).__name__}: {exc}",
+            },
+        )
+        return get_llm(
+            provider=fallback_provider,
+            model=fallback_model,
+            temperature=default_temperature,
+            max_tokens=default_max_tokens,
+            settings=cfg,
+        )
+
+
+def _build_workspace_llm(
+    *,
+    provider: LLMProvider,
+    workspace_model: str | None,
+    tier_state: dict[str, Any],
+    settings: AISettings,
+    default_temperature: float | None,
+    default_max_tokens: int | None,
+) -> LLMHandle:
+    """Build the workspace-selected handle. Split out so the caller can fall back."""
     return get_llm(
-        provider=choice,
+        provider=provider,
         model=workspace_model,
-        temperature=_optional_float(tier_state.get("temperature")),
-        max_tokens=_optional_int(tier_state.get("max_tokens")),
+        temperature=_optional_float(tier_state.get("temperature"), default_temperature),
+        max_tokens=_optional_int(tier_state.get("max_tokens"), default_max_tokens),
         reasoning_effort=_optional_str(tier_state.get("reasoning_effort")),
-        settings=cfg,
+        settings=settings,
     )
 
 
-def _optional_float(value: Any) -> float | None:
+def _optional_float(value: Any, default: float | None = None) -> float | None:
     try:
-        return float(value) if value is not None else None
+        return float(value) if value is not None else default
     except (TypeError, ValueError):
-        return None
+        return default
 
 
-def _optional_int(value: Any) -> int | None:
+def _optional_int(value: Any, default: int | None = None) -> int | None:
     try:
-        return int(value) if value is not None else None
+        return int(value) if value is not None else default
     except (TypeError, ValueError):
-        return None
+        return default
 
 
 def _optional_str(value: Any) -> str | None:

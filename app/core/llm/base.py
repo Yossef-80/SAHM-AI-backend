@@ -224,11 +224,31 @@ class BaseLLMClient(ABC):
     where subtle per-provider drift would otherwise creep in.
     """
 
-    def __init__(self, *, model: str, timeout: float, max_retries: int, base_delay: float) -> None:
+    #: Used when a caller passes no temperature. Deliberately the same value the
+    #: `complete()` signature used to hardcode, so a deployment that configures
+    #: nothing keeps byte-identical requests.
+    DEFAULT_TEMPERATURE = 0.4
+    DEFAULT_MAX_TOKENS = 2000
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        timeout: float,
+        max_retries: int,
+        base_delay: float,
+        default_temperature: float | None = None,
+        default_max_tokens: int | None = None,
+    ) -> None:
         self.model = model
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_delay = base_delay
+        #: Sampling this client falls back to when a call does not name its own.
+        #: Comes from the workspace's LLM settings row (Settings -> LLM) after the
+        #: process defaults; None keeps DEFAULT_TEMPERATURE / DEFAULT_MAX_TOKENS.
+        self.default_temperature = default_temperature
+        self.default_max_tokens = default_max_tokens
 
     # -- to implement --------------------------------------------------------
 
@@ -256,9 +276,21 @@ class BaseLLMClient(ABC):
         tools: list[ToolSpec] | None = None,
         response_schema: type[BaseModel] | None = None,
         tier: TierName = "strong",
-        max_tokens: int = 2000,
-        temperature: float = 0.4,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
     ) -> LLMResult:
+        # Resolution order, most specific first: this call -> this client's
+        # workspace-configured default -> the historical constants. `None` (not
+        # `0`/`0.0`) is the "unspecified" marker throughout, so a deliberate
+        # temperature of 0.0 still means 0.0.
+        if temperature is None:
+            temperature = (
+                self.default_temperature
+                if self.default_temperature is not None
+                else self.DEFAULT_TEMPERATURE
+            )
+        if max_tokens is None:
+            max_tokens = self.default_max_tokens or self.DEFAULT_MAX_TOKENS
         started = time.monotonic()
         from app.core.logging import get_logger
         llm_trace = get_logger("app.llm.trace")

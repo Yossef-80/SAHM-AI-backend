@@ -11,6 +11,7 @@ from langgraph.prebuilt import ToolNode
 from app.ai.agents.karim.schema import PerformanceReport
 from app.ai.agents.karim.state import KarimState
 from app.ai.providers.llm import get_llm
+from app.ai.providers.llm.agent_llm import agent_llm_for_graph
 from app.ai.settings import get_ai_settings
 from app.ai.tools import fetch_ga4_performance, get_brand_context_tool, save_learning_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
@@ -89,7 +90,9 @@ def call_model(state: KarimState, config: RunnableConfig) -> dict:
     messages = list(state["messages"])
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [SystemMessage(content=KARIM_PROMPT)] + messages
-    llm_handle = get_llm(provider=get_ai_settings().llm_provider)
+    llm_handle = agent_llm_for_graph(
+        "karim", config, builder=get_llm, settings=get_ai_settings()
+    )
     response = llm_handle.chat.bind_tools(KARIM_TOOLS).invoke(messages, config)
     return {"messages": [response]}
 

@@ -81,12 +81,22 @@ class Settings(BaseSettings):
     # app boots and the whole flow runs with zero external services.
     database_url: str = "sqlite+aiosqlite:///./sahm.db"
     db_echo: bool = False
+    #: Full per-query tracing (statement + cleaned parameters at DEBUG). Off by
+    #: default: it cleans and redacts every parameter of every statement, which
+    #: is real per-query CPU on hot paths. Turn on with DB_TRACE=true when you
+    #: are actually debugging SQL.
+    db_trace: bool = False
+    #: Queries slower than this always log a WARNING, tracing on or off -- slow
+    #: queries are the thing worth knowing about, and the check costs a compare.
+    db_slow_query_ms: int = 1000
 
     # --- Supabase (HTTPS API: REST / Auth) ---------------------------------
     # These are NOT database credentials. ``database_url`` above is what
     # SQLAlchemy uses; a Supabase connection string needs the database password
     # from Dashboard -> Project Settings -> Database. These four are for the
     # PostgREST / Auth endpoints only.
+    #: Bucket generated creatives and mirrored uploads land in.
+    storage_bucket: str = "creatives"
     supabase_url: str | None = None
     supabase_publishable_key: str | None = None
     supabase_secret_key: str | None = None
@@ -148,6 +158,19 @@ class Settings(BaseSettings):
     llm_max_retries: int = 3
     llm_retry_base_delay: float = 0.5
     llm_max_output_tokens: int = 4096
+
+    # Sampling defaults for the client tier. None means "no opinion": the client
+    # keeps its own historical default (0.4 / 2000), which is what every existing
+    # call site already got, and per-role temperatures (see `app.ai.roles`) stay
+    # the only thing that overrides creative work.
+    #
+    # NOTE: deliberately not aliased to AI_LLM_TEMPERATURE / AI_LLM_MAX_TOKENS.
+    # Those are the *agent* layer's one-temperature-for-everything settings, and
+    # reusing them here would re-flatten every role onto 0.2 -- the exact bug
+    # this work removes. Only a workspace settings row (Settings -> LLM) and
+    # LLM_TEMPERATURE / LLM_MAX_TOKENS feed these.
+    llm_temperature: float | None = None
+    llm_max_tokens: int | None = None
 
     # Cost guard: per-workspace daily token budget.
     daily_token_budget: int = 2_000_000
@@ -213,6 +236,11 @@ class Settings(BaseSettings):
     #: connector default) means "the provider decides", which is honest about
     #: what the request asks for instead of silently buying `high`.
     image_quality: str | None = None
+    #: Render ceiling for one image call, in seconds. The provider's own worst
+    #: case for a large edit was observed past 120s, so the old hardcoded 120 was
+    #: cutting off renders that were about to succeed (and were still billed).
+    #: Values below 30 are ignored in favour of the default.
+    image_timeout_seconds: float = 300.0
     # Placeholder SVGs are never returned unless an operator explicitly opts in.
     image_allow_mock_assets: bool = False
 

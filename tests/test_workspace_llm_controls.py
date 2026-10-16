@@ -285,7 +285,11 @@ async def test_chat_falls_back_to_the_process_model_when_settings_are_unreadable
 
     # Built from the process configuration instead of raising.
     assert handle is not None
-    assert captured["kwargs"]["model"] == "process-default-model"
+    # The process configuration is tier-aware: AI_LLM_MODEL still names the base
+    # model (and reaches the strong tier when nothing else is set), but an
+    # explicit LLM_MODEL_STRONG wins. Assert against the resolved value rather
+    # than a hardcoded string so the test never depends on a developer's .env.
+    assert captured["kwargs"]["model"] == (get_ai_settings().model_for_tier("strong"))
     get_ai_settings.cache_clear()
 
 

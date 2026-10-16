@@ -64,6 +64,12 @@ class GenerateLaylaTextResponse(ApiModel):
     ]
     output: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
+    # Which role/tier produced this text, and how much brand memory it was given.
+    # Optional so older clients and stored payloads keep validating; the UI shows
+    # them in the creative's detail panel.
+    role: str | None = None
+    model: str | None = None
+    brand_context_tokens: int | None = None
 
 
 class StyleElement(ApiModel):
@@ -135,6 +141,42 @@ class GenerateCreativeRequest(ApiModel):
     campaign_id: str | None = None
     persona_id: str | None = None
     num_images: int = Field(default=1, ge=1, le=4)
+
+
+class SaveTextCreativeRequest(ApiModel):
+    """Persist a piece of Layla text as a real creative.
+
+    ``original_text`` is what Layla produced; ``text`` is what the user is
+    keeping. When the two differ, the pair is a style signal (hook c of the
+    learning loop) rather than a plain approval (hook b).
+    """
+
+    tool: Literal[
+        "generate_creative_brief",
+        "generate_commercial_script",
+        "generate_image_prompt",
+        "generate_video_prompt",
+        "generate_ad_copy",
+        "generate_ad_variations",
+    ] = "generate_ad_copy"
+    text: str = Field(min_length=1, max_length=20000)
+    original_text: str | None = Field(default=None, max_length=20000)
+    brief: str = Field(default="", max_length=12000)
+    title: str = Field(default="", max_length=160)
+    campaign_id: str | None = None
+    creative_id: str | None = None
+    model: str | None = Field(default=None, max_length=120)
+
+
+class UpdateTextCreativeRequest(ApiModel):
+    """Edit the copy of a saved text creative.
+
+    Saving the edit records the before/after pair as brand-voice memory, which is
+    the whole point: the user's own rewrite teaches Layla more than any adjective
+    in their profile.
+    """
+
+    text: str = Field(min_length=1, max_length=20000)
 
 
 class GeneratedAsset(ToolOutput):

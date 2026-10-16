@@ -23,6 +23,11 @@ _logger = get_logger(__name__)
 
 _TOKEN_RE = re.compile(r"[a-z0-9']+")
 
+#: The fallback for scripts ``_TOKEN_RE`` cannot see -- for this product, Arabic.
+#: ``\w`` minus digits and underscore is "letters of any script", so an Arabic
+#: sentence tokenizes into its words instead of into nothing.
+_WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
+
 
 @runtime_checkable
 class EmbeddingProvider(Protocol):
@@ -40,15 +45,38 @@ class MockEmbeddingProvider:
 
     Similar texts (shared tokens) land near each other, which is enough to test
     retrieval ordering. Not suitable for production semantic search.
+
+    ``_TOKEN_RE`` is Latin-only, and that used to be the whole tokenizer: Arabic
+    -- the language most of this product's memory is written in -- produced *no*
+    tokens, so every Arabic text embedded to a zero vector. A zero vector has no
+    direction to compare, pgvector answers NaN for its cosine distance, and the
+    search then either fell back silently or ordered the results arbitrarily.
+    Non-Latin scripts now fall through to a Unicode word split, and a final
+    character-level fallback guarantees that any non-empty text has a direction.
     """
 
     def __init__(self, dim: int = 64, model: str = "mock-embed-1") -> None:
         self.dim = dim
         self.model = model
 
+    @staticmethod
+    def _tokens(text: str) -> list[str]:
+        lowered = text.lower()
+        tokens = _TOKEN_RE.findall(lowered)
+        if tokens:
+            return tokens
+        # Any script the Latin pattern cannot see (Arabic, Hebrew, Greek, Cyrillic,
+        # CJK runs, emoji-free symbols): split on Unicode word boundaries.
+        tokens = [t for t in _WORD_RE.findall(lowered) if t.strip("\u0640")]  # strip tatweel
+        if tokens:
+            return tokens
+        # Last resort: a string of digits or punctuation still gets a direction,
+        # so the caller never receives a vector that cannot be compared.
+        return [ch for ch in lowered if not ch.isspace()]
+
     def _vector(self, text: str) -> list[float]:
         vec = [0.0] * self.dim
-        for token in _TOKEN_RE.findall(text.lower()):
+        for token in self._tokens(text):
             digest = hashlib.sha256(token.encode()).digest()
             bucket = int.from_bytes(digest[:4], "big") % self.dim
             sign = 1.0 if digest[4] % 2 == 0 else -1.0

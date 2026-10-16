@@ -192,8 +192,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "require_auth": settings.require_auth,
         },
     )
+    # Object storage: verify/recreate the bucket the image pipeline writes to.
+    # Best effort -- a storage hiccup must not stop the API from booting.
+    try:
+        from app.core.storage import ensure_bucket, is_supabase_configured
+
+        if is_supabase_configured(settings):
+            bucket = str(getattr(settings, "storage_bucket", "creatives") or "creatives")
+            created = await ensure_bucket(settings, bucket)
+            _logger.info("storage_bucket_ready", extra={"bucket": bucket, "ok": created})
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("storage_bucket_check_failed", extra={"error": str(exc)})
+
     yield
     from app.core.ai_usage import stop_usage_writer
+
+    # LTM debouncer first: it holds sleeping tasks that would otherwise outlive
+    # the engine they write through.
+    try:
+        from app.ai.memory.compressor import memory_debouncer
+
+        await memory_debouncer.shutdown()
+    except Exception as exc:  # noqa: BLE001 - shutdown must never raise
+        _logger.warning("ltm_debouncer_shutdown_failed", extra={"error": str(exc)})
 
     await stop_usage_writer()
     await close_clients()
