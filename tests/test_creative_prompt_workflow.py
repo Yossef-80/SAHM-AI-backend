@@ -1128,3 +1128,41 @@ def test_real_questions_are_not_mistaken_for_field_names(item: str) -> None:
     from app.ai.agents.orchestrator.brain import _is_raw_field_name_question
 
     assert _is_raw_field_name_question(item) is False, item
+
+
+@pytest.mark.parametrize(
+    "msg",
+    [
+        "ولد الصورة",
+        "اعمل الصورة",
+        "صمم الصورة",
+        "generate image",
+        "create the image",
+        "خلاص نفذ الصورة وولدها",
+    ],
+)
+def test_breakout_creative_prompt_on_image_generation_intent(msg: str) -> None:
+    from app.ai.agents.orchestrator.brain import (
+        _activate_creative_prompt_workflow,
+        _prepare_creative_prompt_turn,
+        _requests_image_generation,
+    )
+
+    assert _requests_image_generation(msg) is True
+
+    # 1. Activation should not enter creative_prompt
+    activated = _activate_creative_prompt_workflow({}, msg, [])
+    assert activated.get("workflow") != "creative_prompt"
+    assert activated.get("allow_image_generation") is True
+    assert activated.get("creative_mode") == "design"
+
+    # 2. Even if already inside creative_prompt, turn preparation should exit
+    prepared = _prepare_creative_prompt_turn(
+        {"workflow": "creative_prompt", "prompt_type": "image", "creative_prompt_stage": "collecting_details"},
+        msg,
+    )
+    assert prepared.get("workflow") != "creative_prompt"
+    assert "creative_prompt_stage" not in prepared
+    assert prepared.get("allow_image_generation") is True
+    assert prepared.get("creative_mode") == "design"
+

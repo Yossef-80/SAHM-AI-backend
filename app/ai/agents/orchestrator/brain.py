@@ -124,21 +124,66 @@ def _attachment_messages(context: dict[str, Any], handle: Any) -> list[Any]:
     return [HumanMessage(content=blocks)]
 
 
+_PROMPT_ONLY_PATTERN = re.compile(
+    r"(?i)(?:\bprompt\s+only\b|\bwrite\s+(?:me\s+)?a\s+prompt\b|"
+    r"\bimage\s+prompt\b|\bvideo\s+prompt\b|اكتب\s+(?:لي\s+)?(?:برومبت|prompt)|"
+    r"برومبت\s+فقط|صياغة\s+البرومبت)"
+)
+
+
 def _requests_image_generation(prompt: str) -> bool:
     low = (prompt or "").lower()
-    if any(p in low for p in ("prompt", "how do i", "how to")):
+    if _PROMPT_ONLY_PATTERN.search(low):
+        return False
+    if any(p in low for p in ("how do i", "how to", "ازاي", "كيف")):
         return False
     return any(
         p in low
         for p in (
             "generate an image",
+            "generate image",
+            "generate the image",
             "create an image",
+            "create image",
+            "create the image",
             "draw an image",
             "make an image",
+            "make image",
+            "make the image",
+            "render an image",
+            "render image",
+            "render the image",
+            "generate photo",
+            "generate picture",
+            "generate it",
+            "create it",
             "توليد صورة",
+            "توليد الصورة",
             "أنشئ صورة",
+            "انشئ صورة",
+            "أنشئ الصورة",
+            "انشئ الصورة",
             "صمم صورة",
+            "صمم الصورة",
             "اعمل صورة",
+            "اعمل الصورة",
+            "ولد صورة",
+            "ولّد صورة",
+            "ولد الصورة",
+            "ولّد الصورة",
+            "طلع الصورة",
+            "طلع صورة",
+            "نفذ الصورة",
+            "نفّذ الصورة",
+            "نفذ صورة",
+            "نفّذ صورة",
+            "ولدها",
+            "ولّدها",
+            "اعملها",
+            "صممها",
+            "طلعها",
+            "نفذها",
+            "نفّذها",
         )
     )
 
@@ -1655,6 +1700,17 @@ def _activate_creative_prompt_workflow(
     history: list[dict[str, Any]],
 ) -> dict[str, Any]:
     prepared = dict(context)
+    if _requests_image_generation(message):
+        prepared.pop("workflow", None)
+        prepared.pop("creative_prompt_stage", None)
+        prepared.pop("creative_prompt_reference_shown_key", None)
+        prepared.pop("creative_prompt_user_facts", None)
+        prepared.pop("creative_prompt_confirmed_facts", None)
+        prepared.pop("creative_prompt_unresolved_fields", None)
+        prepared["creative_mode"] = "design"
+        prepared["allow_image_generation"] = True
+        return prepared
+
     kind = str(prepared.get("prompt_type") or "").lower()
     if prepared.get("workflow") != "creative_prompt":
         detected_kind = _detect_creative_prompt_type(message)
@@ -1693,6 +1749,18 @@ def _prepare_creative_prompt_turn(
     context: dict[str, Any], message: str
 ) -> dict[str, Any]:
     """Apply the prompt-interview state transition inside the AI/orchestration layer."""
+    if _requests_image_generation(message):
+        prepared = dict(context)
+        prepared.pop("workflow", None)
+        prepared.pop("creative_prompt_stage", None)
+        prepared.pop("creative_prompt_reference_shown_key", None)
+        prepared.pop("creative_prompt_user_facts", None)
+        prepared.pop("creative_prompt_confirmed_facts", None)
+        prepared.pop("creative_prompt_unresolved_fields", None)
+        prepared["creative_mode"] = "design"
+        prepared["allow_image_generation"] = True
+        return prepared
+
     if context.get("workflow") != "creative_prompt":
         return context
 

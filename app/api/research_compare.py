@@ -257,8 +257,8 @@ async def compare_competitors(
         select(BrandProfile).where(BrandProfile.business_id == ws.business_id).limit(1)
     )
     workspace_language = (
-        (brand_profile.language if brand_profile is not None else None)
-        or getattr(getattr(ws, "business", None), "language", None)
+        getattr(brand_profile, "language", None)
+        or getattr(ws.business, "language", None)
         or ""
     )
     language = resolve_output_language(

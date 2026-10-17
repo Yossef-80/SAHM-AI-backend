@@ -33,9 +33,13 @@ _REFERENCE_INTENT = re.compile(
     r"مرجع|كمرجع|استلهام|إلهام|زي\s+الصورة|مثل\s+الصورة|على\s+نمط)"
 )
 _GENERATE_INTENT = re.compile(
-    r"(?i)(?:\bgenerate\s+(?:an?\s+)?image\b|\bcreate\s+(?:an?\s+)?image\b|"
-    r"\brender\s+(?:an?\s+)?image\b|\bmake\s+(?:an?\s+)?image\b|"
-    r"انشئ\s+صورة|أنشئ\s+صورة|ولّد\s+صورة|ولد\s+صورة|اعمل\s+صورة|طلع\s+الصورة)"
+    r"(?i)(?:\bgenerate\s+(?:an?\s+)?(?:image|picture|photo|visual|creative)\b|"
+    r"\bcreate\s+(?:an?\s+)?(?:image|picture|photo|visual|creative)\b|"
+    r"\brender\s+(?:an?\s+)?(?:image|picture|photo|visual|creative)\b|"
+    r"\bmake\s+(?:an?\s+)?(?:image|picture|photo|visual|creative)\b|"
+    r"\bgenerate\s+it\b|\bcreate\s+it\b|\brender\s+it\b|\bdo\s+it\b|"
+    r"انشئ\s+صورة|أنشئ\s+صورة|ولّد\s+صورة|ولد\s+صورة|اعمل\s+صورة|طلع\s+الصورة|صمم\s+صورة|"
+    r"ولّدها|ولدها|اعملها|اعمل\s+الصورة|ولد\s+الصورة|أنشئ\s+الصورة|طلع\s+الصورة|صممها)"
 )
 _PROMPT_ONLY = re.compile(
     r"(?i)(?:\bprompt\s+only\b|\bwrite\s+(?:me\s+)?a\s+prompt\b|"
@@ -84,7 +88,9 @@ def _validate_explicit_intent(name: str, context: Any) -> str | None:
             "Ask the user whether this asset is a reference before requesting analysis."
         )
     if name == "generate_image":
-        # `prompt` mode must still refuse: the user asked for wording, not pixels.
+        # An explicit command to generate the image in the latest message overrides prompt-only mode.
+        if _GENERATE_INTENT.search(latest) and not _PROMPT_ONLY.search(latest):
+            return None
         if mode == "prompt" or (
             mode != "design"
             and (not _GENERATE_INTENT.search(latest) or _PROMPT_ONLY.search(latest))

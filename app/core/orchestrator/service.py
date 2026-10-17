@@ -677,6 +677,15 @@ async def handle_message(
         if prompt_type in {"image", "video"}:
             context["prompt_type"] = prompt_type
         context["persona_id"] = "layla"
+    else:
+        if context.get("workflow") == "creative_prompt":
+            context.pop("workflow", None)
+            context.pop("creative_prompt_stage", None)
+            context.pop("creative_prompt_reference_shown_key", None)
+            context.pop("creative_prompt_user_facts", None)
+            context.pop("creative_prompt_confirmed_facts", None)
+            context.pop("creative_prompt_unresolved_fields", None)
+            conversation.context = dict(context)
     if context.get("workflow") == "creative_prompt":
         if next_prompt_stage:
             context["creative_prompt_stage"] = next_prompt_stage
