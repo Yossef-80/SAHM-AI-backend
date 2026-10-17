@@ -419,14 +419,9 @@ async def _generate_openai_image(
     final asset. Image-edit models that return base64 are persisted separately by
     the local asset store below.
     """
-    if "dall-e-3" in str(model).lower():
-        size = {"1:1": "1024x1024", "4:5": "1024x1792", "9:16": "1024x1792", "16:9": "1792x1024"}.get(
-            aspect_ratio, "1024x1024"
-        )
-    else:
-        size = {"1:1": "1024x1024", "4:5": "1024x1024", "9:16": "1024x1024", "16:9": "1024x1024"}.get(
-            aspect_ratio, "1024x1024"
-        )
+    size = {"1:1": "1024x1024", "4:5": "1024x1280", "9:16": "1024x1792", "16:9": "1792x1024"}.get(
+        aspect_ratio, "1024x1024"
+    )
     endpoint = "/images/edits" if reference_image else "/images/generations"
     url = (base_url or "https://api.openai.com/v1").rstrip("/") + endpoint
     headers = {"authorization": f"Bearer {api_key}"}

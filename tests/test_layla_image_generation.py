@@ -335,3 +335,57 @@ def test_layla_graph_only_binds_image_tool_after_explicit_request(monkeypatch):
         {"configurable": {"allow_image_generation": True}},
     )
     assert "generate_image_draft_tool" not in captured[-1]
+
+
+def test_requests_image_generation_broadened_arabic_and_context():
+    # Arabic feminine phrasing addressing Layla
+    assert brain._requests_image_generation("اعملي صورة للمنتج")
+    assert brain._requests_image_generation("صمميلي بوستر جديد")
+    assert brain._requests_image_generation("ارسم صورة")
+    assert brain._requests_image_generation("ولديلي صورة")
+    assert brain._requests_image_generation("عايز اعملص صورة للبراند بتاعي")
+    assert brain._requests_image_generation("طلعيلي صورة للبراند")
+    assert brain._requests_image_generation("نفذيلي صورة إعلانية")
+    
+    # Tool mentions & design mode context
+    assert brain._requests_image_generation("استخدمي /image_draft")
+    assert brain._requests_image_generation("any text", context={"creative_mode": "design"})
+    assert brain._requests_image_generation("any text", context={"allow_image_generation": True})
+
+    # English phrases
+    assert brain._requests_image_generation("draw me an image")
+    assert brain._requests_image_generation("design a poster for our campaign")
+    assert brain._requests_image_generation("create creative visual")
+
+    # Negative / questions
+    assert not brain._requests_image_generation("how to generate image")
+    assert not brain._requests_image_generation("ازاي اعمل صورة")
+
+
+def test_reference_analysis_message_grounding():
+    context = {
+        "reference_analysis_context": {
+            "source_name": "product_hero.jpg",
+            "summary": "Coffee cup on wooden table with warm lighting",
+            "style": {
+                "palette": ["#5A3825", "#F5EFEB"],
+                "lighting": "Warm morning sunlight",
+                "composition": "Centered close-up",
+            },
+        }
+    }
+    # Arabic
+    ar_msg = brain._reference_analysis_message(context, arabic=True)
+    assert ar_msg is not None
+    assert "مرجع_الصورة_المعتمدة_للتصميم" in ar_msg
+    assert "product_hero.jpg" in ar_msg
+    assert "Coffee cup on wooden table" in ar_msg
+    assert "#5A3825" in ar_msg
+
+    # English
+    en_msg = brain._reference_analysis_message(context, arabic=False)
+    assert en_msg is not None
+    assert "REFERENCED_CREATIVE_IMAGE_GROUNDING" in en_msg
+    assert "product_hero.jpg" in en_msg
+    assert "Warm morning sunlight" in en_msg
+

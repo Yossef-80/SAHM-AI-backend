@@ -25,8 +25,12 @@ def build_chat_model(
     if not settings.openai_api_key and not settings.openai_base_url:
         raise ProviderNotConfiguredError("AI_LLM_PROVIDER=openai but OPENAI_API_KEY is empty.")
 
+    effective_model = (model or "").strip()
+    if not effective_model or effective_model.lower() in {"openai", "default"}:
+        effective_model = settings.openai_model
+
     return ChatOpenAI(
-        model=model or settings.openai_model,
+        model=effective_model,
         api_key=settings.openai_api_key or "not-needed",
         base_url=settings.openai_base_url,
         temperature=settings.llm_temperature if temperature is None else temperature,
@@ -34,3 +38,4 @@ def build_chat_model(
         timeout=settings.llm_timeout_seconds,
         max_retries=settings.llm_max_retries,
     )
+

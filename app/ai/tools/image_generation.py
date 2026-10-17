@@ -109,6 +109,10 @@ async def generate_image_draft_tool(
 
     provider, api_key, model, base_url, allow_mock = await _resolve_image_configuration(configurable)
     style = dict(style_spec or {})
+    if not style and isinstance(configurable.get("reference_analysis_context"), dict):
+        ref_style = configurable["reference_analysis_context"].get("style")
+        if isinstance(ref_style, dict):
+            style = dict(ref_style)
     effective_prompt = _compose_image_prompt(prompt[:4000], style)
 
     try:
@@ -153,6 +157,8 @@ async def generate_image_draft_tool(
         db = configurable.get("tool_db")
         biz_id = configurable.get("business_id")
         campaign_id = configurable.get("campaign_id")
+        ref_ctx = configurable.get("reference_analysis_context")
+        ref_id = ref_ctx.get("id") if isinstance(ref_ctx, dict) else configurable.get("reference_analysis_id")
         if db is not None and biz_id:
             try:
                 import uuid
@@ -162,6 +168,7 @@ async def generate_image_draft_tool(
                     id=f"cr_{uuid.uuid4().hex[:16]}",
                     business_id=biz_id,
                     campaign_id=campaign_id or None,
+                    reference_analysis_id=ref_id or None,
                     persona_id="layla",
                     task_name="generate_image_draft",
                     kind="image",

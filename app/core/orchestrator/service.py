@@ -562,6 +562,35 @@ async def handle_message(
     if validated_prompt_answer:
         ai_context["creative_prompt_answer"] = validated_prompt_answer
     reference_id = str(context.get("reference_analysis_id") or "").strip()
+    if not reference_id:
+        import re
+        mentions = re.findall(r"[/@]([^\s/@,!?]+)", safe_message)
+        if mentions:
+            saved_refs = (
+                await db.execute(
+                    select(BrandMemoryItem)
+                    .where(
+                        BrandMemoryItem.business_id == business.id,
+                        BrandMemoryItem.kind == "reference_analysis",
+                    )
+                    .order_by(BrandMemoryItem.created_at.desc())
+                    .limit(20)
+                )
+            ).scalars().all()
+            for mention in mentions:
+                clean_mention = mention.strip().lower()
+                if not clean_mention or clean_mention in {"layla", "omar", "nour", "karim", "salma", "image_draft", "tavily"}:
+                    continue
+                for cand in saved_refs:
+                    cand_meta = cand.metadata_ or {}
+                    cand_name = str(cand_meta.get("source_name") or "").strip().lower()
+                    if clean_mention in cand_name or cand_name in clean_mention or clean_mention == str(cand.id).lower():
+                        reference_id = cand.id
+                        context["reference_analysis_id"] = reference_id
+                        break
+                if reference_id:
+                    break
+
     if reference_id:
         reference = await db.get(BrandMemoryItem, reference_id)
         if (
@@ -574,7 +603,9 @@ async def handle_message(
         style = reference_metadata.get("style")
         if not isinstance(style, dict):
             raise NotFoundError("creative reference analysis is incomplete")
+        ai_context["reference_analysis_id"] = reference_id
         ai_context["reference_analysis_context"] = {
+            "id": reference_id,
             "source_name": str(reference_metadata.get("source_name") or "Saved reference")[:160],
             "summary": str(reference_metadata.get("summary") or "")[:2000],
             "style": style,

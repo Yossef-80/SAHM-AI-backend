@@ -88,9 +88,6 @@ def _validate_explicit_intent(name: str, context: Any) -> str | None:
             "Ask the user whether this asset is a reference before requesting analysis."
         )
     if name == "generate_image":
-        # An explicit command to generate the image in the latest message overrides prompt-only mode.
-        if _GENERATE_INTENT.search(latest) and not _PROMPT_ONLY.search(latest):
-            return None
         if mode == "prompt" or (
             mode != "design"
             and (not _GENERATE_INTENT.search(latest) or _PROMPT_ONLY.search(latest))

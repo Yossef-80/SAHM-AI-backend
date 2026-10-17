@@ -78,7 +78,7 @@ def _resolves(token: str) -> bool:
         return True
     suffix = "/" + token
     return any(
-        str(path).endswith(suffix)
+        path.as_posix().endswith(suffix)
         for path in (REPO_ROOT / "app").rglob(token.rsplit("/", 1)[-1])
     )
 
