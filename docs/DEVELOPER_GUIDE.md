@@ -1,7 +1,12 @@
-# 🛠️ SAHM Marketing OS — Tools & Agents Engineering Guide
+# Developer guide: tools and agents
 
-> **Audience:** Developers, AI engineers, and technical contributors tasked with building, debugging, and improving **Tools** and **Agents** in SAHM AI.  
-> **Purpose:** A complete, hands-on engineering manual and reference playbook. You can hand this document directly to an AI assistant (Claude, ChatGPT, Gemini) to collaborate on developing new tools, tuning prompts, or optimizing multi-agent execution.
+> **Audience:** Engineers adding a tool, an agent, or a prompt.
+> **Purpose:** How tools and agents are actually built here, what may be edited
+> freely, and what needs a review. Detailed enough to hand to an AI assistant to
+> work alongside you.
+>
+> Read first: [`../README.md`](../README.md) §2 (how a request flows) and
+> [`ARCHITECTURE.md`](./ARCHITECTURE.md) §5 (playbooks).
 
 ---
 
@@ -68,9 +73,9 @@ To maintain database integrity, multi-tenant workspace isolation, and security s
 
 ---
 
-## 3. Catalog of the 9 Research Hub Tools (`app/api/research.py`)
+## 3. Catalog of the 9 research tools (`app/core/tools/research.py`)
 
-All 9 research tools adhere to the **Dense Report Standard**: strictly 300–380 words, dense bullet points, zero conversational filler, and clickable markdown source links (`- [Title](URL)`).
+All 9 research tools adhere to the **Dense Report Standard**: strictly 300–380 words, dense bullet points, zero conversational filler, and clickable markdown source links (`` - [Title](URL) ``).
 
 ### Tool 1: Website Analyzer (`analyze_website`)
 - **Card in UI:** Website analyzer
@@ -299,7 +304,21 @@ flowchart TD
 
 ## 7. How to Build a New Tool in 5 Steps
 
-Follow this exact recipe whenever you build a new tool for SAHM AI:
+### First: which kind of tool?
+
+| | **Workspace tool** | **AI-native tool** |
+| :--- | :--- | :--- |
+| Lives in | `app/core/tools/` | `app/ai/tools/` |
+| Shape | `Tool(input_model, output_model, handler, side_effect)` | LangChain `@tool` function |
+| Called by | the generic runtime, `/tools/{name}/invoke`, MCP export | a specialist LangGraph |
+| Must declare | a side effect (`EXTERNAL_WRITE` is refused) | nothing |
+| Use it when | the capability needs the workspace (db, campaign, tokens) and should be auditable and reviewable | the capability is a step inside one agent's reasoning loop |
+
+The recipe below is the **AI-native** path. For a workspace tool, follow
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) §5 Playbook A; the extra step there is the
+registry and the persona allowlist.
+
+### The AI-native recipe
 
 ### Step 1: Define the Pydantic Input Schema
 Create your input schema in `app/ai/tools/your_tool.py`:
@@ -357,6 +376,15 @@ NOUR_TOOLS = [..., analyze_tiktok_hashtag]
 ```
 Update the agent's prompt in the same file to describe when and how to call the tool.
 
+Two rules that have already caused production bugs here:
+
+- **Never re-derive the reply language inside a tool.** Read it from the
+  `[RESPONSE_LANGUAGE]` block or take it as an input; see
+  [`LANGUAGE_POLICY.md`](./LANGUAGE_POLICY.md).
+- **Write memory through `BrandMemoryStore`, not by constructing
+  `BrandMemoryItem` directly.** The store computes the dedupe key, the TTL and
+  the token cap; a hand-built row silently loses all three.
+
 ### Step 5: Test the Tool
 Write a targeted unit or integration test in `tests/test_your_tool.py`:
 ```python
@@ -368,3 +396,29 @@ async def test_analyze_tiktok_hashtag():
     result = await analyze_tiktok_hashtag.ainvoke({"hashtag": "cairofashion", "region": "EG"})
     assert "top_hooks" in result
 ```
+
+---
+
+## 8. Backlog: tools that do not exist yet
+
+Kept next to the instructions for building them:
+
+- **SEO keyword clustering** — group raw keywords into intent clusters (Omar).
+- **Backlink / domain-authority check** — needs a paid provider (Nour).
+- **Organic publishing** — post an approved creative to a Facebook/Instagram page.
+  This is an external write, so it belongs behind the approval flow, never in an
+  agent's tool list.
+- **Scheduled re-research** — refresh a competitor profile on a cadence rather
+  than on request.
+
+---
+
+## 9. When something looks wrong
+
+| Symptom | First place to look |
+| :--- | :--- |
+| An agent ignores its instructions | `app/ai/agents/<agent>/graph.py::call_model` — is the role prompt actually first in the list? |
+| Mixed-language output | `docs/LANGUAGE_POLICY.md` §5 |
+| A tool returns nothing useful | the tool's status path: it must return `unavailable` with a reason, not empty data |
+| The agent will not stop calling tools | the loop cap in `RunOptions.max_iterations`, and whether a `submit_*` tool is bound |
+| Memory context is empty | `MEMORY_ENABLED`, kind TTLs, and `POST /memory/prune` dry run |

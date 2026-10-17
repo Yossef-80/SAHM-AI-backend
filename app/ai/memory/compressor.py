@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import re
 import uuid
 from datetime import datetime, timezone
@@ -9,7 +8,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Profile, Conversation, Message, BrandMemoryItem
+from app.db.models import Profile, Conversation, Message
 from app.db.session import session_scope
 from app.ai.providers.llm import get_llm
 from app.ai.security import redact_sensitive_data
@@ -31,66 +30,16 @@ def _message_to_text(msg: Any) -> str:
 
 
 
-def count_tokens(text: str) -> int:
-    """Measure real tokens using tiktoken (cl100k_base).
-    
-    If tiktoken is unavailable, uses a language-aware approximation:
-    - Arabic characters (\u0600-\u06FF): ~1.8 characters per token.
-    - Other/Latin characters: ~3.5 characters per token.
-    Never uses a flat chars/3.5 across Arabic text.
-    """
-    if not text:
-        return 0
-    try:
-        import tiktoken
-        enc = tiktoken.get_encoding("cl100k_base")
-        return len(enc.encode(text))
-    except Exception:
-        pass
-    
-    # Language-aware fallback
-    arabic_chars = sum(1 for c in text if "\u0600" <= c <= "\u06ff")
-    other_chars = len(text) - arabic_chars
-    est_tokens = int((arabic_chars / 1.8) + (other_chars / 3.5))
-    return max(1, est_tokens)
+# Token measurement lives in the core layer so the session compressor, the
+# brand-memory assembler and the API all agree on what a "token" is. The old
+# local copy and the 4-chars-per-token estimate in the store disagreed by ~2x
+# on Arabic text.
+from app.core.memory.tokens import count_tokens, truncate_to_tokens  # noqa: E402
 
 
 def _truncate_to_boundary(text: str, max_tokens: int) -> str:
-    """Truncate text at a bullet or sentence boundary without breaking mid-sentence."""
-    if not text:
-        return ""
-    lines = text.split("\n")
-    kept_lines: list[str] = []
-    
-    for line in lines:
-        candidate = "\n".join(kept_lines + [line]) if kept_lines else line
-        if count_tokens(candidate) > max_tokens:
-            if not kept_lines:
-                # If even the first line is over, split by sentences (. , ؟ , !)
-                sentences = re.split(r"(?<=[.!?؟])\s+", line)
-                kept_sents: list[str] = []
-                for s in sentences:
-                    cand_s = " ".join(kept_sents + [s]) if kept_sents else s
-                    if count_tokens(cand_s) <= max_tokens:
-                        kept_sents.append(s)
-                    else:
-                        break
-                if kept_sents:
-                    return " ".join(kept_sents)
-                # Word-level fallback if a single sentence exceeds cap
-                words = line.split()
-                kept_words: list[str] = []
-                for w in words:
-                    cand_w = " ".join(kept_words + [w]) if kept_words else w
-                    if count_tokens(cand_w) <= max_tokens:
-                        kept_words.append(w)
-                    else:
-                        break
-                return " ".join(kept_words)
-            break
-        kept_lines.append(line)
-        
-    return "\n".join(kept_lines)
+    """Backwards-compatible name; the implementation is shared."""
+    return truncate_to_tokens(text, max_tokens)
 
 
 async def enforce_token_cap(
@@ -247,39 +196,18 @@ async def resplit_existing_profile(
 
     profile.user_context_summary = facts_part
 
-    # Persist plans in BrandMemoryItem(kind="strategy_blueprint")
+    # Persist plans through the store so the single-active-row rule, the TTL and
+    # the dedupe key are applied the same way as every other memory write.
     if plans_part:
-        item_stmt = (
-            select(BrandMemoryItem)
-            .where(
-                BrandMemoryItem.business_id == business_id,
-                BrandMemoryItem.kind == "strategy_blueprint",
-            )
-            .limit(1)
+        from app.core.memory.store import BrandMemoryStore
+
+        await BrandMemoryStore(db).upsert_singleton(
+            business_id=business_id,
+            kind="strategy_blueprint",
+            text=plans_part,
+            metadata={"active_plans": plans_part, "source": "ltm_resplit_migration"},
+            source="ltm_resplit_migration",
         )
-        plan_item = await db.scalar(item_stmt)
-        now = datetime.now(timezone.utc)
-        if plan_item:
-            plan_item.text = plans_part
-            plan_item.metadata_ = {
-                **(plan_item.metadata_ or {}),
-                "active_plans": plans_part,
-                "updated_at": now.isoformat(),
-            }
-        else:
-            new_item = BrandMemoryItem(
-                id=f"mem_plan_{uuid.uuid4().hex[:12]}",
-                business_id=business_id,
-                kind="strategy_blueprint",
-                text=plans_part,
-                metadata_={
-                    "active_plans": plans_part,
-                    "source": "ltm_resplit_migration",
-                    "created_at": now.isoformat(),
-                },
-                created_at=now,
-            )
-            db.add(new_item)
 
     await db.commit()
     logger.info(
@@ -498,39 +426,17 @@ class IntelligentMemoryCompressor:
                 # 7. Save BRAND FACTS to Profile.user_context_summary
                 profile.user_context_summary = new_facts
 
-                # 8. Save ACTIVE PLANS to BrandMemoryItem(kind="strategy_blueprint")
+                # 8. Save ACTIVE PLANS as the single active plan row.
                 if new_plans:
-                    plan_stmt = (
-                        select(BrandMemoryItem)
-                        .where(
-                            BrandMemoryItem.business_id == business_id,
-                            BrandMemoryItem.kind == "strategy_blueprint",
-                        )
-                        .limit(1)
+                    from app.core.memory.store import BrandMemoryStore
+
+                    await BrandMemoryStore(db).upsert_singleton(
+                        business_id=business_id,
+                        kind="strategy_blueprint",
+                        text=new_plans,
+                        metadata={"active_plans": new_plans},
+                        source="ltm_compressor",
                     )
-                    existing_plan = await db.scalar(plan_stmt)
-                    now = datetime.now(timezone.utc)
-                    if existing_plan:
-                        existing_plan.text = new_plans
-                        existing_plan.metadata_ = {
-                            **(existing_plan.metadata_ or {}),
-                            "active_plans": new_plans,
-                            "updated_at": now.isoformat(),
-                        }
-                    else:
-                        new_plan_item = BrandMemoryItem(
-                            id=f"mem_plan_{uuid.uuid4().hex[:12]}",
-                            business_id=business_id,
-                            kind="strategy_blueprint",
-                            text=new_plans,
-                            metadata_={
-                                "active_plans": new_plans,
-                                "source": "ltm_compressor",
-                                "created_at": now.isoformat(),
-                            },
-                            created_at=now,
-                        )
-                        db.add(new_plan_item)
 
                 await db.commit()
 
@@ -552,52 +458,10 @@ class IntelligentMemoryCompressor:
                 return profile.user_context_summary if profile else None
 
 
-class MemoryDebouncer:
-    """
-    Manages configurable inactivity debounce timers per business.
-    Every new message resets the countdown timer. When the user is inactive for the duration,
-    the background compressor fires automatically.
-    """
-    def __init__(self, delay_seconds: int | None = None):
-        if delay_seconds is None:
-            try:
-                from app.ai.settings import get_ai_settings
-                delay_seconds = get_ai_settings().memory_ltm_debounce_seconds
-            except Exception:
-                delay_seconds = 180
-        self.delay_seconds = delay_seconds
-        self._timers: dict[str, asyncio.Task[None]] = {}
-        self.compressor = IntelligentMemoryCompressor()
-
-    def schedule_ltm_update(self, business_id: str):
-        """Schedule or reset the inactivity timer."""
-        # Cancel any existing active timer for this business
-        existing_task = self._timers.get(business_id)
-        if existing_task and not existing_task.done():
-            existing_task.cancel()
-
-        # Start a new countdown task
-        task = asyncio.create_task(self._countdown_and_execute(business_id))
-        self._timers[business_id] = task
-
-    async def _countdown_and_execute(self, business_id: str):
-        try:
-            await asyncio.sleep(self.delay_seconds)
-            logger.info("ltm_debounce_triggered", extra={"business_id": business_id})
-            await self.compressor.update_global_profile(business_id)
-        except asyncio.CancelledError:
-            # Timer was reset by a new incoming message; normal behavior
-            pass
-        except Exception as e:
-            logger.error("ltm_debounce_error", extra={"business_id": business_id, "error": str(e)})
-        finally:
-            if self._timers.get(business_id) is asyncio.current_task():
-                self._timers.pop(business_id, None)
-
-
-# Process-wide singleton debouncer
-memory_debouncer = MemoryDebouncer()
-
+# ``MemoryDebouncer`` lived here. It was removed when the three post-turn
+# memory passes were merged into ``app/ai/memory/consolidator.py``: a debouncer
+# per process, plus an un-debounced identity pass, plus per-turn compaction,
+# meant three writers of the same profile row with no ordering between them.
 
 async def manage_session_memory_with_token_cap(
     db: AsyncSession,

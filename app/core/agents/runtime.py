@@ -31,7 +31,7 @@ import re
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from pydantic import ValidationError
@@ -99,6 +99,10 @@ class RunOptions:
     allow_tool_calls: bool = True
     temperature: float = 0.4
     max_tokens_per_call: int = 2000
+    #: Reply language for this run ("ar"/"en"). ``None`` keeps the persona's own
+    #: configured language. Resolved by the caller via ``app.core.i18n`` so the
+    #: UI choice beats the persona default.
+    language: str | None = None
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> "RunOptions":
@@ -530,6 +534,7 @@ async def _execute(
         tool_results="",
         inputs=inputs,
         user_message=user_message,
+        language=options.language,
     )
     messages = [Msg(role="user", content=user_message or f"Run the {task_name} task.")]
 
@@ -1070,14 +1075,18 @@ async def run_agent(
     settings: Settings | None = None,
     options: RunOptions | None = None,
     user_message: str = "",
+    language: str | None = None,
 ) -> AgentResult:
     """Run one task to completion and return the result.
 
     ``ctx`` carries the db session, llm client and request id. ``llm`` may be
-    passed to override the router (tests do this).
+    passed to override the router (tests do this). ``language`` pins the reply
+    language for this run; leave it ``None`` to use the persona's own setting.
     """
     cfg = settings or get_settings()
     opts = options or RunOptions.from_settings(cfg)
+    if language:
+        opts = replace(opts, language=language)
     deps = RunDependencies(
         llm=llm or ctx.llm or get_llm("strong", cfg),
         db=ctx.db,
@@ -1105,12 +1114,15 @@ async def run_agent_stream(
     settings: Settings | None = None,
     options: RunOptions | None = None,
     user_message: str = "",
+    language: str | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     """Streaming variant. Yields step_started / tool_called / tool_result /
     token / completed / failed events so the frontend can render TaskProgress and
     streaming text."""
     cfg = settings or get_settings()
     opts = options or RunOptions.from_settings(cfg)
+    if language:
+        opts = replace(opts, language=language)
     deps = RunDependencies(
         llm=llm or ctx.llm or get_llm("strong", cfg),
         db=ctx.db,

@@ -433,7 +433,10 @@ async def test_actual_graphs_run_omar_tools_then_layla_with_handoff(
         ("tool", "generate_campaign_strategy"),
     ]
     assert layla_model.input_tails == [("human", None)]
-    assert brand_ids == ["biz_test"]
+    # The tool now reads the workspace database first (brand_profiles +
+    # brand_memory_items), so the legacy LangGraph-store fallback is not used
+    # when a ``tool_db`` is attached to the graph run.
+    assert brand_ids == []
 
     tool_rows = (
         await seeded_db.execute(

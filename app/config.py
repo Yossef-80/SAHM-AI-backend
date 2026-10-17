@@ -24,9 +24,15 @@ Tier = Literal["fast", "strong"]
 GROQ_GPT_OSS_MODEL_PREFIX = "openai/gpt-oss"
 
 #: Providers that the LLM router knows how to construct.
+#:
+#: ``ollama`` is accepted here because the AI layer (``app.ai.settings``) supports
+#: it and both classes read the same ``AI_LLM_PROVIDER``/``LLM_PROVIDER_*``
+#: variables. Leaving it out meant the shipped ``.env.example``
+#: (``AI_LLM_PROVIDER=ollama``) crashed the core settings at import time.
 LLMProviderName = Literal[
     "mock", "claude", "openai", "groq", "gemini", "deepseek", "mistral",
     "openrouter", "together", "fireworks", "perplexity", "xai", "custom",
+    "ollama",
 ]
 
 #: Image-generation providers behind the image interface.
@@ -77,7 +83,7 @@ class Settings(BaseSettings):
     login_lockout_seconds: int = 900
 
     # ------------------------------------------------------------------ db ----
-    # Postgres+pgvector is the production target. SQLite is supported so the
+    # Postgres is the production target. SQLite is supported so the
     # app boots and the whole flow runs with zero external services.
     database_url: str = "sqlite+aiosqlite:///./sahm.db"
     db_echo: bool = False
@@ -97,11 +103,6 @@ class Settings(BaseSettings):
     # its own opaque sessions. The frontend uses @supabase/supabase-js for
     # login/register/OAuth and sends the access token as Authorization: Bearer.
     use_supabase_auth: bool = False
-    # Embedding dimension must match the configured embedding provider output.
-    embedding_dim: int = 64
-    # Vector backend: "pgvector" on Postgres, "python" (cosine in-process) on
-    # SQLite or when pgvector is unavailable.
-    vector_backend: Literal["auto", "pgvector", "python"] = "auto"
 
     # ---------------------------------------------------------------- llm ----
     # Which provider serves which tier. Switching provider or model is an env
@@ -169,28 +170,115 @@ class Settings(BaseSettings):
     agent_run_timeout_seconds: float = 180.0
 
     # -------------------------------------------------------------- memory ----
-    # Max tokens in active chat history before older turns are summarized into DB
+    # Layered brand memory. Every value below is read by
+    # ``app/core/memory/policy.py::MemoryPolicy.from_settings``; the same names
+    # exist on ``app.ai.settings.AISettings`` so the AI layer and the core layer
+    # can never disagree about a threshold.
+    #
+    # The full design is in ``docs/MEMORY_ARCHITECTURE.md``.
+    memory_enabled: bool = True
+
+    # -- session layer (raw turns -> rolling summary) -------------------------
     memory_session_max_tokens: int = Field(
         10000,
         validation_alias=AliasChoices("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"),
     )
-    # Token threshold for brand profile & intelligence extraction before rolling summarization
+    memory_retain_recent_turns: int = Field(
+        2, validation_alias=AliasChoices("MEMORY_RETAIN_RECENT_TURNS")
+    )
+    memory_ltm_debounce_seconds: int = Field(
+        180, validation_alias=AliasChoices("MEMORY_LTM_DEBOUNCE_SECONDS")
+    )
     brand_memory_token_limit: int = Field(
         10000,
-        validation_alias=AliasChoices("BRAND_MEMORY_TOKEN_LIMIT", "BRAND_IDENTITY_TOKEN_LIMIT", "MEMORY_BRAND_MAX_TOKENS"),
+        validation_alias=AliasChoices(
+            "BRAND_MEMORY_TOKEN_LIMIT",
+            "BRAND_IDENTITY_TOKEN_LIMIT",
+            "MEMORY_BRAND_MAX_TOKENS",
+        ),
     )
-    # Inactivity delay in seconds before updating global profile LTM in background (180s = 3 min)
-    memory_ltm_debounce_seconds: int = 180
-    # Maximum tokens cap for distilled BrandMemoryItem.text
-    memory_item_max_tokens: int = 120
-    # Maximum tokens cap for global Profile.user_context_summary
-    memory_global_profile_max_tokens: int = 300
-    # Number of recent turns to retain raw when session is summarized
-    memory_retain_recent_turns: int = 2
+    memory_global_profile_max_tokens: int = Field(
+        300, validation_alias=AliasChoices("MEMORY_GLOBAL_PROFILE_MAX_TOKENS")
+    )
+    # Whole-brand re-extraction is expensive and changes slowly; it runs at
+    # most once per interval, not once per chat turn.
+    memory_identity_sync_enabled: bool = Field(
+        True, validation_alias=AliasChoices("MEMORY_IDENTITY_SYNC_ENABLED")
+    )
+    memory_identity_min_interval_seconds: int = Field(
+        900, validation_alias=AliasChoices("MEMORY_IDENTITY_MIN_INTERVAL_SECONDS")
+    )
+    # When false (default) the identity pass only fills blank brand-profile
+    # fields; a value saved from the Settings page is never overwritten.
+    memory_identity_overwrite_profile: bool = Field(
+        False, validation_alias=AliasChoices("MEMORY_IDENTITY_OVERWRITE_PROFILE")
+    )
 
-    # ---------------------------------------------------------- embeddings ---
-    embedding_provider: Literal["mock", "openai"] = "mock"
-    embedding_model: str = "mock-embed-1"
+    # -- prompt assembly ------------------------------------------------------
+    memory_context_token_cap: int = Field(
+        900, validation_alias=AliasChoices("MEMORY_CONTEXT_TOKEN_CAP")
+    )
+    memory_context_top_k: int = Field(
+        6, validation_alias=AliasChoices("MEMORY_CONTEXT_TOP_K")
+    )
+    memory_recent_learnings: int = Field(
+        3, validation_alias=AliasChoices("MEMORY_RECENT_LEARNINGS")
+    )
+    memory_identity_share: float = Field(
+        0.45, validation_alias=AliasChoices("MEMORY_IDENTITY_SHARE")
+    )
+    memory_plan_share: float = Field(
+        0.15, validation_alias=AliasChoices("MEMORY_PLAN_SHARE")
+    )
+
+    # -- ranking (no embeddings: BM25 + recency + affinity + importance) ------
+    memory_candidate_window: int = Field(
+        300, validation_alias=AliasChoices("MEMORY_CANDIDATE_WINDOW")
+    )
+    memory_recency_half_life_days: float = Field(
+        30.0, validation_alias=AliasChoices("MEMORY_RECENCY_HALF_LIFE_DAYS")
+    )
+    memory_weight_affinity: float = Field(
+        0.20, validation_alias=AliasChoices("MEMORY_WEIGHT_AFFINITY")
+    )
+    memory_weight_lexical: float = Field(
+        0.40, validation_alias=AliasChoices("MEMORY_WEIGHT_LEXICAL")
+    )
+    memory_weight_recency: float = Field(
+        0.25, validation_alias=AliasChoices("MEMORY_WEIGHT_RECENCY")
+    )
+    memory_weight_importance: float = Field(
+        0.15, validation_alias=AliasChoices("MEMORY_WEIGHT_IMPORTANCE")
+    )
+    memory_pinned_boost: float = Field(
+        0.35, validation_alias=AliasChoices("MEMORY_PINNED_BOOST")
+    )
+    memory_campaign_boost: float = Field(
+        0.10, validation_alias=AliasChoices("MEMORY_CAMPAIGN_BOOST")
+    )
+    memory_phrase_boost: float = Field(
+        0.10, validation_alias=AliasChoices("MEMORY_PHRASE_BOOST")
+    )
+    memory_min_relevance: float = Field(
+        0.12, validation_alias=AliasChoices("MEMORY_MIN_RELEVANCE")
+    )
+
+    # -- lifecycle ------------------------------------------------------------
+    memory_dedupe_enabled: bool = Field(
+        True, validation_alias=AliasChoices("MEMORY_DEDUPE_ENABLED")
+    )
+    memory_default_ttl_days: int = Field(
+        180, validation_alias=AliasChoices("MEMORY_DEFAULT_TTL_DAYS")
+    )
+    memory_max_items_per_kind: int = Field(
+        500, validation_alias=AliasChoices("MEMORY_MAX_ITEMS_PER_KIND")
+    )
+    memory_item_max_tokens: int = Field(
+        120, validation_alias=AliasChoices("MEMORY_ITEM_MAX_TOKENS")
+    )
+    memory_sweep_on_write: bool = Field(
+        True, validation_alias=AliasChoices("MEMORY_SWEEP_ON_WRITE")
+    )
 
     # ------------------------------------------------------------- search ----
     search_provider: SearchProviderName = "mock"

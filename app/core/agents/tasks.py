@@ -19,6 +19,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.i18n import normalise_language
 from app.core.logging import get_logger
 from app.schemas.common import Evidence, Tier
 
@@ -524,6 +525,7 @@ def build_prompt(
     tool_results: str = "",
     inputs: dict[str, Any] | None = None,
     user_message: str = "",
+    language: str | None = None,
 ) -> str:
     """Assemble a task prompt. THE ONLY place prompts are built.
 
@@ -535,6 +537,11 @@ def build_prompt(
         5. output-schema instruction
 
     Improving this function improves every task at once, which is the point.
+
+    ``language`` overrides the persona's configured language for this one run.
+    The caller resolves it (``app.core.i18n.resolve_reply_language``) from the
+    UI choice, the workspace project language and the message; the persona
+    default is only the last resort.
     """
     from app.core.llm.base import schema_instruction
 
@@ -550,8 +557,13 @@ def build_prompt(
     }
     body = task.render_prompt(values)
 
-    language = str(getattr(getattr(persona, "language", None), "value", "en"))
-    language_block = LANGUAGE_INSTRUCTION.get(language, LANGUAGE_INSTRUCTION["en"])
+    resolved_language = (
+        normalise_language(language)
+        or str(getattr(getattr(persona, "language", None), "value", "en"))
+    )
+    language_block = LANGUAGE_INSTRUCTION.get(
+        resolved_language, LANGUAGE_INSTRUCTION["en"]
+    )
 
     parts = [
         _persona_style_block(persona),

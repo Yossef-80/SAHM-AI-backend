@@ -68,16 +68,19 @@ async def test_session_memory_below_cap_returns_raw_history() -> None:
 @pytest.mark.asyncio
 async def test_session_memory_growth_gating_prevents_redundant_llm_calls() -> None:
     """When conversation has a summary and token history grows < 25%, reuse summary without LLM."""
+    # Build the transcript with the *current* tokenizer instead of a hardcoded
+    # character count: the watermark is a token count, and a change to the
+    # counter must not silently turn a 5%-growth test into a 50%-growth test.
+    long_text = "word " * 10500
+    total = count_tokens(long_text) + count_tokens("Short reply")
     conv = Conversation(
         id="conv_gate",
         business_id="biz_1",
         title="Test Growth Gating",
-        context={"summary_token_watermark": 10000},
+        context={"summary_token_watermark": int(total / 1.05)},
         summary="Existing high quality summary.",
     )
-    # Generate messages that exceed 10,000 tokens, e.g. 10,500 tokens (5% growth)
-    # 10500 tokens * ~3.5 chars = ~36,750 chars
-    long_text = "word " * 10500
+    assert total > 10_000
     messages = [
         Message(id="m1", conversation_id="conv_gate", role="user", content=long_text, blocks=[]),
         Message(id="m2", conversation_id="conv_gate", role="assistant", content="Short reply", blocks=[]),
@@ -99,15 +102,15 @@ async def test_session_memory_growth_gating_prevents_redundant_llm_calls() -> No
 @pytest.mark.asyncio
 async def test_session_memory_regenerates_when_growth_exceeds_twenty_five_percent() -> None:
     """When history grows >= 25% over the watermark, regenerate summary and update watermark."""
+    long_text = "word " * 13000
+    total = count_tokens(long_text) + count_tokens("Recent turn")
     conv = Conversation(
         id="conv_regen",
         business_id="biz_1",
         title="Test Regen",
-        context={"summary_token_watermark": 10000},
+        context={"summary_token_watermark": int(total / 1.30)},
         summary="Old summary.",
     )
-    # 13,000 tokens = 30% growth over 10,000
-    long_text = "word " * 13000
     messages = [
         Message(id="m1", conversation_id="conv_regen", role="user", content=long_text, blocks=[]),
         Message(id="m2", conversation_id="conv_regen", role="assistant", content="Recent turn", blocks=[]),
@@ -131,7 +134,7 @@ async def test_session_memory_regenerates_when_growth_exceeds_twenty_five_percen
         # Watermark updated in context!
         watermark = conv.context.get("summary_token_watermark")
         assert watermark is not None
-        assert watermark >= 12500
+        assert watermark >= total
 
 
 def test_conversation_messages_ordering_model_declaration() -> None:

@@ -278,7 +278,7 @@ CONNECTORS: dict[str, Connector] = {
     "get_brand_context": Connector(
         provider="database",
         url_template=None,
-        notes="Local only. Reads brand_memory_items + brand_profiles via pgvector or in-Python cosine.",
+        notes="Local only. Reads brand_memory_items + brand_profiles through the lexical brand-memory store.",
     ),
     "save_learning": Connector(
         provider="database",

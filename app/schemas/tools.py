@@ -159,11 +159,15 @@ class GetCompetitorAdsOutput(ToolOutput):
 class MemoryScope(BaseModel):
     """What get_brand_context should retrieve for this task."""
 
-    query: str = Field(default="", description="free text used for similarity search")
+    query: str = Field(default="", description="free text used for lexical ranking")
     kinds: list[str] = Field(default_factory=list)
     top_k: int = Field(default=6, ge=1, le=20)
     include_learnings: bool = True
     max_learnings: int = Field(default=3, ge=0, le=10)
+    #: Focus the ranking on one campaign when the turn is campaign-scoped.
+    campaign_id: str | None = None
+    #: Override the assembled context budget (defaults to MEMORY_CONTEXT_TOKEN_CAP).
+    token_budget: int | None = Field(default=None, ge=100, le=20_000)
 
 
 class GetBrandContextInput(BaseModel):
@@ -176,8 +180,12 @@ class BrandContextItem(BaseModel):
     kind: str
     label: str
     detail: str = ""
+    #: Relevance score 0..1 from the deterministic ranker (kept under the old
+    #: field name so existing clients keep working).
     similarity: float | None = None
     memory_id: str | None = None
+    #: Why this item ranked where it did (lexical terms, recency, affinity...).
+    reason: str | None = None
 
 
 class BrandContext(ToolOutput):

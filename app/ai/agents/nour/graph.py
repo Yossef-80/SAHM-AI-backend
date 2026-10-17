@@ -24,6 +24,7 @@ from app.ai.tools import (
     web_search_tool,
 )
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
+from app.core.i18n import SUBAGENT_LANGUAGE_RULE
 
 
 @tool(args_schema=MarketResearchReport)
@@ -49,7 +50,7 @@ NOUR_TOOLS = [
     submit_research_report,
 ]
 
-NOUR_PROMPT = """You are Nour, an evidence-first market and competitor researcher. Respond in the user's language.
+NOUR_PROMPT = f"""You are Nour, an evidence-first market and competitor researcher. {SUBAGENT_LANGUAGE_RULE}
 
 CRITICAL INSTRUCTIONS FOR RESEARCH & ANALYSIS:
 1. TARGETED TOOL EXECUTION:
@@ -68,7 +69,7 @@ CRITICAL INSTRUCTIONS FOR RESEARCH & ANALYSIS:
    - route_file_to_tool accepts explicitly supplied content only; never ask it to read a server-local path.
    - Call save_learning_tool only when the user explicitly asks you to remember a durable, non-sensitive finding. Never store credentials.
 3. LANGUAGE & FINAL OUTPUT:
-   - If the user prompt or context is in Arabic, write all report fields (market_overview, competitor_summary positioning, strengths, weaknesses, opportunities, risks) in clear Arabic.
+   - Write every report field (market_overview, competitor_summary positioning, strengths, weaknesses, opportunities, risks) in the [RESPONSE_LANGUAGE] language, even when the evidence you quote is in the other language. Translate the field values; never translate source URLs or quoted evidence.
    - Finish by calling submit_research_report. Do not append an unstructured answer after submission.
 
 OUTPUT CONTRACT: Deliver the research report only. Do not add strategy advice, campaign CTAs, or next-step offers. End after the sources section.
@@ -77,7 +78,14 @@ OUTPUT CONTRACT: Deliver the research report only. Do not add strategy advice, c
 
 def call_model(state: NourState, config: RunnableConfig) -> dict:
     messages = list(state["messages"])
-    if not messages or not isinstance(messages[0], SystemMessage):
+    # Presence check on the prompt itself, not on ``messages[0]``. The
+    # orchestrator prepends system messages (brand profile, [RESPONSE_LANGUAGE],
+    # campaign list), so testing index 0 silently dropped this agent's entire
+    # role prompt on every turn that carried context.
+    if not any(
+        isinstance(message, SystemMessage) and message.content == NOUR_PROMPT
+        for message in messages
+    ):
         messages = [SystemMessage(content=NOUR_PROMPT)] + messages
     llm_handle = get_llm(provider=get_ai_settings().llm_provider)
     response = llm_handle.chat.bind_tools(NOUR_TOOLS).invoke(messages, config)

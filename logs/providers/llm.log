@@ -642,3 +642,148 @@
 2026-10-14 10:25:27 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
 2026-10-14 10:25:31 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
 2026-10-14 10:28:25 | INFO    | provider.llm | llm_built | provider='gemini' model='gemini-3.1-flash-lite' structured_method='function_calling'
+2026-10-14 11:27:58 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:28:19 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:28:52 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:29:12 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:29:55 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:29:55 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gpt-4o-mini' node=None messages=4
+2026-10-14 11:29:56 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gpt-4o-mini' duration_ms=1062 input_tokens=767 output_tokens=29 tool_calls=1
+2026-10-14 11:29:56 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:29:56 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:29:56 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=3
+2026-10-14 11:29:57 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=1131 input_tokens=2598 output_tokens=12 tool_calls=1
+2026-10-14 11:29:57 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:29:57 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=5
+2026-10-14 11:29:58 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=1347 input_tokens=2894 output_tokens=28 tool_calls=1
+2026-10-14 11:29:59 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:29:59 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=7
+2026-10-14 11:30:00 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=979 input_tokens=2993 output_tokens=26 tool_calls=1
+2026-10-14 11:30:00 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:30:00 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=9
+2026-10-14 11:30:03 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:30:03 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=3759 input_tokens=3088 output_tokens=211 tool_calls=0
+2026-10-14 11:30:23 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:30:44 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:32:23 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:00 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:00 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gpt-4o-mini' node=None messages=7
+2026-10-14 11:35:01 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gpt-4o-mini' duration_ms=1147 input_tokens=1119 output_tokens=28 tool_calls=1
+2026-10-14 11:35:01 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:01 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:01 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=6
+2026-10-14 11:35:02 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=1328 input_tokens=2951 output_tokens=20 tool_calls=1
+2026-10-14 11:35:03 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:03 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=8
+2026-10-14 11:35:05 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=2163 input_tokens=3106 output_tokens=141 tool_calls=4
+2026-10-14 11:35:05 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:05 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=13
+2026-10-14 11:35:08 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=2638 input_tokens=3478 output_tokens=217 tool_calls=0
+2026-10-14 11:35:28 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:51 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:35:51 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:36:05 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:36:05 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:39:55 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:40:14 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:40:14 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:40:14 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=6
+2026-10-14 11:40:16 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=2473 input_tokens=3776 output_tokens=142 tool_calls=0
+2026-10-14 11:40:35 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:43:01 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:43:01 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:43:01 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=8
+2026-10-14 11:43:04 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=3029 input_tokens=3958 output_tokens=203 tool_calls=0
+2026-10-14 11:43:24 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:45:22 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:53:19 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:53:19 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:53:19 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=6
+2026-10-14 11:53:21 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=1694 input_tokens=3791 output_tokens=50 tool_calls=1
+2026-10-14 11:53:41 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:54:43 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:54:43 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:54:43 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=8
+2026-10-14 11:54:45 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=2336 input_tokens=3924 output_tokens=137 tool_calls=1
+2026-10-14 11:55:09 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:55:36 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:55:36 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:55:36 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=10
+2026-10-14 11:55:38 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=2294 input_tokens=4020 output_tokens=112 tool_calls=1
+2026-10-14 11:56:00 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 11:57:58 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:18:18 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:18:18 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:18:18 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=10
+2026-10-14 13:18:24 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=6264 input_tokens=4179 output_tokens=267 tool_calls=1
+2026-10-14 13:18:45 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:20:43 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:22:22 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:22:22 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:22:22 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=12
+2026-10-14 13:22:26 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=3874 input_tokens=4211 output_tokens=191 tool_calls=1
+2026-10-14 13:22:59 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:25:10 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:27:18 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:27:18 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:27:18 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=14
+2026-10-14 13:27:20 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=2626 input_tokens=4287 output_tokens=108 tool_calls=1
+2026-10-14 13:43:06 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:43:06 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:43:06 | INFO    | provider.llm | llm_started | agent='layla' model='gpt-4o-mini' node='agent' messages=15
+2026-10-14 13:43:09 | INFO    | provider.llm | llm_finished | agent='layla' model='gpt-4o-mini' duration_ms=3009 input_tokens=5041 output_tokens=138 tool_calls=1
+2026-10-14 13:43:32 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:43:40 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:44:03 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:44:03 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:45:29 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:46:13 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:46:13 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:50:40 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:50:40 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gpt-4o-mini' node=None messages=5
+2026-10-14 13:50:42 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gpt-4o-mini' duration_ms=1192 input_tokens=1131 output_tokens=23 tool_calls=1
+2026-10-14 13:50:42 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:50:42 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:50:42 | INFO    | provider.llm | llm_started | agent='omar' model='gpt-4o-mini' node='agent' messages=5
+2026-10-14 13:50:43 | INFO    | provider.llm | llm_finished | agent='omar' model='gpt-4o-mini' duration_ms=1248 input_tokens=2466 output_tokens=12 tool_calls=1
+2026-10-14 13:50:43 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-14 13:50:43 | INFO    | provider.llm | llm_started | agent='omar' model='gpt-4o-mini' node='agent' messages=7
+2026-10-14 13:50:46 | INFO    | provider.llm | llm_finished | agent='omar' model='gpt-4o-mini' duration_ms=2860 input_tokens=2932 output_tokens=204 tool_calls=0
+2026-10-16 19:36:47 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:36:47 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gpt-4o-mini' node=None messages=5
+2026-10-16 19:36:50 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gpt-4o-mini' duration_ms=3044 input_tokens=1126 output_tokens=30 tool_calls=1
+2026-10-16 19:36:50 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:36:50 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:36:50 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=4
+2026-10-16 19:36:52 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=1750 input_tokens=2958 output_tokens=31 tool_calls=1
+2026-10-16 19:36:52 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:36:52 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=6
+2026-10-16 19:36:56 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=3904 input_tokens=3063 output_tokens=88 tool_calls=0
+2026-10-16 19:37:19 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:37:29 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:39:18 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:41:35 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:41:35 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gpt-4o-mini' node=None messages=7
+2026-10-16 19:41:37 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gpt-4o-mini' duration_ms=1619 input_tokens=1277 output_tokens=38 tool_calls=1
+2026-10-16 19:41:37 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:41:37 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:41:37 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=6
+2026-10-16 19:41:39 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=2004 input_tokens=3109 output_tokens=36 tool_calls=1
+2026-10-16 19:41:39 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:41:39 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=8
+2026-10-16 19:41:40 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=1559 input_tokens=3224 output_tokens=83 tool_calls=0
+2026-10-16 19:42:00 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:42:09 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:53:31 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:53:31 | INFO    | provider.llm | llm_started | agent='orchestrator' model='gpt-4o-mini' node=None messages=9
+2026-10-16 19:53:34 | INFO    | provider.llm | llm_finished | agent='orchestrator' model='gpt-4o-mini' duration_ms=2134 input_tokens=1386 output_tokens=40 tool_calls=1
+2026-10-16 19:53:34 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:53:34 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:53:34 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=8
+2026-10-16 19:53:36 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=1947 input_tokens=3218 output_tokens=33 tool_calls=1
+2026-10-16 19:53:36 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:53:36 | INFO    | provider.llm | llm_started | agent='nour' model='gpt-4o-mini' node='agent' messages=10
+2026-10-16 19:53:38 | INFO    | provider.llm | llm_finished | agent='nour' model='gpt-4o-mini' duration_ms=2554 input_tokens=3327 output_tokens=71 tool_calls=0
+2026-10-16 19:54:07 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:54:15 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'
+2026-10-16 19:55:57 | INFO    | provider.llm | llm_built | provider='openai' model='gpt-4o-mini' structured_method='function_calling'

@@ -1,8 +1,9 @@
 """SQLAlchemy 2 models.
 
-PostgreSQL + pgvector is the production target. Every model here also works on
-SQLite (dev/test) via the ``Embedding`` type decorator, which stores vectors as
-JSON and does cosine similarity in Python when pgvector is not available.
+One schema for PostgreSQL (production) and SQLite (dev/test). Brand memory is
+stored as short text rows and retrieved with deterministic lexical ranking --
+see ``app/core/memory/store.py`` -- so there is no vector column, no pgvector
+dependency and no embedding provider to keep in sync.
 
 Every table that a user can inspect (tasks, tool calls, approvals, usage) is
 queryable so "what did the AI do" is answerable from the DB.
@@ -63,7 +64,6 @@ class DateString(TypeDecorator):
             return None
         return str(value)
 
-from app.config import get_settings
 from app.schemas.common import (
     Autonomy,
     Language,
@@ -72,105 +72,8 @@ from app.schemas.common import (
     Tone,
 )
 
-#: Vector width for every ``Embedding`` column (D6).
-#:
-#: Read once at import time, deliberately. The column type is constructed while
-#: the model class body executes, i.e. at module import, so there is no
-#: connection or request context in which to resolve it later; and
-#: ``get_settings()`` is ``@lru_cache``d, so this is a single evaluation whose
-#: value every worker agrees on. The trade-off is that changing
-#: ``EMBEDDING_DIM`` requires a restart *and* a migration -- which is the point:
-#: previously the column silently used the class default of 64 while the
-#: embedding provider emitted ``EMBEDDING_DIM`` floats, so raising the env var
-#: desynchronised the two with no error anywhere.
-EMBEDDING_DIM: int = get_settings().embedding_dim
-
-
 class Base(DeclarativeBase):
     pass
-
-
-# --------------------------------------------------------------- embeddings --
-
-
-class Embedding(TypeDecorator):
-    """Vector column: pgvector on Postgres, JSON elsewhere.
-
-    Keeps one model definition working against both backends. On Postgres the
-    column is a real ``vector`` column so similarity search happens in the
-    database; on SQLite the vector is stored as JSON and similarity is computed
-    in Python (see ``app/core/memory/store.py``).
-    """
-
-    impl = JSON
-    cache_ok = True
-
-    def __init__(self, dim: int | None = None) -> None:
-        super().__init__()
-        #: Falls back to the configured dimension so the class default can
-        #: never drift from ``EMBEDDING_DIM`` (D6).
-        self.dim = dim if dim is not None else EMBEDDING_DIM
-
-    def load_dialect_impl(self, dialect: Any) -> Any:
-        if dialect.name == "postgresql":
-            try:
-                from pgvector.sqlalchemy import Vector
-
-                return dialect.type_descriptor(Vector(self.dim))
-            except Exception:  # pragma: no cover - pgvector not installed
-                pass
-        return dialect.type_descriptor(JSON())
-
-    def process_bind_param(self, value: Any, dialect: Any) -> Any:
-        if value is None:
-            return None
-        if dialect.name == "postgresql":
-            return list(value)
-        return list(value)
-
-    def process_result_value(self, value: Any, dialect: Any) -> Any:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                return None
-        return list(value)
-
-    class comparator_factory(TypeDecorator.Comparator):
-        """Expose pgvector's distance operators through the decorator.
-
-        Without this, ``BrandMemoryItem.embedding.cosine_distance(...)`` resolves
-        against the JSON impl and raises AttributeError, silently forcing every
-        search onto the slow Python fallback.
-
-        The operators are emitted directly rather than delegating to
-        ``self.expr.cosine_distance``: ``self.expr`` has our own type, so
-        delegating recurses forever. ``<=>`` is pgvector's cosine distance,
-        ``<->`` L2, ``<#>`` negative inner product.
-        """
-
-        def cosine_distance(self, other: Any) -> Any:
-            return self.expr.op("<=>")(other)
-
-        def l2_distance(self, other: Any) -> Any:
-            return self.expr.op("<->")(other)
-
-        def max_inner_product(self, other: Any) -> Any:
-            return self.expr.op("<#>")(other)
-
-
-def cosine(a: list[float], b: list[float]) -> float:
-    """Cosine similarity. Used on non-pgvector backends."""
-    if not a or not b or len(a) != len(b):
-        return 0.0
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(y * y for y in b))
-    if na == 0.0 or nb == 0.0:
-        return 0.0
-    return dot / (na * nb)
 
 
 # ------------------------------------------------------------------- tables --
@@ -256,11 +159,29 @@ class SavedAudience(Base, TimestampMixin):
 
 
 class BrandMemoryItem(Base):
-    """A single memory unit, vector-embedded for similarity retrieval."""
+    """One unit of brand memory.
+
+    Retrieval is deterministic lexical ranking (see ``app/core/memory``): there
+    is no embedding column and no vector index. The lifecycle columns below are
+    what replaced the reindex workflow:
+
+    * ``dedupe_digest``  -- digest of (kind, workspace, campaign, normalised text);
+      a repeat write updates the same row instead of adding a near-duplicate.
+    * ``importance`` / ``pinned`` -- ranking inputs; the kind registry supplies
+      the default importance.
+    * ``expires_at`` -- materialised TTL for episodic kinds, so expiry is an
+      indexed predicate instead of Python arithmetic over the whole table.
+    * ``archived_at`` -- soft delete: out of retrieval, still auditable.
+    * ``use_count`` / ``last_used_at`` -- proof an item was actually injected
+      into a prompt; pruning spares rows that earn their place.
+    """
 
     __tablename__ = "brand_memory_items"
     __table_args__ = (
         Index("ix_brand_memory_items_biz_kind", "business_id", "kind"),
+        Index("ix_brand_memory_items_biz_active", "business_id", "archived_at"),
+        Index("ix_brand_memory_items_biz_created", "business_id", "created_at"),
+        Index("ix_brand_memory_items_dedupe", "business_id", "dedupe_digest"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -270,15 +191,33 @@ class BrandMemoryItem(Base):
     kind: Mapped[str] = mapped_column(
         String(40),
         index=True,
-        comment="voice_example|visual_style|offer|audience|competitor_note|learning|reference_analysis",
+        comment=(
+            "See app/core/memory/kinds.py: brand_identity|voice_example|"
+            "visual_style|offer|audience|strategy_blueprint|competitor_note|"
+            "market_research|market_gaps|website_analysis|reference_analysis|"
+            "chat_attachment|learning"
+        ),
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list[float] | None] = mapped_column(Embedding(EMBEDDING_DIM))
     # Free-form: campaign ids, scores, tags, reference analysis payloads.
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
     campaign_id: Mapped[str | None] = mapped_column(String(64), index=True)
+
+    # -- lifecycle / ranking --------------------------------------------------
+    dedupe_digest: Mapped[str | None] = mapped_column(String(64))
+    importance: Mapped[float] = mapped_column(Float, default=0.5, nullable=False)
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    source: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    use_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     business: Mapped[Business] = relationship(back_populates="memory_items")
@@ -844,7 +783,6 @@ class UsageRecord(Base):
 
 
 __all__ = [
-    "EMBEDDING_DIM",
     "AgentTask",
     "AgentToolCall",
     "AuditLog",
@@ -856,7 +794,6 @@ __all__ = [
     "ContentItem",
     "Conversation",
     "Creative",
-    "Embedding",
     "Integration",
     "Insight",
     "Message",
@@ -868,7 +805,6 @@ __all__ = [
     "Tone",
     "Autonomy",
     "Language",
-    "cosine",
     # Legacy (kept for migration, will be removed):
     "User",
     "Membership",

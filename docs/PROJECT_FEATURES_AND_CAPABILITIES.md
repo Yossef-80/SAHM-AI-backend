@@ -17,7 +17,7 @@
 | **Creatives Studio** | `/creatives` | Layla (ليلى) | Direct-response ad copy, 3-second video hooks, commercial storyboards, reference image style extraction, image prompt generation. |
 | **Analytics & GA4 Insights Hub** | `/insights` | Karim (كريم) | Google Analytics 4 (GA4) traffic and conversion metrics, Meta ad performance, anomaly alerts. |
 | **Recommendations & Approvals**| `/recommendations` | Salma (سلمى) | Automated performance audits, 2-phase human-in-the-loop approvals with diff inspection, Meta write execution. |
-| **Brand Memory & Knowledge Base**| `/settings/memory` | Central Brain | Dual-layer memory items, vector embeddings (pgvector), global brand profile LTM anchor (<300 tokens), zero token bloat. |
+| **Brand Memory & Knowledge Base**| `/settings/memory` | Central Brain | 13 lifecycle-managed memory kinds, lexical + recency ranking (no embeddings), global brand profile LTM anchor (<300 tokens), zero token bloat. |
 | **Integrations & Connectors** | `/settings/connectors`, `/integrations` | System Core | Encrypted Meta OAuth, Google Analytics service account, Google Places, Apify Facebook ads scraper, Tavily/DuckDuckGo. |
 | **Governance & Usage Guardrails**| `/settings/audit`, `/settings/usage`, `/settings/llm`| System Core | Per-workspace daily token spend ceilings, immutable audit logging, multi-tenant RBAC, dual-tier LLM provider routing. |
 
@@ -87,6 +87,10 @@ An interactive conversational interface where business owners collaborate with t
    - Emits Server-Sent Events (`SSE`) carrying progress updates and the final blocks payload.
 6. **Client Rendering:**
    - The frontend renders dynamic blocks: expandable finding cards, source citations, action buttons, and markdown text.
+7. **Answer language:**
+   - The thread answers in the language chosen in the UI (`ar` / `en`), and follows
+     a change immediately — including mid-conversation. The rule, the resolution
+     order and the tests are in [`LANGUAGE_POLICY.md`](LANGUAGE_POLICY.md).
 
 ---
 
@@ -251,7 +255,7 @@ Ensures that every agent understands the brand's unique history, competitors, an
 ### Key Capabilities:
 - **Tier 1: Active History:** Maintains recent conversational context.
 - **Tier 2: Dynamic Session Summary:** Condenses conversation threads once they reach 1,500 tokens.
-- **Tier 3: Brand Memory Items:** Stores verified facts in the `BrandMemoryItem` table with vector embeddings for cosine retrieval and full reports in metadata.
+- **Tier 3: Brand Memory Items:** Stores verified facts in the `BrandMemoryItem` table; retrieval is BM25 + recency + kind affinity (no embeddings), full reports stay in metadata.
 - **Tier 4: Global Brand Brain (LTM):** Permanently maintains `Profile.user_context_summary` (<300 tokens) updated in the background after 3 minutes of inactivity.
 - **Separation of Facts vs Plans:** General brand facts are available to the router, while active marketing plans are isolated to strategy agents.
 - **CRUD Management:** Users can inspect, edit, or delete any memory item in `/settings/memory`.

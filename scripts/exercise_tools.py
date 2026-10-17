@@ -34,7 +34,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # Never let a real provider or a real database be picked up by this script.
 os.environ.setdefault("LLM_PROVIDER_FAST", "mock")
 os.environ.setdefault("LLM_PROVIDER_STRONG", "mock")
-os.environ.setdefault("EMBEDDING_PROVIDER", "mock")
 os.environ.setdefault("SEARCH_PROVIDER", "mock")
 os.environ.setdefault("KEYWORD_PROVIDER", "mock")
 os.environ.setdefault("IMAGE_PROVIDER", "mock")

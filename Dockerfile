@@ -73,7 +73,6 @@ RUN python -m venv /opt/venv \
       "alembic>=1.13" \
       "aiosqlite>=0.20" \
       "asyncpg>=0.29" \
-      "pgvector>=0.2.5" \
       "langgraph>=0.2.60" \
       "httpx>=0.27" \
       "Pillow>=10.0.0" \

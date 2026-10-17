@@ -19,3 +19,9 @@ __all__ = [
     "profile_namespace",
     "put_brand_profile",
 ]
+
+# The single per-workspace post-turn memory pass. Imported lazily by callers so
+# that importing this package never starts asyncio work.
+from app.ai.memory.consolidator import MemoryConsolidator, memory_consolidator  # noqa: E402
+
+__all__ += ["MemoryConsolidator", "memory_consolidator"]

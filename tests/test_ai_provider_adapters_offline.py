@@ -699,20 +699,43 @@ async def test_session_memory_uses_mock_summary_and_redacts_before_persisting(
     assert flushes == [True]
 
 
-async def test_memory_debouncer_runs_a_fake_compressor_without_sleeping_for_real_time() -> None:
-    from app.ai.memory.compressor import MemoryDebouncer
+async def test_consolidator_serialises_one_pass_per_workspace() -> None:
+    """Two rapid turns must not produce two concurrent profile writers."""
+    import asyncio
 
+    from app.ai.memory.consolidator import MemoryConsolidator
+
+    running = 0
+    peak = 0
     calls: list[str] = []
 
-    class FakeCompressor:
-        async def update_global_profile(self, business_id: str) -> None:
-            calls.append(business_id)
+    consolidator = MemoryConsolidator()
 
-    debouncer = MemoryDebouncer(delay_seconds=0)
-    debouncer.compressor = FakeCompressor()  # type: ignore[assignment]
-    debouncer.schedule_ltm_update("biz-offline")
-    task = debouncer._timers["biz-offline"]
-    await task
+    async def fake_step(req) -> None:  # type: ignore[no-untyped-def]
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        calls.append(req.business_id)
+        await asyncio.sleep(0.01)
+        running -= 1
 
-    assert calls == ["biz-offline"]
-    assert debouncer._timers == {}
+    import app.ai.memory.consolidator as module
+
+    original = module._debounce_seconds
+    module._debounce_seconds = lambda: 0  # type: ignore[assignment]
+    try:
+        consolidator._compact_session = fake_step  # type: ignore[assignment]
+        consolidator._update_profile = fake_step  # type: ignore[assignment]
+        consolidator._identity_due = lambda business_id: False  # type: ignore[assignment]
+
+        consolidator.schedule(business_id="biz-offline")
+        consolidator.schedule(business_id="biz-offline")
+        await consolidator.wait_idle("biz-offline")
+    finally:
+        module._debounce_seconds = original  # type: ignore[assignment]
+
+    # Both steps must complete. A crash in the logging call after step 1 (the
+    # D2 regression) would abort the pass after the session step and silently
+    # skip the profile and identity work.
+    assert len(calls) >= 2, f"expected session + profile steps, got {calls}"
+    assert peak == 1, "two passes for one workspace overlapped"

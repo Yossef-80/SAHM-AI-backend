@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 app/__init__.py
 app/config.py
@@ -67,6 +68,7 @@ app/ai/marketing/schemas.py
 app/ai/memory/__init__.py
 app/ai/memory/brand_memory.py
 app/ai/memory/compressor.py
+app/ai/memory/consolidator.py
 app/ai/providers/__init__.py
 app/ai/providers/_loader.py
 app/ai/providers/reviews.py
@@ -135,6 +137,7 @@ app/core/ai_usage.py
 app/core/auth.py
 app/core/chat_attachments.py
 app/core/errors.py
+app/core/i18n.py
 app/core/logging.py
 app/core/ratelimit.py
 app/core/research_reports.py
@@ -163,8 +166,13 @@ app/core/llm/ollama_client.py
 app/core/llm/openai_client.py
 app/core/llm/router.py
 app/core/memory/__init__.py
-app/core/memory/embeddings.py
+app/core/memory/kinds.py
+app/core/memory/lexical.py
+app/core/memory/lifecycle.py
+app/core/memory/policy.py
+app/core/memory/ranking.py
 app/core/memory/store.py
+app/core/memory/tokens.py
 app/core/orchestrator/__init__.py
 app/core/orchestrator/blocks.py
 app/core/orchestrator/service.py
@@ -187,6 +195,7 @@ app/db/migrations/env.py
 app/db/migrations/versions/9ab6bffb43a6_add_profiles_table_for_supabase_auth.py
 app/db/migrations/versions/__init__.py
 app/db/migrations/versions/a7d8c3e219b4_add_meta_page_id.py
+app/db/migrations/versions/b3f1c2d4e5a6_brand_memory_lifecycle.py
 app/db/migrations/versions/b60e91f42c73_add_content_calendar_items.py
 app/db/migrations/versions/b7c8d9e0f1a2_add_composite_indexes.py
 app/db/migrations/versions/c1f4a9d27e35_add_usage_action_and_estimated.py
@@ -255,6 +264,7 @@ tests/test_creative_prompt_workflow.py
 tests/test_creative_upload.py
 tests/test_daily_insights.py
 tests/test_deployment_ops.py
+tests/test_docs_map.py
 tests/test_error_response_surface.py
 tests/test_ga4_tool.py
 tests/test_image_edit_endpoint.py
@@ -262,6 +272,7 @@ tests/test_karim_campaign_context.py
 tests/test_layla_image_generation.py
 tests/test_layla_text_generation.py
 tests/test_llm_layer.py
+tests/test_memory_layers.py
 tests/test_memory_performance.py
 tests/test_meta_ad_plans.py
 tests/test_meta_ads_mcp.py
@@ -275,6 +286,7 @@ tests/test_omar_layla_handoff_flow.py
 tests/test_profile_field_families.py
 tests/test_reference_vision.py
 tests/test_registry_policy.py
+tests/test_reply_language.py
 tests/test_report_presentation.py
 tests/test_research_report_shaping.py
 tests/test_runtime.py

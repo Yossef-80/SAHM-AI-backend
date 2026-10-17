@@ -1,6 +1,13 @@
-# SAHM Marketing OS - Database & Tooling Guide
+# Database guide
 
-This guide explains the backend database schema (powered by SQLAlchemy + Postgres/SQLite) and how you should design AI tools to seamlessly save their outputs into these tables using Pydantic schemas.
+> **Audience:** Backend engineers adding a table, a query or a migration.
+> **Purpose:** The 23 tables, what owns them, the conventions they follow, and how
+> to change the schema safely.
+
+Sahm runs on PostgreSQL in deployment and on SQLite for local development and
+tests: SQLAlchemy 2 (async) + Alembic, with one model file (`app/db/models.py`)
+and one migration history (`app/db/migrations/versions/`). Any schema change is
+two things — an edit to the model **and** a migration — never one.
 
 ---
 
@@ -16,7 +23,7 @@ The database is built with multi-tenancy in mind, meaning almost every table rel
 
 ### B. Chat & AI Memory
 * **`Conversation` & `Message`**: Standard chat history. Messages contain both raw `content` (text) and `blocks` (the strict JSON UI blocks consumed by React).
-* **`BrandMemoryItem`**: The long-term RAG (Retrieval-Augmented Generation) memory. Contains vector `embedding` columns. Used to store "learnings", "voice examples", or "audience notes" that agents can search through later.
+* **`BrandMemoryItem`**: The long-term brand memory -- **not** a vector table. There is no `embedding` column and no RAG: rows are retrieved with a deterministic lexical + recency + kind-affinity ranker (`app/core/memory/`). It stores the 13 kinds in `app/core/memory/kinds.py` ("learnings", "voice examples", "strategy_blueprint", research artifacts, chat attachments ...) together with the lifecycle columns that make retention work: `expires_at`, `importance`, `pinned`, `dedupe_digest`, `archived_at`. See `docs/MEMORY_ARCHITECTURE.md`.
 
 ### C. Marketing Entities (The Heavy Lifters)
 * **`Campaign`**: A marketing campaign with dates, budgets, and objectives.
@@ -24,7 +31,13 @@ The database is built with multi-tenancy in mind, meaning almost every table rel
 * **`Insight`**: Data discoveries (e.g., "Competitor X is running 50% off sales").
 * **`Recommendation`**: AI-suggested actions (e.g., "Increase budget by $500"). Contains an approval flow (`requires_approval`, `approved_by`, `status`).
 
-### D. System Logging & Tasks
+### D. Content, Audiences & Configuration
+* **`ContentItem`** (`content_items`): one calendar post — date, time, channel, format, hook, caption, hashtags, status, pillar.
+* **`SavedAudience`** (`saved_audiences`): a reusable audience definition per workspace.
+* **`ToolSettings`** / **`LlmProviderSettings`**: per-workspace connector credentials (encrypted) and fast/strong model routing.
+* **`UsageRecord`**: one row per model call — tokens in/out, model, task.
+
+### E. System Logging & Tasks
 * **`AgentTask`**: Long-running background processes.
 * **`AgentToolCall`**: A log of every single tool an agent uses (e.g., when Nour searches the web, it gets logged here with `input`, `output_summary`, and `duration_ms`).
 * **`AuditLog`**: Tracks when a human approves or rejects a Recommendation.

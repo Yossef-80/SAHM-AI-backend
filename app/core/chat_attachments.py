@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.core.errors import ValidationFailed
+from app.core.memory.lifecycle import memory_defaults
 from app.core.logging import get_logger
 from app.core.tools.media import persist_inline_reference_image
 from app.db.models import BrandMemoryItem
@@ -79,6 +80,12 @@ async def store_chat_attachment(
         business_id=business_id,
         kind=KIND,
         text=name,
+        **memory_defaults(
+            KIND,
+            business_id=business_id,
+            text=name,
+            source="chat_attachment",
+        ),
         metadata_={
             "source_name": name,
             "file_id": file_id,

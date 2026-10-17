@@ -33,12 +33,14 @@ async def _handle_save_learning(payload: SaveLearningInput, ctx: ToolContext) ->
 get_brand_context_tool = Tool(
     name="get_brand_context",
     description=(
-        "Retrieve the compact brand context: brand voice, visual style, offers, "
-        "audience, competitors, and the most relevant memory items and learnings "
-        "for the task at hand. Call this FIRST for any task that should sound like "
-        "the brand or reference its offers/audience. Do not call it to look up "
-        "campaign performance numbers (use get_campaign_insights) or to research "
-        "the market (use web_search)."
+        "Retrieve the compact brand context: identity (voice, visual style, "
+        "offers, audience, competitors), the active strategy plan, the most "
+        "relevant research/competitor notes for this task, and recent learnings. "
+        "The result is pre-budgeted (~900 tokens) and ranked deterministically "
+        "(lexical relevance + recency + kind affinity), so it is safe to call on "
+        "every task. Call this FIRST for any task that should sound like the "
+        "brand. Do not call it for campaign performance numbers (use "
+        "get_campaign_insights) or to research the market (use web_search)."
     ),
     input_model=GetBrandContextInput,
     output_model=BrandContext,

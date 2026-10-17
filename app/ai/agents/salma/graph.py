@@ -14,6 +14,7 @@ from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
 from app.ai.tools import get_brand_context_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
+from app.core.i18n import SUBAGENT_LANGUAGE_RULE
 
 
 @tool(args_schema=OptimizationPlan)
@@ -28,7 +29,7 @@ SALMA_TOOLS = [
     submit_optimization_plan,
 ]
 
-SALMA_PROMPT = """You are Salma, Sahm's campaign optimizer. Respond in the user's language.
+SALMA_PROMPT = f"""You are Salma, Sahm's campaign optimizer. {SUBAGENT_LANGUAGE_RULE}
 
 Read actual campaign insights and, where useful, breakdowns before proposing a
 change. Propose at most one specific, reversible change, and cite the exact

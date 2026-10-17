@@ -1,74 +1,93 @@
-# 📚 SAHM AI — Documentation Portal & Knowledge Base
+# Documentation
 
-> Welcome to the comprehensive documentation suite for **SAHM AI (سهم)** — the autonomous Multi-Agent Marketing Operating System designed for SMBs, e-commerce brands, and agencies in Egypt and the MENA region.
+> Sahm is an autonomous marketing department for small businesses: five specialist
+> AI agents, one shared brand memory, in Arabic and English.
+> Start at [`../README.md`](../README.md) for the one-page version; come back here
+> when you need depth.
 
 ---
 
-## 🗺️ Documentation Directory Map
+## Read by goal
 
-This folder (`backend/docs/`) contains 7 core technical, commercial, and presentation manuals designed to help you **understand every feature in the project**, **deliver non-technical and executive presentations**, **improve and extend the codebase**, and **run live software demonstrations**:
+### "I need to explain Sahm to a non-technical audience"
+
+| Document | What it gives you |
+| :--- | :--- |
+| [`NON_TECHNICAL_PRESENTATION_GUIDE.md`](NON_TECHNICAL_PRESENTATION_GUIDE.md) | The business story, an 8-slide deck, and a demo script with no code in it. |
+| [`PRODUCT_OVERVIEW.md`](PRODUCT_OVERVIEW.md) | What the product is, the problem it solves, who it is for, and what "done" looks like. |
+| [`PRESENTATION_AND_DEMO_GUIDE.md`](PRESENTATION_AND_DEMO_GUIDE.md) | The 10-slide pitch, speaking scripts, live demo steps, and answers to the awkward questions. |
+
+### "I need to understand every feature"
+
+[`PROJECT_FEATURES_AND_CAPABILITIES.md`](PROJECT_FEATURES_AND_CAPABILITIES.md) —
+feature by feature: what the user sees, what the backend does, which tables are
+touched, which agent owns it.
+
+### "I am a reviewer reading the code"
+
+| Document | What it gives you |
+| :--- | :--- |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design, the data-flow diagram, the schema, the full API table, security model, extension playbooks, runbook. |
+| [`MEMORY_ARCHITECTURE.md`](MEMORY_ARCHITECTURE.md) | How brand memory works: 13 kinds, lifecycle, BM25 + recency + affinity ranking, token budgets, and why there is no vector store. |
+| [`ORCHESTRATOR.md`](ORCHESTRATOR.md) | Routing, the specialist graphs, the UI-block bridge, the background workers. |
+| [`LANGUAGE_POLICY.md`](LANGUAGE_POLICY.md) | The bilingual contract: which language every answer uses, and where that is decided. |
+| [`DATABASE_GUIDE.md`](DATABASE_GUIDE.md) | Tables, relationships, conventions for writing to them. |
+| [`../README.md`](../README.md) §4 | The design decisions worth arguing about. |
+
+### "I am going to change the code"
+
+| Document | What it gives you |
+| :--- | :--- |
+| [`../AGENTS.md`](../AGENTS.md) | **Start here.** Task router (task → files → tests), module map with status, invariants, recipes. Built so neither a person nor an agent has to scan the tree. |
+| [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) | Tool and agent internals, safe zones in the tree, how to add a tool, prompt tuning, failure modes. |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) §5 | Playbooks: new tool, new provider, new migration. |
+| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Branches, commits, PR checklist, review rules. |
+| [`RUNNING_BACKEND.md`](RUNNING_BACKEND.md) | Run it locally, health checks, containers. |
+| [`AD_CREATIVE_FLOW.md`](AD_CREATIVE_FLOW.md) | The competitor-ad → vision → prompt → image flow, and its safety rules. |
+
+### "I need to operate it"
+
+[`RUNNING_BACKEND.md`](RUNNING_BACKEND.md) and the runbook section of
+[`ARCHITECTURE.md`](ARCHITECTURE.md) §6. Memory retention is configured and
+audited through `POST /memory/prune` (see `MEMORY_ARCHITECTURE.md` §9).
+
+---
+
+## The whole set
 
 ```
-SAHM-AI-backend/docs/
+AGENTS.md                                    # the code map (root, not in docs/)
+docs/
+├── README.md                                # you are here
 │
-├── 📖 README.md                                      # You are here: Master Portal & Reading Paths
+├── ── product & storytelling ───────────────────────────────────────────
+├── PRODUCT_OVERVIEW.md                      # vision, problem, scope, market
+├── PROJECT_FEATURES_AND_CAPABILITIES.md     # every feature, end to end
+├── NON_TECHNICAL_PRESENTATION_GUIDE.md      # business-language deck + demo
+├── PRESENTATION_AND_DEMO_GUIDE.md           # technical pitch + live demo
 │
-├── 📢 NON_TECHNICAL_PRESENTATION_GUIDE.md           # Non-Technical Presentation, Pitch Deck & Storytelling
-│                                                     # (The "AI Tool Chaos" problem, connected intelligence, 8 slides)
-│
-├── 🎤 PRESENTATION_AND_DEMO_GUIDE.md                 # Full Presentation, Pitch Deck & Live Demo Playbook
-│                                                     # (10-slide deck, step-by-step live demo scripts, Q&A answers)
-│
-├── 🚀 TEAM_PROJECT_SCOPE_AND_ASSESSMENT.md          # Project Scope, Commercial Vision & State Assessment
-│                                                     # (What SAHM is, problems solved, current architecture)
-│
-├── 🌟 PROJECT_FEATURES_AND_CAPABILITIES.md           # End-to-End Features & Capabilities Manual
-│                                                     # (Deep-dive into all 10 platform feature modules)
-│
-├── 🛠️ TEAM_TOOLS_AND_AGENTS_GUIDE.md                 # Tools & Agents Engineering Playbook
-│                                                     # (9 Research tools, LangGraph agents, Playwright, Apify, GA4)
-│
-├── 🧠 TEAM_BRAND_MEMORY_AND_ORCHESTRATOR_ARCHITECTURE.md # Central Brain & Cognitive Architecture
-│                                                     # (4-tier memory, token bloat prevention, Orchestrator brain)
-│
-└── ⚙️ SYSTEM_ARCHITECTURE_AND_ENGINEERING_PLAYBOOK.md # System Design, ERD Models, APIs & Security
-                                                      # (Database ERD, REST API spec, Fernet encryption, runbook)
+├── ── engineering ──────────────────────────────────────────────────────
+├── ARCHITECTURE.md                          # design, schema, API, runbook
+├── ORCHESTRATOR.md                          # routing, graphs, workers
+├── MEMORY_ARCHITECTURE.md                   # brand memory, in detail
+├── MEMORY_VALIDATION_REPORT.md              # PM review of the memory rebuild
+├── LANGUAGE_POLICY.md                       # bilingual answer contract
+├── DATABASE_GUIDE.md                        # tables and conventions
+├── DEVELOPER_GUIDE.md                       # tools, agents, safe zones
+├── AD_CREATIVE_FLOW.md                      # competitor ad → prompt → image
+└── RUNNING_BACKEND.md                       # local run, health, containers
 ```
 
 ---
 
-## 🎯 Recommended Reading Paths by Goal
+## Conventions in this folder
 
-Choose the reading path that fits your current objective:
-
-### Path A: "I need to give a presentation to business owners, clients, or non-technical judges"
-1. Start with [**`NON_TECHNICAL_PRESENTATION_GUIDE.md`**](file:///D:/NTI-Final-Project/SAHM-AI-backend/docs/NON_TECHNICAL_PRESENTATION_GUIDE.md) for the storytelling narrative ("The AI Tool Chaos Trap" vs. "The Connected Intelligence Flywheel").
-2. Use the **8-Slide Ready-to-Use Deck** with exact speaking scripts in business language.
-3. Use the **Non-Technical Live Demo Script** (Ahmed's Apparel Brand story) to demonstrate Tie House research, 5-day calendar scheduling, and Egyptian ad hooks without showing a single line of code.
-
-### Path B: "I need to understand every feature and what SAHM offers"
-1. Read [**`TEAM_PROJECT_SCOPE_AND_ASSESSMENT.md`**](file:///D:/NTI-Final-Project/SAHM-AI-backend/docs/TEAM_PROJECT_SCOPE_AND_ASSESSMENT.md) for the commercial vision, target audience, and the 5 specialized AI marketers.
-2. Read [**`PROJECT_FEATURES_AND_CAPABILITIES.md`**](file:///D:/NTI-Final-Project/SAHM-AI-backend/docs/PROJECT_FEATURES_AND_CAPABILITIES.md) for a detailed walkthrough of all 10 features (Research Hub, Assistant Chat, Content Calendar, Campaigns, Creatives, GA4 Analytics, and Safe Approvals).
-
-### Path C: "I need technical depth, investor Q&A, and full pitch deck coverage"
-1. Open [**`PRESENTATION_AND_DEMO_GUIDE.md`**](file:///D:/NTI-Final-Project/SAHM-AI-backend/docs/PRESENTATION_AND_DEMO_GUIDE.md).
-2. Copy the **10-Slide Pitch Deck** into your presentation slides.
-3. Review the **10 Q&A Questions & Answers** to prepare for challenging technical, business, and AI safety inquiries.
-
-### Path D: "I am an engineer looking to improve or build new features"
-1. Read [**`TEAM_TOOLS_AND_AGENTS_GUIDE.md`**](file:///D:/NTI-Final-Project/SAHM-AI-backend/docs/TEAM_TOOLS_AND_AGENTS_GUIDE.md) to learn how agents and tools are implemented in LangGraph.
-2. Read [**`TEAM_BRAND_MEMORY_AND_ORCHESTRATOR_ARCHITECTURE.md`**](file:///D:/NTI-Final-Project/SAHM-AI-backend/docs/TEAM_BRAND_MEMORY_AND_ORCHESTRATOR_ARCHITECTURE.md) to understand the 4-tier memory hierarchy, token bloat rules, and deterministic routing.
-3. Consult [**`SYSTEM_ARCHITECTURE_AND_ENGINEERING_PLAYBOOK.md`**](file:///D:/NTI-Final-Project/SAHM-AI-backend/docs/SYSTEM_ARCHITECTURE_AND_ENGINEERING_PLAYBOOK.md) for database ERDs, REST API contracts, security protocols, and step-by-step developer recipes.
-
----
-
-## ⚡ Quick Summary of SAHM AI's Core Capabilities
-
-- **Autonomous Multi-Agent Squad:** Nour (Researcher), Omar (Strategist), Layla (Creative), Karim (Analyst), and Salma (Optimizer) collaborating under a deterministic Orchestrator.
-- **The Connected Intelligence Flywheel:** Search connects to Strategy; Strategy connects to Creatives; Creatives connect to the Calendar; Analytics connect to Approvals. All powered by one shared Brand Memory.
-- **Real-Time Market Evidence:** Live web crawling, Google Maps reviews extraction via Playwright, Facebook Ad Library scraping via Apify, and Google Analytics 4 performance reporting.
-- **Ground-Truth Entity Resolver:** Auto-corrects brand typos (e.g. *"Tiee Hose"* ➔ *"Tie House"*) and rejects fake queries before running searches.
-- **Unified Brand Identity Hub:** Central living brand profile (`/brand-identity`) with color palette tokens, strategic essence (voice, tagline, archetype), target audience, SWOT analysis, and 1-click sync from chats.
-- **Automated Content Calendar:** Direct multi-day social media schedule generation saved automatically into PostgreSQL.
-- **Zero-Token-Bloat Memory:** Dual-layer storage (380-word reports for humans, ~100-token facts for AI prompts) reducing context window consumption by over 90%.
-- **Human-in-the-Loop Safety:** Two-phase approval workflow with before/after diffs and immutable audit logging before executing ad account changes.
+- Every document states its **audience** at the top. If your audience is not
+  listed, the document is probably not for you — use the tables above.
+- **Code wins.** When a document and the code disagree, the code is right and the
+  document is a bug. The docs are checked against the tree in the same PR that
+  changes behaviour.
+- Paths are **repository-relative**. No absolute paths, no `file:///` links, no
+  machine-specific directories.
+- One idea per section, tables over prose for anything enumerable, and an honest
+  "what this does not do" wherever a limitation exists.

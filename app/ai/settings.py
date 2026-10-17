@@ -157,12 +157,49 @@ class AISettings(BaseSettings):
     postgres_url: str | None = Field(None, validation_alias=_env("AI_POSTGRES_URL"))
 
     # ============================================================ MEMORY ====
+    # Layered brand memory. These names are identical to the ones on
+    # ``app.config.Settings``; ``MemoryPolicy.from_settings`` can be built from
+    # either object. Design: docs/MEMORY_ARCHITECTURE.md.
+    memory_enabled: bool = Field(True, validation_alias=_env("MEMORY_ENABLED"))
+
+    # -- session layer --------------------------------------------------------
     memory_session_max_tokens: int = Field(10000, gt=0, validation_alias=_env("SESSION_MEMORY_MAX_TOKENS", "MEMORY_SESSION_MAX_TOKENS"))
-    brand_memory_token_limit: int = Field(10000, gt=0, validation_alias=_env("BRAND_MEMORY_TOKEN_LIMIT", "BRAND_IDENTITY_TOKEN_LIMIT", "MEMORY_BRAND_MAX_TOKENS"))
-    memory_ltm_debounce_seconds: int = Field(180, ge=0, validation_alias=_env("MEMORY_LTM_DEBOUNCE_SECONDS"))
-    memory_item_max_tokens: int = Field(120, gt=0, validation_alias=_env("MEMORY_ITEM_MAX_TOKENS"))
-    memory_global_profile_max_tokens: int = Field(300, gt=0, validation_alias=_env("MEMORY_GLOBAL_PROFILE_MAX_TOKENS"))
     memory_retain_recent_turns: int = Field(2, ge=1, validation_alias=_env("MEMORY_RETAIN_RECENT_TURNS"))
+    memory_ltm_debounce_seconds: int = Field(180, ge=0, validation_alias=_env("MEMORY_LTM_DEBOUNCE_SECONDS"))
+    brand_memory_token_limit: int = Field(10000, gt=0, validation_alias=_env("BRAND_MEMORY_TOKEN_LIMIT", "BRAND_IDENTITY_TOKEN_LIMIT", "MEMORY_BRAND_MAX_TOKENS"))
+    memory_global_profile_max_tokens: int = Field(300, gt=0, validation_alias=_env("MEMORY_GLOBAL_PROFILE_MAX_TOKENS"))
+    memory_identity_sync_enabled: bool = Field(True, validation_alias=_env("MEMORY_IDENTITY_SYNC_ENABLED"))
+    memory_identity_min_interval_seconds: int = Field(900, ge=0, validation_alias=_env("MEMORY_IDENTITY_MIN_INTERVAL_SECONDS"))
+    # When false (default) the identity pass only fills *blank* brand-profile
+    # fields; a value saved from the Settings page is never replaced by an
+    # inference from a chat.
+    memory_identity_overwrite_profile: bool = Field(False, validation_alias=_env("MEMORY_IDENTITY_OVERWRITE_PROFILE"))
+
+    # -- prompt assembly ------------------------------------------------------
+    memory_context_token_cap: int = Field(900, gt=0, validation_alias=_env("MEMORY_CONTEXT_TOKEN_CAP"))
+    memory_context_top_k: int = Field(6, ge=1, le=50, validation_alias=_env("MEMORY_CONTEXT_TOP_K"))
+    memory_recent_learnings: int = Field(3, ge=0, le=50, validation_alias=_env("MEMORY_RECENT_LEARNINGS"))
+    memory_identity_share: float = Field(0.45, ge=0, le=1, validation_alias=_env("MEMORY_IDENTITY_SHARE"))
+    memory_plan_share: float = Field(0.15, ge=0, le=1, validation_alias=_env("MEMORY_PLAN_SHARE"))
+
+    # -- ranking (lexical, deterministic; no embeddings) ----------------------
+    memory_candidate_window: int = Field(300, ge=1, validation_alias=_env("MEMORY_CANDIDATE_WINDOW"))
+    memory_recency_half_life_days: float = Field(30.0, gt=0, validation_alias=_env("MEMORY_RECENCY_HALF_LIFE_DAYS"))
+    memory_weight_affinity: float = Field(0.20, ge=0, validation_alias=_env("MEMORY_WEIGHT_AFFINITY"))
+    memory_weight_lexical: float = Field(0.40, ge=0, validation_alias=_env("MEMORY_WEIGHT_LEXICAL"))
+    memory_weight_recency: float = Field(0.25, ge=0, validation_alias=_env("MEMORY_WEIGHT_RECENCY"))
+    memory_weight_importance: float = Field(0.15, ge=0, validation_alias=_env("MEMORY_WEIGHT_IMPORTANCE"))
+    memory_pinned_boost: float = Field(0.35, ge=0, validation_alias=_env("MEMORY_PINNED_BOOST"))
+    memory_campaign_boost: float = Field(0.10, ge=0, validation_alias=_env("MEMORY_CAMPAIGN_BOOST"))
+    memory_phrase_boost: float = Field(0.10, ge=0, validation_alias=_env("MEMORY_PHRASE_BOOST"))
+    memory_min_relevance: float = Field(0.12, ge=0, le=1, validation_alias=_env("MEMORY_MIN_RELEVANCE"))
+
+    # -- lifecycle ------------------------------------------------------------
+    memory_dedupe_enabled: bool = Field(True, validation_alias=_env("MEMORY_DEDUPE_ENABLED"))
+    memory_default_ttl_days: int = Field(180, ge=1, validation_alias=_env("MEMORY_DEFAULT_TTL_DAYS"))
+    memory_max_items_per_kind: int = Field(500, ge=1, validation_alias=_env("MEMORY_MAX_ITEMS_PER_KIND"))
+    memory_item_max_tokens: int = Field(120, gt=0, validation_alias=_env("MEMORY_ITEM_MAX_TOKENS"))
+    memory_sweep_on_write: bool = Field(True, validation_alias=_env("MEMORY_SWEEP_ON_WRITE"))
 
     # =========================================================== REVIEWS ====
     google_places_api_key: str | None = Field(None, validation_alias=_env("GOOGLE_PLACES_API_KEY"))

@@ -37,8 +37,11 @@ After a restore, finish the job::
     python -m alembic -c app/db/migrations/alembic.ini upgrade head
     curl -fsS http://localhost:8000/health/ready
 
-The `vector` extension is included in a custom-format dump (``pg_dump`` emits
-``CREATE EXTENSION`` for it), so a restored database already has pgvector.
+Brand memory no longer uses the `vector` extension (retrieval is lexical -- see
+``docs/MEMORY_ARCHITECTURE.md``), so a restore does not need it. A dump taken
+from an older database still carries ``CREATE EXTENSION vector``; it is
+harmless, and revision ``b3f1c2d4e5a6`` drops the leftover ``embedding``
+column on the next ``upgrade head``.
 
 SECURITY
 --------

@@ -75,7 +75,7 @@ async def test_answer_is_resolved_from_persisted_option_payload_and_message_id_i
         AsyncMock(return_value=([{"role": "assistant", "content": "Choose one image"}], None)),
     )
     monkeypatch.setattr(
-        "app.ai.memory.compressor.memory_debouncer.schedule_ltm_update",
+        "app.ai.memory.consolidator.memory_consolidator.schedule",
         Mock(),
     )
 

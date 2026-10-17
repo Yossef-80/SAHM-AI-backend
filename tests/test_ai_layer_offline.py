@@ -365,7 +365,7 @@ def test_file_routing_ignores_server_paths_and_redacts_supplied_content() -> Non
     assert "do-not-store-this" not in json.dumps(supplied)
 
 
-def test_memory_profile_and_learning_are_scoped_and_redacted(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_memory_profile_and_learning_are_scoped_and_redacted(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.ai.tools.brand_context as brand_context_module
     import app.ai.tools.save_learning as save_learning_module
 
@@ -393,8 +393,11 @@ def test_memory_profile_and_learning_are_scoped_and_redacted(monkeypatch: pytest
     assert "private-value" not in profile.description
     assert get_brand_profile(store, "biz-b") is None
 
+    # The tools are async: they prefer the workspace database (async session)
+    # and only fall back to the in-memory LangGraph store when no DB is attached.
+    # LangGraph's ToolNode awaits them; the test must too.
     saved = json.loads(
-        save_learning_module.save_learning_tool.invoke(
+        await save_learning_module.save_learning_tool.ainvoke(
             {
                 "insight": "The supplied page lists EGP 350; access_token=private-value",
                 "category": "market",
@@ -407,7 +410,7 @@ def test_memory_profile_and_learning_are_scoped_and_redacted(monkeypatch: pytest
     assert "private-value" not in json.dumps(saved)
 
     context = json.loads(
-        brand_context_module.get_brand_context_tool.invoke(
+        await brand_context_module.get_brand_context_tool.ainvoke(
             {}, config={"configurable": {"business_id": "biz-a"}}
         )
     )
@@ -416,7 +419,7 @@ def test_memory_profile_and_learning_are_scoped_and_redacted(monkeypatch: pytest
     assert "private-value" not in json.dumps(context)
 
     settings_context = json.loads(
-        brand_context_module.get_brand_context_tool.invoke(
+        await brand_context_module.get_brand_context_tool.ainvoke(
             {},
             config={
                 "configurable": {
@@ -437,7 +440,7 @@ def test_memory_profile_and_learning_are_scoped_and_redacted(monkeypatch: pytest
     assert settings_context["profile"]["industry"] == "Coffee shop"
 
     other = json.loads(
-        brand_context_module.get_brand_context_tool.invoke(
+        await brand_context_module.get_brand_context_tool.ainvoke(
             {}, config={"configurable": {"business_id": "biz-b"}}
         )
     )

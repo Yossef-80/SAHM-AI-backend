@@ -16,6 +16,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.core.memory.lifecycle import memory_defaults
 from app.db.models import (
     BrandMemoryItem,
     BrandProfile as BrandProfileRow,
@@ -330,6 +331,18 @@ async def _rolling_compress_older_chats(
         return current_summary or older_text
 
 
+def _identity_may_overwrite_profile() -> bool:
+    """Whether the identity pass may replace human-saved brand profile fields."""
+    try:
+        from app.ai.settings import get_ai_settings
+
+        return bool(
+            getattr(get_ai_settings(), "memory_identity_overwrite_profile", False)
+        )
+    except Exception:  # noqa: BLE001 - settings must never break the pass
+        return False
+
+
 class BrandIntelligenceAgent:
     """Dedicated background agent responsible for continuous brand intelligence extraction,
     token-aware rolling memory compression, and live dashboard profile synchronization."""
@@ -637,14 +650,39 @@ class BrandIntelligenceAgent:
         if industry and (not biz.industry or biz.industry == "None"):
             biz.industry = industry
 
-        bp.brand_voice = brand_voice
-        bp.target_audience = target_summary
-        bp.key_offers = offers
-        bp.competitors = competitors
+        # Fill the blank fields; never overwrite what a human saved in Settings.
+        #
+        # This pass reads chats and rewrites the brand profile. It used to assign
+        # every field unconditionally, which meant a user who typed their brand
+        # voice into Settings could have it replaced minutes later by an LLM
+        # inference from a chat. ``MEMORY_IDENTITY_OVERWRITE_PROFILE=true``
+        # restores the old behaviour for teams that want the agent to own the
+        # profile outright.
         from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(bp, "competitors")
-        bp.goals = [f"Establish market leadership in {industry}", "Achieve high brand recall and customer loyalty"]
-        bp.visual_style = json.dumps(extracted_palette.model_dump(), ensure_ascii=False)
+
+        overwrite = _identity_may_overwrite_profile()
+
+        def _assign(field_name: str, value: Any) -> None:
+            current = getattr(bp, field_name, None)
+            is_empty = current in (None, "", [], {}) or (
+                isinstance(current, str) and not current.strip()
+            )
+            if overwrite or is_empty:
+                setattr(bp, field_name, value)
+                if field_name in {"competitors", "key_offers", "goals"}:
+                    flag_modified(bp, field_name)
+
+        _assign("brand_voice", brand_voice)
+        _assign("target_audience", target_summary)
+        _assign("key_offers", offers)
+        _assign("competitors", competitors)
+        if not bp.goals:
+            bp.goals = [
+                f"Establish market leadership in {industry}",
+                "Achieve high brand recall and customer loyalty",
+            ]
+        if not bp.visual_style:
+            bp.visual_style = json.dumps(extracted_palette.model_dump(), ensure_ascii=False)
 
         now_dt = _now()
 
@@ -692,13 +730,20 @@ class BrandIntelligenceAgent:
         )
         existing_mem = (await db.execute(mem_stmt)).scalars().first()
         if not existing_mem:
+            _identity_text = f"Brand Identity: {response.name} ({response.industry}). Tagline: {tagline}. Voice: {brand_voice}"
             existing_mem = BrandMemoryItem(
                 id=f"mem_identity_{uuid.uuid4().hex[:16]}",
                 business_id=business_id,
                 kind="brand_identity",
-                text=f"Brand Identity: {response.name} ({response.industry}). Tagline: {tagline}. Voice: {brand_voice}",
+                text=_identity_text,
                 metadata_={"brand_identity": response.model_dump(mode="json")},
                 created_at=now_dt,
+                **memory_defaults(
+                    "brand_identity",
+                    business_id=business_id,
+                    text=_identity_text,
+                    source="identity_service",
+                ),
             )
             db.add(existing_mem)
         else:
@@ -786,13 +831,20 @@ async def update_brand_identity(
     )
     existing_mem = (await db.execute(mem_stmt)).scalars().first()
     if not existing_mem:
+        _identity_text = f"Brand Identity: {current.name} ({current.industry}). Voice: {current.essence.brand_voice}"
         existing_mem = BrandMemoryItem(
             id=f"mem_identity_{uuid.uuid4().hex[:16]}",
             business_id=business_id,
             kind="brand_identity",
-            text=f"Brand Identity: {current.name} ({current.industry}). Voice: {current.essence.brand_voice}",
+            text=_identity_text,
             metadata_={"brand_identity": current.model_dump(mode="json")},
             created_at=_now(),
+            **memory_defaults(
+                "brand_identity",
+                business_id=business_id,
+                text=_identity_text,
+                source="identity_service",
+            ),
         )
         db.add(existing_mem)
     else:

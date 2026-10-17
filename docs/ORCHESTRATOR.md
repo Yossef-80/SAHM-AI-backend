@@ -1,7 +1,19 @@
-# 🧠 SAHM Brand Memory & Orchestrator Architecture Guide
+# Orchestrator, memory tiers & background workers
 
-> **Target Audience:** Engineering team, AI engineers, and system architects working on SAHM Marketing OS.  
-> **Purpose:** A complete, deep-dive architectural manual explaining how memory is structured, how token bloat is eliminated, how facts and plans are separated, how the Orchestrator routes user prompts, how UI Blocks are generated, and how background memory debouncers operate.
+> **Note (2026-10):** the memory layer was rebuilt. Vector storage and the
+> `embedding` column are gone; retrieval is lexical (BM25) + recency + kind
+> affinity over a lifecycle-managed table, and the three post-turn passes were
+> merged into one per-workspace consolidator. This document is still accurate on
+> the **orchestrator** and on the token-budgeting rationale; for anything
+> memory-related the authoritative reference is
+> [`MEMORY_ARCHITECTURE.md`](./MEMORY_ARCHITECTURE.md).
+
+> **Audience:** Engineers working on routing, prompts, or the post-turn workers.
+> **Purpose:** How the orchestrator routes a turn, how the specialist graphs are
+> wired, how the UI-block bridge works, how the memory tiers fit together, and
+> what runs after a turn. For the memory *store* (kinds, ranking, retention) the
+> authoritative reference is [`MEMORY_ARCHITECTURE.md`](./MEMORY_ARCHITECTURE.md);
+> for the whole system, [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ---
 
@@ -58,10 +70,19 @@ CREATE TABLE brand_memory_items (
     business_id VARCHAR(64) NOT NULL,          -- Multi-tenant isolation (FK to businesses.id)
     kind VARCHAR(40) NOT NULL,                 -- Category enum
     text TEXT NOT NULL,                        -- COMPACT distilled facts (~80-120 words for AI injection)
-    embedding VECTOR(1536),                    -- pgvector cosine similarity vector
     metadata JSONB DEFAULT '{}',               -- Full report, citations, and analysis payloads
     campaign_id VARCHAR(64),                   -- Optional link to campaign
-    created_at TIMESTAMP WITH TIME ZONE        -- Temporal ordering
+    -- lifecycle (replaces the old `embedding` vector column and the reindex endpoint)
+    dedupe_digest VARCHAR(64),                 -- sha256(kind|workspace|campaign|normalised text)
+    importance DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+    pinned BOOLEAN NOT NULL DEFAULT false,
+    source VARCHAR(40) NOT NULL DEFAULT '',
+    use_count INTEGER NOT NULL DEFAULT 0,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,       -- materialised per-kind TTL
+    archived_at TIMESTAMP WITH TIME ZONE,      -- soft delete
+    created_at TIMESTAMP WITH TIME ZONE,       -- Temporal ordering
+    updated_at TIMESTAMP WITH TIME ZONE
 );
 ```
 
@@ -256,15 +277,21 @@ class MemoryDebouncer:
 All memory thresholds and timeouts can be configured in `SAHM-AI-backend/.env`:
 
 ```env
-# Memory Configuration
-MEMORY_SESSION_MAX_TOKENS=1500          # Trigger session summary compaction
+# Memory Configuration (full table: docs/MEMORY_ARCHITECTURE.md §8)
+MEMORY_ENABLED=true
+SESSION_MEMORY_MAX_TOKENS=10000          # Trigger session summary compaction
 MEMORY_RETAIN_RECENT_TURNS=2             # Turns kept intact after summary
-MEMORY_LTM_DEBOUNCE_SECONDS=180          # Inactivity period before LTM update (3 mins)
-MEMORY_LTM_MAX_TOKENS=300                # Strict token cap on Profile.user_context_summary
+MEMORY_LTM_DEBOUNCE_SECONDS=180          # Inactivity period before the profile pass
+MEMORY_GLOBAL_PROFILE_MAX_TOKENS=300     # Strict cap on Profile.user_context_summary
+MEMORY_IDENTITY_SYNC_ENABLED=true        # Whole-brand re-extraction pass
+MEMORY_IDENTITY_MIN_INTERVAL_SECONDS=900
+MEMORY_CONTEXT_TOKEN_CAP=900             # Total tokens the brand block may inject
+MEMORY_CONTEXT_TOP_K=6
+MEMORY_MIN_RELEVANCE=0.12
+MEMORY_MAX_ITEMS_PER_KIND=500
 
-# Embedding Configuration
-EMBEDDING_DIM=1536                       # Dimension for pgvector cosine vectors
-EMBEDDING_PROVIDER=openai                # or mock
+# There is no embedding configuration any more: EMBEDDING_DIM / EMBEDDING_PROVIDER /
+# VECTOR_BACKEND are ignored, and brand memory is retrieved lexically.
 
 # Timeouts & Guardrails
 AI_LLM_TIMEOUT_SECONDS=180               # Timeout for heavy agent tasks

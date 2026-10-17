@@ -15,6 +15,7 @@ from app.ai.settings import get_ai_settings
 from app.ai.tools import get_brand_context_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
 from app.ai.tools.image_generation import generate_image_draft_tool
+from app.core.i18n import SUBAGENT_LANGUAGE_RULE
 
 
 @tool(args_schema=CreativeBrief)
@@ -30,7 +31,7 @@ LAYLA_TOOLS = [
     generate_image_draft_tool,
 ]
 
-LAYLA_PROMPT = """You are Layla, Sahm's advertising creative agent. Respond in the user's language.
+LAYLA_PROMPT = f"""You are Layla, Sahm's advertising creative agent. {SUBAGENT_LANGUAGE_RULE}
 
 Create structured ad copy, a commercial script, an image prompt, a video prompt,
 or creative variations as requested. Preserve the user's intended visual details

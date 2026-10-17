@@ -1,7 +1,9 @@
-# 🚀 SAHM Marketing OS — Project Scope, Architecture & State Assessment
+# Product overview: scope, market and architecture
 
-> **Target Audience:** Engineering team members, technical leads, product managers, and presentation speakers who need a complete, ground-up understanding of SAHM AI, its commercial value proposition, actual implementation status, and multi-agent system.  
-> **How to Use:** Read this document to understand the full system scope, copy sections into presentation slide decks, or feed it to AI assistants (Claude, ChatGPT, Gemini) to collaborate on new features and architectural optimizations.
+> **Audience:** Product managers, technical leads, and anyone preparing a
+> presentation who needs the commercial case *and* an honest implementation status.
+> **Purpose:** What Sahm is, who it is for, what is built, how the two halves of
+> the backend fit together, and where the gaps are.
 
 ---
 
@@ -33,7 +35,7 @@ SAHM transforms fragmented, high-friction marketing workflows into an integrated
 |                                CENTRAL BRAIN & MEMORY ENGINE                                      |
 |  Tier 1: Working Turn History (Current active session messages)                                   |
 |  Tier 2: Dynamic Session Summary (conversation.summary compressed at token cap)                   |
-|  Tier 3: Brand Memory Items (Vector-embedded; compact 80-120 word text + full report metadata)    |
+|  Tier 3: Brand Memory Items (13 kinds, BM25 + recency + affinity ranking; no vector store)        |
 |  Tier 4: Global Brand Brain (Profile.user_context_summary < 300 tokens, 3-min debounced update)    |
 +----------------------------------------------------+----------------------------------------------+
                                                      |
@@ -143,7 +145,7 @@ SAHM delivers 8 cohesive feature pillars:
 
 | Layer / Component | Implementation Location | Operational Status | Key Highlights |
 | :--- | :--- | :--- | :--- |
-| **API Entrypoint & Routers** | `app/main.py`, `app/api/*` | **100% Operational** | FastAPI with 16 modular routers, lifecycle hooks, unified error envelope, request timing headers (`X-DB-Queries`, `X-DB-Time`). |
+| **API Entrypoint & Routers** | `app/main.py`, `app/api/*` | **100% Operational** | FastAPI with 19 modular routers, lifecycle hooks, unified error envelope, request timing headers (`X-DB-Queries`, `X-DB-Time`). |
 | **LangGraph Multi-Agent Engine** | `app/ai/agents/` | **100% Operational** | Fully migrated to LangGraph StateGraphs (`nour_graph`, `omar_graph`, `layla_graph`, `karim_graph`, `salma_graph`). |
 | **Deterministic Orchestrator Brain** | `app/ai/agents/orchestrator/brain.py` | **100% Operational** | `temperature=0.0` routing with `RoutingDecision` schema, plan/fact context separation, and dedicated `chat` fallback agent. |
 | **UI Block Structurer** | `app/ai/agents/orchestrator/brain.py` | **100% Operational** | Translates raw agent tool arguments and Markdown into typed `MessageWithBlocks` (`text`, `findings`, `action_card`). |
@@ -152,9 +154,9 @@ SAHM delivers 8 cohesive feature pillars:
 | **GA4 Performance Tool** | `app/ai/tools/fetch_ga4_performance.py` | **100% Operational** | Google Analytics Data API client for sessions, bounce rate, and conversions using service account credentials. |
 | **Apify Facebook Ads Scraper** | `app/ai/tools/fetch_competitor_ads.py` | **100% Operational** | Actor-based scraper extracting active ad copy, media URLs, and keywords from Facebook Page URLs. |
 | **Playwright Reviews Scraper** | `app/ai/tools/get_reviews_playwright.py` | **100% Operational** | Headless Chromium extractor for Google Maps review counts, star ratings, and review cards. |
-| **Memory Compaction Engine** | `app/ai/memory/compressor.py` | **100% Operational** | Tiktoken cl100k_base with Arabic token ratios (~1.8 chars/token), session threshold summary, and 3-min debounced LTM. |
-| **Database & Migration Layer** | `app/db/models.py`, `app/db/migrations/` | **100% Operational** | PostgreSQL + pgvector (with SQLite JSON fallback), Alembic migrations, multi-tenant isolation on `business_id`. |
-| **Dual-Tier LLM Provider Router** | `app/core/llm/router.py` | **100% Operational** | Supports OpenAI, Gemini, Claude, Groq, Ollama, DeepSeek, and Mock with 60s cached workspace settings. |
+| **Memory compaction & consolidation** | `app/ai/memory/compressor.py`, `app/ai/memory/consolidator.py` | **100% Operational** | One token counter for the repo (`app/core/memory/tokens.py`, Arabic-aware), a session summary at the token cap, and **one** per-workspace consolidator (debounced) instead of three racing passes. |
+| **Database & Migration Layer** | `app/db/models.py`, `app/db/migrations/` | **100% Operational** | PostgreSQL (with SQLite fallback), Alembic migrations, multi-tenant isolation on `business_id`. |
+| **Dual-Tier LLM Provider Router** | `app/core/llm/router.py` | **100% Operational** | Supports Ollama, OpenAI (and OpenAI-compatible), Anthropic, Gemini, Groq, OpenRouter and Mock, with workspace-level routing cached per process. |
 | **Protected Approvals System** | `app/core/approvals/`, `app/core/tools/protected.py` | **100% Operational** | Strict isolation: external-write tools cannot be registered in agent catalogs; human confirmation mandatory. |
 | **Next.js 14 Frontend** | `SAHM-AI-frontend/src/app/*` | **100% Operational** | Next.js App Router, Tailwind CSS, shadcn/ui primitives, SSE chat streaming, research views, settings panels. |
 
@@ -171,7 +173,7 @@ SAHM-AI-backend/app/
 │   ├── approvals/            # 2-Phase human approval workflow & Meta change execution
 │   ├── auth.py & security.py # TokenCipher (Fernet encryption), password hashing, JWT/Supabase auth
 │   ├── llm/                  # Low-level client router (OpenAI, Claude, Ollama, Mock)
-│   ├── memory/               # Embedding store (pgvector cosine search + Python fallback)
+│   ├── memory/               # Brand memory: kinds, lexical BM25, ranking, lifecycle, store
 │   ├── orchestrator/         # REST message handling service (service.py), block validation
 │   ├── ratelimit.py          # Request throttling & IP rate limiting
 │   └── tools/                # Static tool registry (base.py, registry.py, protected.py)

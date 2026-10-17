@@ -1,6 +1,12 @@
 # Competitor-ad selection, analysis, and ad prompts
 
-The assistant flow now keeps competitor research and vision calls separated:
+> **Audience:** Engineers touching the competitor-ad path, and whoever is asked
+> "can it copy this competitor's ad?".
+> **Purpose:** The five-step flow from ad-library search to a copyable *original*
+> prompt, the vision-model configuration it depends on, and the safety rules that
+> keep a competitor's logo and copy out of the output.
+
+The assistant flow keeps competitor research and vision calls separated:
 
 1. An explicit competitor-ad request searches the public Meta Ad Library.
 2. Up to six safe image previews are staged in a workspace-scoped cache for 24 hours. The chat presents those previews through the authenticated `GET /api/v1/assistant/ad-previews/{preview_id}` route; a browser `<img>` never receives a Meta snapshot URL or token.

@@ -539,12 +539,23 @@ async def test_bind_workspace_puts_the_tenant_on_log_lines(
     assert payload["business_id"] == BIZ_B
 
 
-async def test_embedding_column_derives_its_dimension_from_settings() -> None:
-    """D6: ``EMBEDDING_DIM`` must reach the column, not just the provider."""
-    from app.db.models import EMBEDDING_DIM, BrandMemoryItem
+async def test_brand_memory_has_no_vector_column_and_no_settings_for_one() -> None:
+    """D6, inverted: the vector column is gone and cannot come back by config.
 
-    assert EMBEDDING_DIM == _settings().embedding_dim
-    assert BrandMemoryItem.__table__.c.embedding.type.dim == EMBEDDING_DIM
+    The old test asserted ``EMBEDDING_DIM == settings.embedding_dim`` and that
+    the column used it. Retrieval is lexical now, so the interesting property is
+    that neither the column nor the settings that configured it exist: a
+    deployment cannot re-enable embeddings by setting an env var.
+    """
+    from app.db.models import BrandMemoryItem
+
+    columns = set(BrandMemoryItem.__table__.c.keys())
+    assert "embedding" not in columns
+    assert {"dedupe_digest", "importance", "pinned", "expires_at", "archived_at"} <= columns
+
+    settings = _settings()
+    for name in ("embedding_dim", "embedding_provider", "embedding_model", "vector_backend"):
+        assert not hasattr(settings, name), f"{name} must not be configurable any more"
 
 
 # ------------------------------------------------------------- boot + probes --

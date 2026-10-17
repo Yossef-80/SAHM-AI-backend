@@ -97,8 +97,14 @@ def test_sqlite_branch_is_untouched() -> None:
     assert "pool_size" not in kwargs
 
 
-def test_pgvector_path_is_a_pooled_pooler_in_compose() -> None:
-    """The local stack must exercise the pgvector path, not SQLite (P5.1)."""
+def test_postgres_path_is_a_pooled_pooler_in_compose() -> None:
+    """The local stack must exercise the Postgres path, not SQLite (P5.1).
+
+    The compose file still uses the ``pgvector/pgvector`` image: it is a stock
+    Postgres 16 with a few extensions pre-installed, and keeping the image
+    means an operator who already pulled it does not have to re-pull. The
+    application no longer creates or uses the ``vector`` extension.
+    """
     compose = (BACKEND_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     assert "pgvector/pgvector:pg16" in compose
     assert "postgresql+asyncpg://" in compose

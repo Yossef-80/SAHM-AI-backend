@@ -1,13 +1,25 @@
-# ⚙️ SAHM Marketing OS — System Architecture & Engineering Playbook
+# System Architecture & Engineering Playbook
 
-> **Audience:** Senior backend engineers, DevOps, AI platform engineers, and contributors maintaining and scaling SAHM Marketing OS.  
+> **Audience:** Senior backend engineers, DevOps, AI platform engineers, and contributors maintaining and scaling SAHM Marketing OS.
 > **Purpose:** The complete technical reference: system design, database schemas, API specifications, security protocols, development playbooks, and troubleshooting runbooks.
+> **Start elsewhere if you can:** [`../README.md`](../README.md) is the one-page explanation of what the product does and how a request flows. This document is the reference you come back to.
+
+### Two things named "orchestrator"
+
+- `app/core/orchestrator/` — the **service** layer: conversations, persistence,
+  SSE plumbing, background tasks. It does not choose agents.
+- `app/ai/agents/orchestrator/` — the **brain**: `orchestrate()`, the routing
+  prompt, the specialist graph wiring, the presentation layer.
+
+The split is historical: the service layer predates the LangGraph migration and
+kept its name. Read `service.py` for *when* things happen and `brain.py` for
+*which agent* handles a turn.
 
 ---
 
 ## 1. High-Level Architecture & End-to-End Data Flow
 
-SAHM is built as a cloud-native, asynchronous service oriented around multi-agent collaboration, streaming Server-Sent Events (SSE), and pgvector-backed memory isolation:
+SAHM is built as a cloud-native, asynchronous service oriented around multi-agent collaboration, streaming Server-Sent Events (SSE), and workspace-isolated, lifecycle-managed memory:
 
 ```mermaid
 flowchart TD
@@ -42,7 +54,7 @@ flowchart TD
 
     subgraph Storage ["Persistence Tier (PostgreSQL + Supabase)"]
         DB[(Relational Tables: Campaigns, Content, Profiles)]
-        VectorDB[(Vector Store: pgvector cosine similarity)]
+        MemoryDB[(Brand Memory: lexical + recency + kind ranking)]
         AuditDB[(Audit Logs & Tool Call Traces)]
     end
 
@@ -70,7 +82,7 @@ flowchart TD
 
 ## 2. Full Database Schema & Entity-Relationship Model
 
-The PostgreSQL database is organized into 5 logical clusters across 18 tables in `app/db/models.py`:
+The PostgreSQL database is organized into 5 logical clusters across 23 tables in `app/db/models.py`:
 
 ```
 +----------------------------------------------------------------------------------------------------+
@@ -78,15 +90,17 @@ The PostgreSQL database is organized into 5 logical clusters across 18 tables in
 +----------------------------------------------------------------------------------------------------+
 |                                                                                                    |
 |  [Cluster 1: Multi-Tenancy & Identity]                                                             |
-|  • businesses              --> Core tenant identity, budget, currency, industry, workspace_id      |
+|  • businesses              --> Core tenant identity, budget, currency, industry, language          |
 |  • brand_profiles          --> 1:1 with business: brand voice, visual style, target audience       |
-|  • profiles                --> Maps Supabase Auth UUID to business_id, role, user_context_summary   |
-|  • memberships             --> User-to-workspace join table with RBAC roles (owner, member, viewer)|
+|  • users / memberships     --> Accounts, and user-to-workspace RBAC (owner, member, viewer)        |
+|  • profiles                --> Maps Supabase Auth UUID to business_id, role, user_context_summary  |
+|  • sessions                --> Refresh/session records for the auth flow                           |
 |                                                                                                    |
 |  [Cluster 2: Memory & Chat Conversations]                                                          |
-|  • conversations           --> Chat session metadata, sticky campaign context, conversation.summary|
+|  • conversations           --> Chat session metadata, sticky context (incl. UI language), summary  |
 |  • messages                --> Individual turns: raw content + blocks (JSON UI Blocks)             |
-|  • brand_memory_items      --> Long-term memory items: text (~100 tokens), embedding, metadata     |
+|  • brand_memory_items      --> 13 memory kinds: text (~100 tokens), lifecycle columns, metadata    |
+|  • saved_audiences         --> Reusable audience definitions per workspace                        |
 |                                                                                                    |
 |  [Cluster 3: Marketing Operations & Publishing]                                                    |
 |  • campaigns               --> Marketing campaigns: name, objective, channel, budget, flight dates|
@@ -123,9 +137,10 @@ The PostgreSQL database is organized into 5 logical clusters across 18 tables in
 #### 2. `brand_memory_items` Table
 - `id` (VARCHAR(64), PK): Unique memory ID (e.g., `mem_res_510a4c514cf0`).
 - `business_id` (VARCHAR(64), FK ➔ `businesses.id`, ON DELETE CASCADE): Tenant scoping.
-- `kind` (VARCHAR(40), indexed): Category (`competitor_note`, `website_analysis`, `market_research`, `market_gaps`, `strategy_blueprint`, `brand_voice_rules`).
+- `kind` (VARCHAR(40), indexed): one of the 13 kinds in `app/core/memory/kinds.py` (`brand_identity`, `voice_example`, `visual_style`, `offer`, `audience`, `strategy_blueprint`, `competitor_note`, `market_research`, `market_gaps`, `website_analysis`, `reference_analysis`, `chat_attachment`, `learning`). The registry — not the database — owns each kind's TTL, importance and token cap.
 - `text` (TEXT): Compact distilled facts strictly between 80 and 120 words (~100 tokens).
-- `embedding` (VECTOR(1536)): Cosine similarity vector via pgvector.
+- `dedupe_digest`: SHA-256 of the normalised (kind, workspace, campaign, text) -- no vector column.
+- `expires_at` / `archived_at` / `importance` / `pinned`: the lifecycle columns that replaced reindexing.
 - `metadata` (JSONB): Full 380-word structured report under `full_report`, citations, and timestamp.
 
 #### 3. `content_items` Table
@@ -191,7 +206,16 @@ All endpoints are hosted under `/api/v1/` and enforce CORS, rate limiting, and r
 | **Settings** | `PATCH`| `/settings/connectors` | `UpdateToolSettingsRequest` | `ToolSettingsResponse` |
 | **Settings** | `GET` | `/settings/llm` | — | `LlmProviderSettingsOut` |
 | **Settings** | `PATCH`| `/settings/llm` | `UpdateLlmProviderSettingsIn` | `LlmProviderSettingsOut` |
-| **Settings** | `GET` | `/settings/memory` | `kind=...` | `list[BrandMemoryItemOut]` |
+| **Memory** | `GET` | `/memory/items` | `kind=...`, `q=...`, `includeArchived` | `list[MemoryItemOut]` (ranked, each with `score` and `reason`) |
+| **Memory** | `POST` | `/memory/items` | `MemoryItemCreate` (kind, text, campaignId, importance, pinned) | `MemoryItemOut` |
+| **Memory** | `PATCH`/`DELETE` | `/memory/items/{id}` | `MemoryItemUpdate` | `MemoryItemOut` |
+| **Memory** | `POST` | `/memory/items/{id}/archive` | — | `MemoryItemOut` (soft delete, keeps the audit trail) |
+| **Memory** | `POST` | `/memory/prune` | `{"dryRun": true, "kind": null}` | `PruneReport` (expired + over-cap rows per kind) |
+| **Tasks** | `POST` | `/tasks` | `CreateTaskRequest` | `AgentTaskOut` |
+| **Tasks** | `GET` | `/tasks/{id}` / `/tasks/{id}/stream` | — | task state / SSE progress |
+| **Personas** | `GET`/`PATCH` | `/personas`, `/personas/{id}` | `PersonaUpdate` | per-workspace persona overrides |
+| **Tools** | `GET` | `/tools`, `/tools/connectors` | — | tool catalog and connector status |
+| **Tools** | `POST` | `/tools/{name}/invoke` | tool input | tool output (read-only tools only) |
 | **Governance**| `GET` | `/usage` | — | `UsageSummaryResponse` |
 | **Governance**| `GET` | `/audit` | — | `list[AuditLogOut]` |
 
@@ -219,12 +243,40 @@ When tools like `analyze_website` or `analyze_reference` accept external URLs:
 
 ## 5. Engineering Playbooks: How to Extend SAHM
 
-### Playbook A: Adding a New Agent Tool in 5 Steps
-1. **Define Schema:** In `app/ai/tools/your_tool.py`, define your input schema using `pydantic.BaseModel`.
-2. **Implement Logic:** Decorate your function with `@tool(args_schema=YourInputSchema)`.
-3. **Database Write:** If saving an entity, use `from app.db.session import session_scope` to persist cleanly.
-4. **Bind to Agent:** In `app/ai/agents/<agent_name>/graph.py`, add the tool to `<AGENT>_TOOLS` and update the agent's system prompt instructions.
-5. **Unit Test:** Create a test in `tests/test_your_tool.py` validating that the tool executes and handles edge cases.
+### Playbook A: Adding a Workspace Tool in 5 Steps
+
+There are two tool families and they are not interchangeable:
+
+| Family | Location | Shape | Used by |
+| :--- | :--- | :--- | :--- |
+| **Workspace tools** | `app/core/tools/` | `Tool` object (input model, output model, async handler) | The generic runtime, the tool API, MCP export |
+| **AI-native tools** | `app/ai/tools/` | LangChain `@tool` functions | The specialist LangGraphs |
+
+To add a workspace tool:
+
+1. **Input + output models:** Pydantic models in `app/schemas/tools.py` (or next
+   to the handler). Every field gets a description — the model reads it.
+2. **Handler:** `async def _handle(request, ctx: ToolContext) -> Output`. All the
+   context a handler may use arrives in `ctx` (db, llm, workspace, campaign);
+   handlers never read globals, which is what makes them unit-testable.
+3. **Declare the tool:**
+   ```python
+   MY_TOOL = Tool(
+       name="my_tool",
+       description="What it does, and when NOT to use it.",
+       input_model=MyInput,
+       output_model=MyOutput,
+       side_effect=ToolSideEffect.READ,   # EXTERNAL_WRITE is rejected by the registry
+       handler=_handle_my_tool,
+   )
+   ```
+4. **Register:** add it to the relevant list in `app/core/tools/registry.py`
+   (`RESEARCH_TOOLS`, `MEMORY_TOOLS`, `META_READ_TOOLS`, `MEDIA_TOOLS`,
+   `RECORDS_TOOLS`) and add the name to the personas allowed to use it.
+5. **Test:** a test in `tests/` that calls the handler with a fake `ToolContext`
+   and asserts both the success path and the "source unavailable" path. A tool
+   that cannot reach its source must return `status="unavailable"` with a reason,
+   never invented data.
 
 ### Playbook B: Adding a New Fast/Strong LLM Provider
 1. Add the provider's OpenAI-compatible base URL to `OPENAI_COMPATIBLE_URLS` in `app/core/llm/router.py`.
@@ -247,6 +299,17 @@ When tools like `analyze_website` or `analyze_reference` accept external URLs:
 ---
 
 ## 6. Troubleshooting & Operational Runbook
+
+Symptoms first, because a reviewer usually arrives with one of these:
+
+| Symptom | Likely cause | Where to look |
+| :--- | :--- | :--- |
+| Answer is in the wrong language | client not sending `language`, or a stale conversation carrying an old choice | `app/core/i18n.py`, `conversation.context["language"]` — see `LANGUAGE_POLICY.md` |
+| Agent "forgot" its role / generic answer | a prepended system message pushed the role prompt out of position | `app/ai/agents/*/graph.py::call_model` |
+| Empty or thin brand context | memory disabled, or all rows expired | `MEMORY_ENABLED`, `POST /memory/prune` dry run |
+| `ProviderNotConfigured` | missing key for the selected provider | `app/ai/providers/llm/*` |
+| 409/404 on a resource that exists | workspace mismatch — IDs are tenant-scoped by design | `app/api/deps.py` |
+
 
 ### Issue 1: `SSLEOFError` / `MaxRetryError` with Remote Ollama / ngrok
 - **Root Cause:** The Google Colab instance restarted or ngrok regenerated a new public URL.

@@ -1,7 +1,12 @@
-# 🎤 SAHM Marketing OS — Presentation, Pitch Deck & Live Demo Playbook
+# Presentation, pitch deck & live demo playbook
 
-> **Purpose:** A ready-to-use guide for delivering high-impact presentations, investor pitch decks, academic/graduation project defenses, and flawless live software demonstrations of SAHM AI.  
-> **How to Use:** Copy slide text directly into PowerPoint/Google Slides, use the speaking scripts for rehearsals, and follow the step-by-step live demo prompts during presentations.
+> **Audience:** Whoever is presenting — to investors, a graduation committee, or a
+> customer. This is the technical-but-narrative deck; the business-language one is
+> [`NON_TECHNICAL_PRESENTATION_GUIDE.md`](NON_TECHNICAL_PRESENTATION_GUIDE.md).
+> **How to use it:** copy the slide text into PowerPoint/Google Slides, rehearse
+> with the speaking scripts, follow the demo steps in order.
+> **Before you present:** run the demo once, end to end, on the machine you will
+> present from. Every failure in a live demo is a step that was never rehearsed.
 
 ---
 
@@ -79,8 +84,8 @@
 ### Slide 6: Architecture & Technology Stack
 - **Header:** Robust, Scalable & Enterprise-Grade Engineering
 - **Architecture Diagram:** Next.js 14 (Frontend) ➔ FastAPI (API Layer) ➔ Central Memory Engine ➔ LangGraph Multi-Agent Squad ➔ External APIs (Meta, GA4, Apify, Tavily).
-- **Core Technologies:** FastAPI, LangChain, LangGraph, PostgreSQL + pgvector (Supabase), Next.js 14 App Router, Tailwind CSS, Fernet encryption.
-- **Presenter Script:** *"Our backend is built on FastAPI and LangGraph with PostgreSQL vector storage. It features full multi-tenant isolation, encrypted credential storage, and real-time Server-Sent Events streaming."*
+- **Core Technologies:** FastAPI, LangChain, LangGraph, PostgreSQL (Supabase), Next.js 14 App Router, Tailwind CSS, Fernet encryption.
+- **Presenter Script:** *"Our backend is built on FastAPI and LangGraph with PostgreSQL-backed brand memory. It features full multi-tenant isolation, encrypted credential storage, and real-time Server-Sent Events streaming."*
 
 ### Slide 7: Proprietary Innovations & Memory Engine
 - **Header:** Eliminating Token Bloat with Dual-Layer Memory
@@ -180,7 +185,7 @@ flowchart LR
 | :--- | :--- | :--- | :--- | :--- |
 | **Monthly Cost** | \$2,500 – \$10,000 | \$20 / user | \$49 – \$199 / user | **\$49 – \$149 / business** |
 | **Turnaround Time** | 3 to 14 days | Instant | Instant | **10 to 30 seconds** |
-| **Brand Memory** | Stored in human brains / docs | Lost every new chat | Shallow company bio | **4-tier vector memory + LTM** |
+| **Brand Memory** | Stored in human brains / docs | Lost every new chat | Shallow company bio | **6-tier memory hierarchy + LTM** |
 | **Egyptian & MENA Nuance** | Excellent (human) | Poor (Stiff MSA Arabic) | Poor (English-centric) | **Native bilingual (Egyptian dialect)** |
 | **Live Web Evidence** | Manual search | Hallucinations likely | Static templates | **Tavily/DDG + Ground-truth verified** |
 | **Actionable Execution** | Manual | Text only (no calendar/DB) | Text only | **Auto-persists to DB & Calendar** |
@@ -212,7 +217,7 @@ flowchart LR
 > **Answer:** *"When a user asks Omar in the assistant chat to plan a 5-day campaign across channels, Omar calls the `generate_content_calendar` tool. That tool generates structured post objects, and our Orchestrator automatically persists them into the `ContentItem` table in PostgreSQL. When the user opens `/calendar`, the posts are already scheduled in the UI."*
 
 ### Q8: "How does SAHM handle multi-tenancy and data isolation between competing brands?"
-> **Answer:** *"Every database query strictly enforces `business_id == ws.business_id`. All vector similarity searches, memory retrievals, and campaign queries are partitioned by workspace ID. Attempting to query another tenant's entity returns a 404 Not Found rather than a 403 to prevent entity existence enumeration."*
+> **Answer:** *"Every database query strictly enforces `business_id == ws.business_id`. All memory retrievals and campaign queries are partitioned by workspace ID. Attempting to query another tenant's entity returns a 404 Not Found rather than a 403 to prevent entity existence enumeration."*
 
 ### Q9: "How does Karim fetch real Google Analytics 4 metrics without asking the user for code?"
 > **Answer:** *"We integrated the Google Analytics Data API v1 beta. Through server environment credentials or workspace connector settings, Karim queries GA4 properties over date ranges to retrieve real sessions, bounce rates, average duration, and conversion events, synthesizing them into executive summaries."*

@@ -41,3 +41,19 @@ var/
 uploads/
 logs/
 *.log
+
+# --- Scraper / debugging output ----------------------------------------------
+# Written at runtime, never part of the source tree. `debug.png` is produced by
+# app/ai/tools/get_reviews_playwright.py when DEBUG_SCREENSHOT fires.
+debug.png
+test_image.png
+sample_card_*.html
+buttons.json
+review_cards.json
+extractor_result.json
+brand_data/
+
+# --- Editor / OS -------------------------------------------------------------
+.idea/
+.vscode/
+.DS_Store

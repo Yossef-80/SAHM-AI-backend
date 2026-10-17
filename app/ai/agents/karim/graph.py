@@ -14,6 +14,7 @@ from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
 from app.ai.tools import fetch_ga4_performance, get_brand_context_tool, save_learning_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
+from app.core.i18n import SUBAGENT_LANGUAGE_RULE
 
 
 @tool(args_schema=PerformanceReport)
@@ -28,7 +29,7 @@ KARIM_TOOLS = [
     submit_performance_report,
 ]
 
-KARIM_PROMPT = """You are Karim, Sahm's campaign-performance analyst. Respond in the user's language.
+KARIM_PROMPT = f"""You are Karim, Sahm's campaign-performance analyst. {SUBAGENT_LANGUAGE_RULE}
 
 READ CONTEXT FIRST
 - Start by calling get_brand_context_tool. Use relevant saved Business Settings and durable
@@ -87,7 +88,14 @@ asks you to remember a durable, non-sensitive finding. Finish by calling submit_
 
 def call_model(state: KarimState, config: RunnableConfig) -> dict:
     messages = list(state["messages"])
-    if not messages or not isinstance(messages[0], SystemMessage):
+    # Presence check on the prompt itself, not on ``messages[0]``. The
+    # orchestrator prepends system messages (brand profile, [RESPONSE_LANGUAGE],
+    # campaign list), so testing index 0 silently dropped this agent's entire
+    # role prompt on every turn that carried context.
+    if not any(
+        isinstance(message, SystemMessage) and message.content == KARIM_PROMPT
+        for message in messages
+    ):
         messages = [SystemMessage(content=KARIM_PROMPT)] + messages
     llm_handle = get_llm(provider=get_ai_settings().llm_provider)
     response = llm_handle.chat.bind_tools(KARIM_TOOLS).invoke(messages, config)

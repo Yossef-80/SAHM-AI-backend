@@ -28,6 +28,7 @@ from app.ai.tools.analyze_website import analyze_website_tool
 from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
 from app.core.logging import get_logger
+from app.core.memory.lifecycle import memory_defaults
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/research", tags=["research"])
@@ -808,6 +809,12 @@ async def run_research(
         business_id=ws.business_id,
         kind=kind,
         text=compact_memory_text,
+        **memory_defaults(
+            kind,
+            business_id=ws.business_id,
+            text=compact_memory_text,
+            source="research",
+        ),
         metadata_={
             "tool": tool_type,
             "query": query,

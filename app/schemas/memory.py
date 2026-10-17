@@ -1,14 +1,15 @@
-"""Schemas for ``/api/v1/memory/*`` (P2.2).
+"""Schemas for ``/api/v1/memory/*``.
 
-The five kinds that had a read path and no write path -- ``voice_example``,
-``visual_style``, ``offer``, ``audience``, ``competitor_note`` -- are writable
-through ``POST /memory/items``, and a brand-voice example is a ``voice_example``
-memory item by design rather than a separate resource.
+The kind list is no longer a literal regex in this file: it is derived from
+``app.core.memory.kinds`` so a new kind cannot be creatable through one layer and
+invisible to another (that is exactly how six kinds were written but never
+retrieved). Service-owned kinds -- ``brand_identity``, ``strategy_blueprint``,
+the research artifacts, ``chat_attachment`` -- are deliberately *not* writable
+through the public API; their producers own their shape.
 
-Bounds are enforced here, not in the handler: a memory row is embedded into a
-prompt on every agent run, so an unbounded ``text`` is a prompt-injection
-surface and an unbounded ``metadata`` is a way to write a 10 MB blob through a
-form.
+Bounds are enforced here, not in the handler: a memory row is injected into a
+prompt on every agent run, so an unbounded ``text`` is a prompt-injection surface
+and an unbounded ``metadata`` is a way to write a 10 MB blob through a form.
 """
 
 from __future__ import annotations
@@ -18,23 +19,31 @@ from typing import Annotated, Any
 
 from pydantic import Field, field_validator
 
-from app.core.memory.store import MEMORY_KINDS
+from app.core.memory.kinds import API_WRITABLE_KINDS, MEMORY_KINDS
 from app.schemas.common import ApiModel
 
-#: A single memory item is embedded verbatim into the brand context
-#: (``app/core/memory/store.py::build_context``), which is capped at 900 tokens.
-#: 4 000 characters is comfortably more than one item needs.
+#: A single memory item is injected verbatim into the brand context, which is
+#: capped at ~900 tokens. 4 000 characters is comfortably more than one item
+#: needs; the store additionally truncates per kind.
 MAX_MEMORY_TEXT = 4_000
 #: Metadata is a tag bag, not a document.
 MAX_METADATA_KEYS = 32
 MAX_METADATA_VALUE = 500
 MAX_METADATA_JSON = 8_000
 
-#: The literal 7 kinds, exposed to the client so a form can render the picker
-#: without hardcoding them.
+#: Every kind the system knows about (for filters and documentation).
 MEMORY_KIND_VALUES: tuple[str, ...] = tuple(MEMORY_KINDS)
+#: The subset a client may create directly.
+MEMORY_WRITABLE_KIND_VALUES: tuple[str, ...] = tuple(API_WRITABLE_KINDS)
 
-MemoryKind = Annotated[str, Field(pattern="^(voice_example|visual_style|offer|audience|competitor_note|learning|reference_analysis)$")]
+MemoryKind = Annotated[
+    str,
+    Field(pattern="^(" + "|".join(API_WRITABLE_KINDS) + ")$"),
+]
+AnyMemoryKind = Annotated[
+    str,
+    Field(pattern="^(" + "|".join(MEMORY_KINDS) + ")$"),
+]
 
 
 def _check_metadata(value: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -58,12 +67,22 @@ def _check_metadata(value: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 class MemoryItemCreate(ApiModel):
-    """``POST /memory/items`` body. One item of any of the 7 kinds."""
+    """``POST /memory/items`` body.
 
-    kind: MemoryKind
+    ``importance`` and ``pinned`` are ranking inputs the author may set: a
+    pinned offer must stay in the prompt even when a query matches it weakly.
+    """
+
+    # Any known kind passes validation; the handler rejects the six service-owned
+    # ones with an explanation. Rejecting them in the pattern would make the
+    # response a field-level "does not match ^(..)$" instead of saying *why*
+    # ``brand_identity`` cannot be hand-written.
+    kind: AnyMemoryKind
     text: str = Field(min_length=1, max_length=MAX_MEMORY_TEXT)
     metadata: dict[str, Any] = Field(default_factory=dict)
     campaign_id: str | None = Field(default=None, max_length=64)
+    importance: float | None = Field(default=None, ge=0.0, le=1.0)
+    pinned: bool = False
 
     @field_validator("metadata")
     @classmethod
@@ -75,13 +94,15 @@ class MemoryItemCreate(ApiModel):
 class MemoryItemUpdate(ApiModel):
     """``PATCH /memory/items/{id}`` body.
 
-    ``kind`` is intentionally **not** editable: it decides which retrieval slice
-    the row belongs to and which prompt section consumes it. Re-kind a row by
-    deleting and re-creating it, so the embedding is rebuilt from scratch.
+    ``kind`` is intentionally **not** editable: it decides the item's lifetime,
+    prompt section and retrieval slice. Re-kind a row by deleting and re-creating
+    it.
     """
 
     text: str | None = Field(default=None, min_length=1, max_length=MAX_MEMORY_TEXT)
     metadata: dict[str, Any] | None = None
+    importance: float | None = Field(default=None, ge=0.0, le=1.0)
+    pinned: bool | None = None
 
     @field_validator("metadata")
     @classmethod
@@ -90,8 +111,7 @@ class MemoryItemUpdate(ApiModel):
 
 
 class MemoryItemOut(ApiModel):
-    """One memory item. No embedding: it is large, useless to a client, and the
-    only consumer of similarity is the search box."""
+    """One memory item. Never includes internals the client cannot act on."""
 
     id: str
     business_id: str
@@ -100,17 +120,23 @@ class MemoryItemOut(ApiModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     campaign_id: str | None = None
     created_at: datetime | None = None
-    #: Only present on ``GET /memory/items?q=``: the cosine similarity to the
-    #: query, 0..1.
+    updated_at: datetime | None = None
+    importance: float = 0.5
+    pinned: bool = False
+    expires_at: datetime | None = None
+    archived_at: datetime | None = None
+    #: Retrieval signals (only on ``GET /memory/items?q=``).
     score: float | None = None
+    reason: str | None = None
 
 
 class MemoryItemList(ApiModel):
     """``GET /memory/items`` response.
 
-    ``mode`` tells the client which ordering rule produced ``items``, because the
-    two are genuinely different and a UI must not assume substring matching:
-    ``"recent"`` is newest-first, ``"similar"`` is embedding-similarity to ``q``.
+    ``mode`` names the ordering rule, because the two are genuinely different:
+    ``"recent"`` is newest-first (the editor list), ``"lexical"`` is
+    BM25 + recency + affinity relevance to ``q`` (never substring matching --
+    ``reason`` on each item says which terms matched).
     """
 
     items: list[MemoryItemOut] = Field(default_factory=list)
@@ -121,26 +147,30 @@ class MemoryItemList(ApiModel):
     mode: str = "recent"
 
 
-class MemoryReindexRequest(ApiModel):
-    """``POST /memory/reindex`` body. ``kind`` omitted means "every kind"."""
+class MemoryPruneRequest(ApiModel):
+    """``POST /memory/prune`` body. ``kind`` omitted means "every kind"."""
 
-    kind: str | None = None
+    kind: AnyMemoryKind | None = None
+    dry_run: bool = True
 
 
-class MemoryReindexResponse(ApiModel):
-    reindexed: int
-    kind: str | None = None
-    item_ids: list[str] = Field(default_factory=list)
+class MemoryPruneResponse(ApiModel):
+    """How many rows would be (or were) archived, per kind."""
+
+    dry_run: bool = True
+    archived_by_kind: dict[str, int] = Field(default_factory=dict)
+    total_archived: int = 0
 
 
 __all__ = [
     "MAX_MEMORY_TEXT",
-    "MEMORY_KIND_VALUES",
     "MEMORY_KINDS",
+    "MEMORY_KIND_VALUES",
+    "MEMORY_WRITABLE_KIND_VALUES",
     "MemoryItemCreate",
     "MemoryItemList",
     "MemoryItemOut",
     "MemoryItemUpdate",
-    "MemoryReindexRequest",
-    "MemoryReindexResponse",
+    "MemoryPruneRequest",
+    "MemoryPruneResponse",
 ]

@@ -19,6 +19,7 @@ from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
 from app.ai.tools import get_brand_context_tool, save_learning_tool, web_search_tool
 from app.ai.tools.core_bridge import persist_ai_tools
+from app.core.i18n import SUBAGENT_LANGUAGE_RULE
 
 
 @tool(args_schema=StrategyReport)
@@ -57,7 +58,7 @@ OMAR_TOOLS = [
     submit_strategy_report,
 ]
 
-OMAR_PROMPT = """You are Omar, Sahm's marketing strategist. Respond in the user's language.
+OMAR_PROMPT = f"""You are Omar, Sahm's marketing strategist. {SUBAGENT_LANGUAGE_RULE}
 Turn brand context and research into a concrete plan. Do not invent facts,
 benchmarks, audience sizes, budgets, or KPI targets; put unavailable information
 in missing_inputs and identify assumptions explicitly. Treat saved profile values

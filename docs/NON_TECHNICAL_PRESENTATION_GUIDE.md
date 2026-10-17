@@ -1,7 +1,12 @@
-# 📢 SAHM AI — The Non-Technical Presentation & Storytelling Playbook
+# The non-technical presentation & storytelling playbook
 
-> **Target Audience:** Business owners, executives, clients, marketing managers, investors, competition judges, and non-technical stakeholders.  
-> **Purpose:** A presentation-ready guide written entirely in clear, jargon-free business language. Use this document to build PowerPoint/Keynote slides, deliver executive pitches, explain what SAHM does, and show why our **Connected Intelligence** solves the chaotic mess of modern AI tools.
+> **Audience:** Business owners, executives, clients, investors, judges — anyone who
+> will never read the code.
+> **Purpose:** A presentation-ready guide in plain business language: the story,
+> an 8-slide deck with speaking notes, a demo script, and answers to the questions
+> this audience actually asks.
+> **Nothing here requires a technical audience.** If a sentence would need a
+> glossary, it is in `ARCHITECTURE.md`, not here.
 
 ---
 
@@ -63,6 +68,15 @@ When you juggle 6 different AI tools:
 |                                                                                                    |
 +----------------------------------------------------------------------------------------------------+
 ```
+
+### And it answers in the language you chose
+
+A detail that lands well with this audience: Sahm is not "an English tool with an
+Arabic button". The workspace is bilingual, and the answer follows **the language
+the user picked** — if the interface is in Arabic, the research, the strategy, the
+ad copy and the error messages are all in Arabic, even when the user pastes an
+English article. Switching the interface to English switches the next answer
+immediately. Customers stop translating their own marketing.
 
 ### How SAHM Connects the Dots for the User:
 1. **Search connects to Strategy:** When our research tool finds an untapped competitor weakness, our strategist immediately builds a marketing plan around it.

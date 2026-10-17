@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.settings import get_ai_settings
+from app.core.memory.lifecycle import memory_defaults
 from app.db.models import BrandMemoryItem
 
 logger = logging.getLogger(__name__)
@@ -203,10 +204,14 @@ async def _save_to_memory(db: AsyncSession, name: str, payload: dict[str, Any]) 
     ref = f"competitor_ads:{safe_name}"
     content = json.dumps(payload, ensure_ascii=False, indent=2)
 
-    # Resolve business_id
+    # Resolve business_id. Only a real string counts: a MagicMock (tests) or a
+    # session object must not become the tenant key of a memory row.
     business_id = getattr(db, "business_id", None)
+    if not isinstance(business_id, str) or not business_id:
+        business_id = None
     if not business_id and hasattr(db, "info") and isinstance(db.info, dict):
-        business_id = db.info.get("business_id")
+        candidate = db.info.get("business_id")
+        business_id = candidate if isinstance(candidate, str) and candidate else None
     if not business_id:
         try:
             biz_id = await db.scalar(select(Business.id).order_by(Business.created_at).limit(1))
@@ -255,6 +260,14 @@ async def _save_to_memory(db: AsyncSession, name: str, payload: dict[str, Any]) 
                 "title": f"Competitor ads: {name}",
                 "full_payload": payload,
             }
+        kwargs.update(
+            memory_defaults(
+                "competitor_note",
+                business_id=business_id,
+                text=str(kwargs.get("text") or ""),
+                source="fetch_competitor_ads",
+            )
+        )
         db.add(BrandMemoryItem(**kwargs))
 
     await db.commit()

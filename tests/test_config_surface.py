@@ -4,8 +4,10 @@ Every one of these tests is a property a customer would notice if it broke:
 
 * ``PATCH /business/profile`` writes **all six** brand fields. Before P2.1 five
   of them had a read path and no write path anywhere in the codebase.
-* Brand memory is writable for **all seven** kinds. Before P2.2, five of the
-  seven could never be created by a user at all.
+* Brand memory is writable for **all seven author-facing** kinds. The other
+  six kinds in the registry are written by their own pipeline (identity sync,
+  research runs, chat attachments) and are rejected by the API -- a kind is
+  either writable here or produced elsewhere, never both.
 * A connector secret is write-only. No response body, ever, in any form.
 * The effective configuration says which layer answered -- workspace, env or
   default -- so a UI can show what is inherited instead of a merged value with
@@ -30,7 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import create_session, hash_password
-from app.core.memory.store import MEMORY_KINDS
+from app.core.memory.kinds import API_WRITABLE_KINDS, MEMORY_KINDS
 from app.db.models import (
     BrandMemoryItem,
     Business,
@@ -257,15 +259,17 @@ async def test_profile_patch_requires_member_not_viewer(
 # ------------------------------------------------------- P2.2 brand memory --
 
 
-async def test_memory_crud_covers_every_kind(api_client) -> None:
-    """All seven kinds are creatable -- the point of P2.2."""
+async def test_memory_crud_covers_every_writable_kind(api_client) -> None:
+    """All seven author-facing kinds are creatable; service kinds are not."""
     body = await _register(api_client, "memory@example.com")
     headers = _auth(body["accessToken"])
 
-    assert len(MEMORY_KINDS) == 7, "MEMORY_KINDS must still declare seven kinds"
+    assert len(API_WRITABLE_KINDS) == 7, "seven author-facing kinds"
+    assert len(MEMORY_KINDS) == 13, "the registry knows 13 kinds in total"
+    assert not set(API_WRITABLE_KINDS) - set(MEMORY_KINDS)
 
     created: list[str] = []
-    for kind in MEMORY_KINDS:
+    for kind in API_WRITABLE_KINDS:
         resp = await api_client.post(
             "/api/v1/memory/items",
             headers=headers,
@@ -284,7 +288,7 @@ async def test_memory_crud_covers_every_kind(api_client) -> None:
     listing = await api_client.get("/api/v1/memory/items", headers=headers)
     assert listing.status_code == 200, listing.text
     body_json = listing.json()
-    assert {i["kind"] for i in body_json["items"]} == set(MEMORY_KINDS)
+    assert {i["kind"] for i in body_json["items"]} == set(API_WRITABLE_KINDS)
     assert body_json["mode"] == "recent", "no q -> newest-first, not similarity"
 
     # Filter by kind.
@@ -294,7 +298,7 @@ async def test_memory_crud_covers_every_kind(api_client) -> None:
     assert filtered.status_code == 200, filtered.text
     assert [i["kind"] for i in filtered.json()["items"]] == ["voice_example"]
 
-    # Edit the text (which re-embeds) and the metadata.
+    # Edit the text and the metadata.
     patched = await api_client.patch(
         f"/api/v1/memory/items/{created[0]}",
         headers=headers,
@@ -314,7 +318,7 @@ async def test_memory_crud_covers_every_kind(api_client) -> None:
     assert created[0] not in {i["id"] for i in after.json()["items"]}
 
 
-async def test_memory_rejects_an_eighth_kind(api_client) -> None:
+async def test_memory_rejects_an_unknown_kind(api_client) -> None:
     body = await _register(api_client, "badkind@example.com")
     resp = await api_client.post(
         "/api/v1/memory/items",
@@ -325,10 +329,27 @@ async def test_memory_rejects_an_eighth_kind(api_client) -> None:
     assert resp.json()["error"]["code"] == "validation_failed"
 
 
-async def test_memory_search_is_similarity_ordered_not_substring(
+async def test_memory_rejects_a_service_owned_kind(api_client) -> None:
+    """``brand_identity`` is real, but only the identity pipeline writes it."""
+    body = await _register(api_client, "servicekind@example.com")
+    resp = await api_client.post(
+        "/api/v1/memory/items",
+        headers=_auth(body["accessToken"]),
+        json={"kind": "brand_identity", "text": "invented identity"},
+    )
+    assert resp.status_code == 422, resp.text
+    assert "writable" in resp.json()["error"]["detail"]
+
+
+async def test_memory_search_is_lexically_ordered_not_substring(
     api_client,
 ) -> None:
-    """``q`` uses embeddings, so the response says ``mode='similar'``."""
+    """``q`` runs BM25 + recency + affinity, so ``mode`` is ``'lexical'``.
+
+    The old assertion was ``mode == "similar"`` because ``q`` meant cosine
+    similarity over a 64-dimension hashed vector. The replacement is exact about
+    why an item matched: every hit carries a ``reason`` naming the terms.
+    """
     body = await _register(api_client, "search@example.com")
     headers = _auth(body["accessToken"])
     for kind, text in [
@@ -345,11 +366,14 @@ async def test_memory_search_is_similarity_ordered_not_substring(
     )
     assert resp.status_code == 200, resp.text
     body_json = resp.json()
-    assert body_json["mode"] == "similar"
+    assert body_json["mode"] == "lexical"
     assert body_json["query"] == "delivery Cairo"
-    assert body_json["items"], "the seeded mock embedding must find something"
+    assert body_json["items"], "BM25 must find the offer"
     assert body_json["items"][0]["kind"] == "offer"
     assert body_json["items"][0]["score"] is not None
+    assert "lex" in (body_json["items"][0]["reason"] or "")
+    # Nothing else mentions "delivery" or "Cairo", so nothing else may rank.
+    assert [i["kind"] for i in body_json["items"]] == ["offer"]
 
 
 async def test_cross_workspace_memory_access_is_404(api_client) -> None:
@@ -387,10 +411,16 @@ async def test_cross_workspace_memory_access_is_404(api_client) -> None:
     assert item_id in {i["id"] for i in still.json()["items"]}
 
 
-async def test_memory_reindex_is_owner_only(
+async def test_memory_prune_is_owner_only_and_dry_run_by_default(
     api_client, seeded_db: AsyncSession
 ) -> None:
-    body = await _register(api_client, "reindex@example.com")
+    """``POST /memory/prune`` replaced ``/memory/reindex``.
+
+    Nothing is embedded any more, so there is nothing to rebuild. What an
+    operator still needs is the ability to see, and then apply, expiry and the
+    per-kind ceiling -- and a non-owner must not be able to archive memory.
+    """
+    body = await _register(api_client, "prune@example.com")
     business_id = body["workspaces"][0]["businessId"]
     headers = _auth(body["accessToken"])
     await api_client.post(
@@ -399,34 +429,31 @@ async def test_memory_reindex_is_owner_only(
         json={"kind": "learning", "text": "short ads outperformed long ones"},
     )
 
-    member = await _make_member(seeded_db, "reindex-member@example.com", business_id, "member")
-    resp = await api_client.post(
-        "/api/v1/memory/reindex", headers=_auth(member), json={}
-    )
+    member = await _make_member(seeded_db, "prune-member@example.com", business_id, "member")
+    resp = await api_client.post("/api/v1/memory/prune", headers=_auth(member), json={})
     assert resp.status_code == 403, resp.text
     assert resp.json()["error"]["code"] == "forbidden"
 
-    resp = await api_client.post("/api/v1/memory/reindex", headers=headers, json={})
+    # Default is a dry run: it reports, it does not archive.
+    resp = await api_client.post("/api/v1/memory/prune", headers=headers, json={})
     assert resp.status_code == 200, resp.text
-    assert resp.json()["reindexed"] == 1
+    assert resp.json()["dryRun"] is True
+    assert resp.json()["archivedByKind"] == {}
 
+    # An unknown kind is a 422, not a silent empty report.
     resp = await api_client.post(
-        "/api/v1/memory/reindex", headers=headers, json={"kind": "voice_example"}
-    )
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["reindexed"] == 0
-
-    resp = await api_client.post(
-        "/api/v1/memory/reindex", headers=headers, json={"kind": "nonsense"}
+        "/api/v1/memory/prune", headers=headers, json={"kind": "nonsense"}
     )
     assert resp.status_code == 422, resp.text
 
 
-async def test_reindex_rewrites_embeddings(
+async def test_expired_memory_is_gone_from_listings_and_context(
     api_client, seeded_db: AsyncSession
 ) -> None:
-    """The point of reindex: rows come back with a usable vector."""
-    body = await _register(api_client, "reindex-vec@example.com")
+    """Expiry is a predicate on ``expires_at``, not a reindex step (P2.2)."""
+    from datetime import datetime, timedelta, timezone
+
+    body = await _register(api_client, "expiry@example.com")
     headers = _auth(body["accessToken"])
     created = await api_client.post(
         "/api/v1/memory/items",
@@ -435,24 +462,31 @@ async def test_reindex_rewrites_embeddings(
     )
     item_id = created.json()["id"]
 
-    # Simulate a row written under a different EMBEDDING_DIM: the vector is
-    # gone and the row is unsearchable until it is reindexed.
+    # An expired row is invisible to the default listing ...
     await seeded_db.execute(
         BrandMemoryItem.__table__.update()
         .where(BrandMemoryItem.id == item_id)
-        .values(embedding=None)
+        .values(expires_at=datetime.now(timezone.utc) - timedelta(days=1))
     )
     await seeded_db.commit()
 
-    resp = await api_client.post("/api/v1/memory/reindex", headers=headers, json={})
-    assert resp.status_code == 200, resp.text
-    assert item_id in resp.json()["itemIds"]
+    resp = await api_client.get("/api/v1/memory/items", headers=headers)
+    assert item_id not in {i["id"] for i in resp.json()["items"]}
 
-    found = await api_client.get(
-        "/api/v1/memory/items?q=free%20bag", headers=headers
+    # ... and still visible when archived rows are asked for explicitly, so an
+    # operator can audit what expired instead of wondering where it went.
+    resp = await api_client.get(
+        "/api/v1/memory/items?include_archived=true", headers=headers
     )
-    assert found.status_code == 200, found.text
-    assert item_id in {i["id"] for i in found.json()["items"]}
+    assert item_id in {i["id"] for i in resp.json()["items"]}
+
+    # Pruning for real applies the expiry that the read path was already
+    # enforcing: the row was invisible but not yet archived.
+    resp = await api_client.post(
+        "/api/v1/memory/prune", headers=headers, json={"kind": "offer", "dryRun": False}
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["archivedByKind"].get("offer") == 1
 
 
 # --------------------------------------------------- P2.4 connector settings --

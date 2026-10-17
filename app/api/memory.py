@@ -1,38 +1,27 @@
-"""Brand-memory CRUD: ``/api/v1/memory/*`` (P2.2).
+"""Brand-memory CRUD and inspection: ``/api/v1/memory/*``.
 
-Why this file exists
---------------------
-``MEMORY_KINDS`` declares seven kinds, but before P2.2 only two of them were
-ever written anywhere: ``learning`` (by the agent's ``save_learning`` tool) and
-``reference_analysis`` (by ``analyze_reference_creative``). The other five --
-``voice_example``, ``visual_style``, ``offer``, ``audience``,
-``competitor_note`` -- had a read path and no write path at all, which is why the
-vector store, the most valuable asset in the product, was ~90% empty. This
-router is what makes them writable.
+What changed when embeddings were removed
+-----------------------------------------
+``GET /memory/items?q=`` used to mean "cosine similarity of a 64-dimension
+hashed bag-of-words vector". It now means BM25 + recency + kind/task affinity
+over the same rows -- a deterministic ranking that needs no provider, no
+reindex step and no vector column. ``mode`` reports which ordering was used and
+each item carries a human-readable ``reason`` ("lex_bm25=0.81 rec=0.42 ...").
+
+The former ``POST /memory/reindex`` endpoint is gone: nothing is embedded, so
+there is nothing to rebuild. Its operational replacement is ``POST
+/memory/prune`` -- archive expired rows and enforce the per-kind ceiling.
 
 Isolation
 ---------
 Every statement filters on ``business_id``, and an id-addressed route answers
 **404**, never 403, for a row belonging to another workspace -- a 403 confirms
-the row exists, which turns a guessed id into an enumeration oracle. That is the
-same rule the rest of the API follows (``app/api/deps.py::assert_owned``).
-
-Ordering, honestly
-------------------
-``GET /memory/items`` has two modes and says which one produced the result:
-
-* no ``q`` -> ``mode="recent"``, newest first. This is the editor list.
-* ``q`` given -> ``mode="similar"``, ordered by **embedding similarity** to ``q``
-  through ``BrandMemoryStore.search()``. It is *not* substring matching: a row
-  whose text does not contain the query can legitimately come first if it means
-  something similar, and a row that contains it may not. ``score`` is returned so
-  the UI can show why.
+the row exists, which turns a guessed id into an enumeration oracle.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Query
-from sqlalchemy import select
 
 from app.api.deps import (
     AuthDep,
@@ -43,31 +32,35 @@ from app.api.deps import (
     require_role,
 )
 from app.core.errors import NotFoundError, ValidationFailed
-from app.core.memory.store import MEMORY_KINDS, BrandMemoryStore
+from app.core.memory.kinds import API_WRITABLE_KINDS, MEMORY_KINDS, is_known_kind
+from app.core.memory.store import BrandMemoryStore
 from app.db.models import BrandMemoryItem
 from app.schemas.memory import (
     MemoryItemCreate,
     MemoryItemList,
     MemoryItemOut,
     MemoryItemUpdate,
-    MemoryReindexRequest,
-    MemoryReindexResponse,
+    MemoryPruneRequest,
+    MemoryPruneResponse,
 )
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 
-#: Writing brand memory is a write: owner or member, never viewer (P1.7 matrix).
+#: Writing brand memory is a write: owner or member, never viewer.
 WRITE_MEMORY = "member"
-#: Re-embedding is an operator action, not an authoring one.
-REINDEX_MEMORY = "owner"
+#: Pruning is an operator action, not an authoring one.
+PRUNE_MEMORY = "owner"
 
-#: Hard ceiling on one page. A UI asking for 10 000 rows gets 200 and a truthful
-#: ``total`` rather than a silent 422 it cannot handle.
+#: Hard ceiling on one page.
 MAX_LIMIT = 200
 DEFAULT_LIMIT = 50
 
 
-def _out(item: BrandMemoryItem, score: float | None = None) -> MemoryItemOut:
+def _out(
+    item: BrandMemoryItem,
+    score: float | None = None,
+    reason: str | None = None,
+) -> MemoryItemOut:
     return MemoryItemOut(
         id=item.id,
         business_id=item.business_id,
@@ -76,7 +69,13 @@ def _out(item: BrandMemoryItem, score: float | None = None) -> MemoryItemOut:
         metadata=dict(item.metadata_ or {}),
         campaign_id=item.campaign_id,
         created_at=item.created_at,
+        updated_at=getattr(item, "updated_at", None),
+        importance=float(getattr(item, "importance", 0.5) or 0.5),
+        pinned=bool(getattr(item, "pinned", False)),
+        expires_at=getattr(item, "expires_at", None),
+        archived_at=getattr(item, "archived_at", None),
         score=score,
+        reason=reason,
     )
 
 
@@ -87,7 +86,7 @@ def _validate_kind(kind: str | None) -> None:
     memories", which is exactly the kind of quiet wrong answer an admin panel
     should not produce.
     """
-    if kind is not None and kind not in MEMORY_KINDS:
+    if kind is not None and not is_known_kind(kind):
         raise ValidationFailed(
             f"unknown memory kind '{kind}'",
             detail={"allowed": list(MEMORY_KINDS)},
@@ -102,33 +101,38 @@ async def list_memory_items(
     q: str | None = Query(
         default=None,
         max_length=500,
-        description="Semantic query. Results are similarity-ordered, not substring-matched.",
+        description="Relevance query: BM25 + recency + kind affinity, not substring matching.",
+    ),
+    include_archived: bool = Query(
+        default=False, description="Include archived (expired/pruned) rows."
     ),
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
 ) -> MemoryItemList:
-    """List this workspace's memory items, newest first or by similarity."""
+    """List this workspace's memory items: newest first, or ranked by relevance."""
     _validate_kind(kind)
     store = BrandMemoryStore(db)
 
     if q:
-        hits = await store.search(
+        hits = await store.search_ranked(
             business_id=ws.business_id,
             query=q,
-            kinds=[kind] if kind else [],
+            kinds=[kind] if kind else None,
             top_k=limit,
+            include_archived=include_archived,
         )
-        items = [_out(item, score=score) for item, score in hits]
-        mode = "similar"
+        items = [_out(hit.item, score=hit.score, reason=hit.reason()) for hit in hits]
+        mode = "lexical"
     else:
         rows = await store.list_items(
-            business_id=ws.business_id, kind=kind, limit=limit
+            business_id=ws.business_id,
+            kind=kind,
+            limit=limit,
+            include_archived=include_archived,
         )
         items = [_out(row) for row in rows]
         mode = "recent"
 
-    total = await store.count_items(
-        business_id=ws.business_id,
-    )
+    total = await store.count_items(business_id=ws.business_id)
     return MemoryItemList(
         items=items, total=total, limit=limit, kind=kind, query=q, mode=mode
     )
@@ -142,13 +146,18 @@ async def create_memory_item(
     ws: WorkspaceDep,
     db: SessionDep,
 ) -> MemoryItemOut:
-    """Create one item of any of the seven kinds. This is the writer.
+    """Create one item of a client-writable kind.
 
-    The body-supplied ``campaign_id`` is ownership-checked before use
-    (``assert_campaign_owned``), because it is the one field that could point a
-    row at another tenant's campaign.
+    Service-owned kinds (``brand_identity``, ``strategy_blueprint``, research
+    artifacts, chat attachments) are rejected: their producers own their shape
+    and their lifecycle.
     """
     await require_role(principal, settings, ws, minimum=WRITE_MEMORY)
+    if payload.kind not in API_WRITABLE_KINDS:
+        raise ValidationFailed(
+            f"kind '{payload.kind}' is written by its own pipeline and cannot be created here",
+            detail={"writable": list(API_WRITABLE_KINDS)},
+        )
     await assert_campaign_owned(db, payload.campaign_id, ws)
 
     store = BrandMemoryStore(db)
@@ -158,6 +167,9 @@ async def create_memory_item(
         text=payload.text,
         metadata=payload.metadata,
         campaign_id=payload.campaign_id,
+        importance=payload.importance,
+        pinned=payload.pinned,
+        source="api",
     )
     await db.commit()
     await db.refresh(item)
@@ -173,15 +185,12 @@ async def update_memory_item(
     ws: WorkspaceDep,
     db: SessionDep,
 ) -> MemoryItemOut:
-    """Edit the text and/or metadata of one item. Re-embeds on a text change.
-
-    404 for another workspace's row, not 403.
-    """
+    """Edit the text, metadata, importance or pin state of one item."""
     await require_role(principal, settings, ws, minimum=WRITE_MEMORY)
-    if not ({"text", "metadata"} & set(payload.model_fields_set)):
+    if not ({"text", "metadata", "importance", "pinned"} & set(payload.model_fields_set)):
         raise ValidationFailed(
-            "no fields to update; send 'text' and/or 'metadata'",
-            detail={"accepted_fields": ["text", "metadata"]},
+            "no fields to update",
+            detail={"accepted_fields": ["text", "metadata", "importance", "pinned"]},
         )
 
     store = BrandMemoryStore(db)
@@ -190,6 +199,8 @@ async def update_memory_item(
         item_id=item_id,
         text=payload.text,
         metadata=payload.metadata if "metadata" in payload.model_fields_set else None,
+        importance=payload.importance,
+        pinned=payload.pinned,
     )
     if item is None:
         raise NotFoundError(f"memory item '{item_id}' not found")
@@ -213,33 +224,50 @@ async def delete_memory_item(
     await db.commit()
 
 
-@router.post("/reindex", response_model=MemoryReindexResponse)
-async def reindex_memory(
-    payload: MemoryReindexRequest,
+@router.post("/items/{item_id}/archive", status_code=204)
+async def archive_memory_item(
+    item_id: str,
     principal: AuthDep,
     settings: SettingsDep,
     ws: WorkspaceDep,
     db: SessionDep,
-) -> MemoryReindexResponse:
-    """Recompute every embedding for this workspace. Owner only.
+) -> None:
+    """Soft-delete: drop the row out of retrieval but keep it auditable."""
+    await require_role(principal, settings, ws, minimum=WRITE_MEMORY)
+    store = BrandMemoryStore(db)
+    if not await store.archive_item(
+        business_id=ws.business_id, item_id=item_id, reason="manual"
+    ):
+        raise NotFoundError(f"memory item '{item_id}' not found")
+    await db.commit()
 
-    Needed after ``EMBEDDING_DIM`` or the embedding provider changes: a row
-    embedded under the old dimension either raises on insert or, worse, scores
-    meaningfully against nothing. Restricted to ``owner`` because it is a bulk
-    write proportional to the size of the table, not an authoring action.
+
+@router.post("/prune", response_model=MemoryPruneResponse)
+async def prune_memory(
+    payload: MemoryPruneRequest,
+    principal: AuthDep,
+    settings: SettingsDep,
+    ws: WorkspaceDep,
+    db: SessionDep,
+) -> MemoryPruneResponse:
+    """Archive expired rows and enforce the per-kind ceiling.
+
+    ``dry_run`` defaults to true: an operator can see what would move before
+    anything moves. Owner only.
     """
-    await require_role(principal, settings, ws, minimum=REINDEX_MEMORY)
+    await require_role(principal, settings, ws, minimum=PRUNE_MEMORY)
     _validate_kind(payload.kind)
 
     store = BrandMemoryStore(db)
-    touched = await store.reindex_items(
-        business_id=ws.business_id, kind=payload.kind
+    report = await store.prune(
+        business_id=ws.business_id, kind=payload.kind, dry_run=payload.dry_run
     )
-    await db.commit()
-    return MemoryReindexResponse(
-        reindexed=len(touched),
-        kind=payload.kind,
-        item_ids=[item.id for item in touched],
+    if not payload.dry_run:
+        await db.commit()
+    return MemoryPruneResponse(
+        dry_run=payload.dry_run,
+        archived_by_kind={kind: count for kind, count in report.items() if count},
+        total_archived=sum(report.values()),
     )
 
 

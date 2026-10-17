@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.security import redact_sensitive_data
 from app.core.errors import NotFoundError, ValidationFailed
+from app.core.i18n import normalise_language, resolve_reply_language
 from app.core.logging import get_logger
 from app.core.orchestrator.blocks import compose_blocks, task_progress_block, validate_blocks
 from app.db.models import (
@@ -420,6 +421,20 @@ async def handle_message(
         context.update({k: v for k, v in supplied_context.items() if v is not None})
     if request.persona_id:
         context["persona_id"] = request.persona_id
+    # --- reply language, decided once per turn -------------------------------
+    # The UI sends its current language on every message, so switching the
+    # language mid-conversation switches the very next answer. Only *explicit*
+    # choices are persisted: remembering a language we merely inferred from one
+    # message would trap a user who pasted a single line of the other script.
+    explicit_language = normalise_language(request.language)
+    if explicit_language:
+        context["language"] = explicit_language
+    reply_language = resolve_reply_language(
+        requested=request.language,
+        conversation=context.get("language"),
+        project=getattr(business, "language", None),
+        prompt=request.message,
+    )
     # Attachments live for exactly one turn. Pulled out *before* the context is
     # persisted, otherwise the same photo would be re-sent to the model on every
     # later turn of the conversation and quietly multiply the token bill.
@@ -521,6 +536,11 @@ async def handle_message(
     # read lives in the conversation bridge; interpretation stays in app/ai.
     ai_context = dict(context)
     ai_context["latest_user_message"] = safe_message
+    # The resolved language for *this* turn (not the remembered one) plus the
+    # workspace's configured project language, so the AI layer never has to
+    # re-derive either from the text.
+    ai_context["language"] = reply_language
+    ai_context["project_language"] = str(getattr(business, "language", "") or "")[:8]
     ai_context["business_profile_context"] = redact_sensitive_data(business_profile_context)
     if (
         context.get("workflow") == "creative_prompt"
@@ -623,7 +643,7 @@ async def handle_message(
             fast_llm=fast_llm,
             context=ai_context,
             forced_agent=request.persona_id or context.get("persona_id"),
-            language=request.language,
+            language=reply_language,
             ad_flow_selection=ad_flow_selection,
             ad_tool_context_factory=_ad_tool_context_factory,
         )
@@ -730,12 +750,19 @@ async def handle_message(
     await db.commit()
 
     if not defer_post_memory:
-        # Trigger 3-minute inactivity debounced Long-Term Memory background update
+        # The single per-workspace memory pass (session compaction, then the
+        # debounced LTM rewrite, then the rate-limited identity sync).
         try:
-            from app.ai.memory.compressor import memory_debouncer
-            memory_debouncer.schedule_ltm_update(business.id)
+            from app.ai.memory.consolidator import memory_consolidator
+
+            memory_consolidator.schedule(
+                business_id=business.id,
+                conversation_id=conversation.id,
+            )
         except Exception as exc:
-            _logger.warning("ltm_debouncer_schedule_failed", extra={"error": str(exc)})
+            _logger.warning(
+                "memory_consolidation_schedule_failed", extra={"error": str(exc)}
+            )
     return AssistantMessageResponse(
         message=assistant_message,
         user_message=user_message,
@@ -877,21 +904,18 @@ async def run_task_in_background(
             business = await db.get(Business, task.business_id) if task.business_id else None
             workspace_id = business.workspace_id or "" if business is not None else ""
             persona = await load_persona(persona_id, db, workspace_id)
-            # The creative dialog passes its selected locale per task. Honour it
-            # for Layla's writing runs without persisting a workspace persona
-            # override or affecting the normal assistant's configured language.
-            requested_language = str(inputs.get("language") or "").strip().lower()
-            if persona_id == "layla" and task_name in {
-                "creative_brief",
-                "commercial_script",
-                "image_prompt",
-                "video_prompt",
-                "ad_copy",
-                "ad_variations",
-            } and requested_language in {"en", "ar"}:
-                from app.schemas.common import Language
+            # The language this run writes in. Same policy as the chat: an
+            # explicit per-task locale (the creative dialog sends one) wins, then
+            # the workspace's project language, then the message itself. Passed to
+            # the runtime as an override so no persona row is mutated and the
+            # normal assistant's configured language is untouched.
+            from app.core.i18n import resolve_reply_language
 
-                persona = persona.model_copy(update={"language": Language(requested_language)})
+            task_language = resolve_reply_language(
+                requested=inputs.get("language"),
+                project=getattr(business, "language", None) if business else None,
+                prompt=user_message or "",
+            )
             ctx = ToolContext(
                 workspace_id=workspace_id,
                 business_id=task.business_id or "",
@@ -906,7 +930,13 @@ async def run_task_in_background(
                 insight_id=(str(inputs.get("insight_id") or inputs.get("insightId") or "") or None),
             )
             result = await run_agent(
-                persona, task_name, inputs, ctx, llm=llm, user_message=user_message
+                persona,
+                task_name,
+                inputs,
+                ctx,
+                llm=llm,
+                user_message=user_message,
+                language=task_language,
             )
             task.status = (
                 TaskStatus.SUCCEEDED.value

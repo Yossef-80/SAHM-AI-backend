@@ -24,6 +24,7 @@ from app.ai.marketing.schemas import ReferenceVisionOutput
 from app.ai.settings import AISettings, get_ai_settings
 from app.config import Settings, get_settings
 from app.core.errors import BlockedTargetError, ToolUnavailable
+from app.core.memory.lifecycle import memory_defaults
 from app.core.security import resolve_and_check, sniff_mime
 from app.db.models import BrandMemoryItem
 from app.schemas.creatives import ReferenceAnalysis, StyleSpec
@@ -290,7 +291,13 @@ async def analyze_reference_source(
         business_id=business_id,
         kind="reference_analysis",
         text=text,
-        embedding=None,
+        **memory_defaults(
+            "reference_analysis",
+            business_id=business_id,
+            text=text,
+            campaign_id=campaign_id,
+            source="reference_analysis",
+        ),
         metadata_={
             "schema_version": 1,
             "style": style_dict,

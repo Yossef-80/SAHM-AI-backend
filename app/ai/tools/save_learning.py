@@ -1,4 +1,12 @@
-"""Explicit, business-scoped long-term learning storage for the AI agents."""
+"""Explicit, business-scoped long-term learning storage for the AI agents.
+
+Writes to the workspace database when the graph has one attached (the normal
+chat path), and only falls back to the LangGraph ``BaseStore`` for offline runs
+with no DB. The DB write goes through ``BrandMemoryStore`` so a learning gets the
+same treatment as every other memory: dedupe, TTL, importance and the
+``learning`` kind contract -- instead of landing in an in-process store that
+disappears with the worker.
+"""
 
 from __future__ import annotations
 
@@ -10,11 +18,11 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from app.ai.enums import LearningCategory
+from app.ai.loggers.tools.save_learning import logger
 from app.ai.memory.brand_memory import Learning, business_id_from, learnings_namespace
 from app.ai.providers.db import current_store
 from app.ai.security import redact_sensitive_data
 from app.ai.settings import get_ai_settings
-from app.ai.loggers.tools.save_learning import logger
 
 
 class SaveLearningInput(BaseModel):
@@ -24,13 +32,13 @@ class SaveLearningInput(BaseModel):
 
 
 @tool(args_schema=SaveLearningInput)
-def save_learning_tool(
+async def save_learning_tool(
     insight: str,
     category: LearningCategory = LearningCategory.MARKET,
     source_url: str | None = None,
     config: RunnableConfig | None = None,
 ) -> str:
-    """Save one durable, non-sensitive finding to this business's AI memory.
+    """Save one durable, non-sensitive finding to this business's memory.
 
     Use this only when the user explicitly asks the agent to remember or save a
     finding. Do not store credentials, personal data, temporary questions, or
@@ -45,14 +53,56 @@ def save_learning_tool(
     if safe_url and len(safe_url) > 1000:
         safe_url = safe_url[:1000]
 
+    configurable = (config or {}).get("configurable", {}) if isinstance(config, dict) else {}
+    business_id = business_id_from(config)
+    agent = configurable.get("agent")
+
+    metadata = {
+        "category": normalized_category.value,
+        "source_url": safe_url,
+        "agent": agent,
+        "insight": safe_insight,
+    }
+
+    db = configurable.get("tool_db")
+    if db is not None:
+        from app.core.memory.store import BrandMemoryStore
+
+        item = await BrandMemoryStore(db).write_item(
+            business_id=business_id,
+            kind="learning",
+            text=safe_insight,
+            metadata=metadata,
+            source="save_learning_tool",
+        )
+        logger.info(
+            "learning_saved",
+            business_id=business_id,
+            category=normalized_category.value,
+            source_url_present=bool(safe_url),
+            insight_chars=len(safe_insight),
+            backend="database",
+        )
+        return json.dumps(
+            {
+                "status": "ok",
+                "id": item.id,
+                "business_id": business_id,
+                "category": normalized_category.value,
+                "insight": safe_insight,
+                "source_url": safe_url,
+            },
+            ensure_ascii=False,
+        )
+
+    # --------------------------------------------------- offline/legacy fallback --
     learning = Learning(
         insight=safe_insight,
         category=normalized_category,
         source_url=safe_url,
-        agent=(config or {}).get("configurable", {}).get("agent"),
+        agent=agent,
     )
     key = f"learning_{uuid4().hex}"
-    business_id = business_id_from(config)
     current_store().put(
         learnings_namespace(business_id),
         key,
@@ -64,6 +114,7 @@ def save_learning_tool(
         category=normalized_category.value,
         source_url_present=bool(safe_url),
         insight_chars=len(safe_insight),
+        backend="langgraph_store",
     )
     return json.dumps(
         {

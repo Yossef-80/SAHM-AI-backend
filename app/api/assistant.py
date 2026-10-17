@@ -50,85 +50,32 @@ async def _post_turn_memory_background(
     conversation_id: str,
     request_id: str,
 ) -> None:
-    """Run post-turn memory compaction and LTM debounce in background outside HTTP turn lifecycle.
+    """Hand the turn's memory work to the single per-workspace consolidator.
 
-    Uses a dedicated session factory (session_scope()) to never compete with request connections,
-    and isolates telemetry under bg_mem_<request_id>.
+    Before P2 this function started three independent background passes
+    (session compaction, the debounced LTM rewrite and the brand-identity
+    extraction) that could interleave and write the same profile row from
+    stale reads -- see ``app/ai/memory/consolidator.py``. The consolidator
+    serialises them per business, debounces the two LLM passes, and skips the
+    identity pass when it ran recently.
     """
     bg_req_id = f"bg_mem_{request_id}"
-    logger.info(
-        "post_turn_memory_background_started",
-        extra={
-            "business_id": business_id,
-            "conversation_id": conversation_id,
-            "request_id": bg_req_id,
-        },
-    )
-    # 1. Background session memory compaction (if needed)
     try:
-        from app.ai.memory.compressor import manage_session_memory_with_token_cap
-        from app.db.models import Conversation, Message
-        from sqlalchemy import select
+        from app.ai.memory.consolidator import memory_consolidator
 
-        async with session_scope() as bg_db:
-            conv = await bg_db.get(Conversation, conversation_id)
-            if conv:
-                msg_rows = (
-                    await bg_db.execute(
-                        select(Message)
-                        .where(Message.conversation_id == conversation_id)
-                        .order_by(Message.created_at.asc())
-                    )
-                ).scalars().all()
-                await manage_session_memory_with_token_cap(
-                    bg_db,
-                    conversation=conv,
-                    messages=list(msg_rows),
-                )
-                await bg_db.commit()
-    except Exception as exc:
+        memory_consolidator.schedule(
+            business_id=business_id,
+            conversation_id=conversation_id,
+            request_id=bg_req_id,
+        )
+    except Exception as exc:  # noqa: BLE001 - memory must never fail a turn
         logger.warning(
-            "post_turn_memory_compaction_failed",
+            "post_turn_memory_schedule_failed",
             extra={
                 "business_id": business_id,
                 "conversation_id": conversation_id,
                 "request_id": bg_req_id,
-                "error": str(exc),
-            },
-        )
-
-    # 2. Debounced LTM update
-    try:
-        from app.ai.memory.compressor import memory_debouncer
-        memory_debouncer.schedule_ltm_update(business_id)
-    except Exception as exc:
-        logger.warning(
-            "post_turn_ltm_schedule_failed",
-            extra={
-                "business_id": business_id,
-                "request_id": bg_req_id,
-                "error": str(exc),
-            },
-        )
-
-    # 3. Dedicated Brand & Dashboard Intelligence Agent (updates brand identity & profile in background on every chat)
-    try:
-        from app.core.brand.identity_service import brand_intelligence_agent
-        async with session_scope() as bg_db:
-            await brand_intelligence_agent.sync_brand_identity(bg_db, business_id)
-        logger.info(
-            "post_turn_brand_intelligence_synced",
-            extra={
-                "business_id": business_id,
-                "request_id": bg_req_id,
-            },
-        )
-    except Exception as exc:
-        logger.warning(
-            "post_turn_brand_intelligence_failed",
-            extra={
-                "business_id": business_id,
-                "request_id": bg_req_id,
+                "error_type": type(exc).__name__,
                 "error": str(exc),
             },
         )

@@ -30,6 +30,7 @@ from app.ai.memory.compressor import compress_history_messages
 from app.ai.providers.llm import get_llm
 from app.ai.security import redact_sensitive_data
 from app.ai.settings import get_ai_settings
+from app.core.i18n import is_arabic_text, reply_language_directive, resolve_reply_language
 from app.core.logging import get_logger
 from app.schemas.blocks import (
     AdPromptBlock,
@@ -120,23 +121,6 @@ def _attachment_messages(context: dict[str, Any], handle: Any) -> list[Any]:
             continue
         blocks.append({"type": "image_url", "image_url": data_url})
     return [HumanMessage(content=blocks)]
-
-
-def _language_directive(language: str | None, prompt: str) -> str | None:
-    """The user-facing reply language, when the client stated one.
-
-    Only Arabic is ever *forced*: an explicit ``ar`` means the customer asked for
-    Arabic output, which used to be ignored entirely (the ``language`` argument
-    was accepted by ``orchestrate`` and never read). Forcing English would be
-    wrong -- an Arabic-speaking user whose cookie says ``en`` must still get
-    Arabic when they write Arabic.
-    """
-    explicit = (language or "").strip().lower()[:2]
-    if explicit == "ar":
-        return "Arabic"
-    if explicit:
-        return None
-    return "Arabic" if _contains_arabic(prompt) else None
 
 
 def _requests_image_generation(prompt: str) -> bool:
@@ -239,11 +223,18 @@ _CREATIVE_PROMPT_FACT_STATUSES = {"confirmed", "correction", "negated", "uncerta
 
 
 def _contains_arabic(value: str) -> bool:
-    return any(0x0600 <= ord(char) <= 0x06FF for char in value)
+    """Script test, kept for callers that only need to *inspect* text.
+
+    It no longer decides the reply language: that is ``resolve_reply_language``
+    in ``app.core.i18n``. Detecting the language of the prompt is one input to
+    that decision, never the decision itself.
+    """
+    return is_arabic_text(value)
 
 
 def _message_text(value: Any) -> str:
     from app.ai.text_utils import extract_clean_text
+
     return extract_clean_text(value)
 
 
@@ -1888,13 +1879,26 @@ def _creative_prompt_blocks(
     prompt: str,
     stage: str,
     history: list[dict[str, Any]],
+    language: str | None = None,
 ) -> tuple[list[Any], str]:
-    """Enforce Layla's interview → plan approval → prompt state machine."""
-    language_sample = " ".join(
-        [prompt]
-        + [str(row.get("content") or "") for row in history[-6:] if row.get("role") == "user"]
-    )
-    arabic = _contains_arabic(language_sample)
+    """Enforce Layla's interview → plan approval → prompt state machine.
+
+    ``language`` is the turn's resolved reply language. Labels follow it, not the
+    script the user happened to type: an English UI with an Arabic pasted brief
+    still gets English labels. ``None`` (direct callers only -- the orchestrator
+    always passes the resolved value) falls back to reading the conversation.
+    """
+    if language is None:
+        sample = " ".join(
+            [prompt]
+            + [
+                str(row.get("content") or "")
+                for row in history[-6:]
+                if row.get("role") == "user"
+            ]
+        )
+        language = "ar" if is_arabic_text(sample) else "en"
+    arabic = language == "ar"
     kind = str(context.get("prompt_type") or "image").lower()
     kind = "video" if kind == "video" else "image"
     prompt_label = "فيديو" if arabic and kind == "video" else "صورة" if arabic else "video" if kind == "video" else "image"
@@ -2357,6 +2361,23 @@ async def orchestrate(
     context = _activate_creative_prompt_workflow(context, prompt, history)
     context = _prepare_creative_prompt_turn(context, prompt)
 
+    # One language decision for the whole turn (see app/core/i18n.py). Resolved
+    # here, once, and threaded into every branch below: the specialist input, the
+    # block formatters, the label sets, and every fallback string. Deciding it
+    # again per branch is how a turn ends up half Arabic and half English.
+    #
+    # ``language`` may already be resolved by the service layer (which knows the
+    # conversation row and the workspace); resolving is idempotent, so calling it
+    # again here only matters for direct callers such as tests.
+    reply_language = resolve_reply_language(
+        requested=language,
+        conversation=context.get("language"),
+        project=context.get("project_language"),
+        prompt=prompt,
+    )
+    context["language"] = reply_language
+    arabic_reply = reply_language == "ar"
+
     if event_queue is not None:
         await event_queue.put(
             {
@@ -2391,18 +2412,7 @@ async def orchestrate(
                     + conversation_summary.strip()
                 )
             )
-        response_language = _language_directive(language, prompt)
-        if response_language:
-            chat_history.append(
-                SystemMessage(
-                    content=(
-                        "[RESPONSE_LANGUAGE]\n"
-                        f"Write every user-facing sentence in {response_language}. "
-                        "Keep brand names, product names, code, numbers and URLs as they are. "
-                        "Do not translate quoted evidence."
-                    )
-                )
-            )
+        chat_history.append(SystemMessage(content=reply_language_directive(reply_language)))
         saved_profile = _format_saved_business_profile(context.get("business_profile_context"))
         if saved_profile:
             chat_history.append(
@@ -2592,7 +2602,7 @@ async def orchestrate(
         if creative_prompt_workflow:
             text = (
                 "تعذر إكمال خطوة Layla الآن. لم يُكتب برومبت نهائي ولم يتم توليد أي صورة أو فيديو. أعد إرسال آخر التفاصيل للمتابعة."
-                if _contains_arabic(prompt)
+                if arabic_reply
                 else "Layla could not complete this step. No final prompt was written and no image or video was generated. Resend the latest details to continue."
             )
             return OrchestratorResult(
@@ -2828,7 +2838,7 @@ async def orchestrate(
         final_msg = format_campaign_response(
             omar_output,
             layla_output,
-            arabic=_contains_arabic(prompt),
+            arabic=arabic_reply,
         )
     elif decision.agent in graphs:
         if event_queue is not None:
@@ -2866,14 +2876,22 @@ async def orchestrate(
                                 if asset.get("provider") == "mock":
                                     image_blocks.append(
                                         TextBlock(
-                                            text="تنبيه: الإعداد الحالي يستخدم مزود mock، لذا المعاينة التالية تجريبية وليست صورة من نموذج فعلي."
+                                            text=(
+                                                "تنبيه: الإعداد الحالي يستخدم مزود mock، لذا المعاينة التالية تجريبية وليست صورة من نموذج فعلي."
+                                                if arabic_reply
+                                                else "Note: this workspace is configured with the mock image provider, so the preview below is a placeholder, not a real model output."
+                                            )
                                         )
                                     )
                                 image_blocks.append(
                                     ImagePreviewBlock(
-                                        title="معاينة مسودة الصورة",
+                                        title="معاينة مسودة الصورة" if arabic_reply else "Image draft preview",
                                         url=asset.get("url") or "",
-                                        alt="مسودة صورة إعلانية مولّدة",
+                                        alt=(
+                                            "مسودة صورة إعلانية مولّدة"
+                                            if arabic_reply
+                                            else "Generated advertising image draft"
+                                        ),
                                         prompt=p_text,
                                         provider=asset.get("provider"),
                                         model=asset.get("model"),
@@ -2905,6 +2923,7 @@ async def orchestrate(
                     prompt=prompt,
                     stage=current_stage,
                     history=history,
+                    language=reply_language,
                 )
                 return OrchestratorResult(
                     blocks=prompt_blocks,
@@ -2922,13 +2941,13 @@ async def orchestrate(
             final_msg = format_agent_report(
                 decision.agent,
                 output,
-                arabic=_contains_arabic(prompt),
+                arabic=arabic_reply,
             )
         except Exception as exc:
             print(f"[ORCHESTRATOR] {decision.agent.title()} graph failed ({type(exc).__name__}).")
             final_msg = (
                 f"تعذر إكمال مهمة {decision.agent.title()} الآن؛ لم يتم حفظ نتيجة غير مكتملة أو تنفيذ أي نشر."
-                if _contains_arabic(prompt)
+                if arabic_reply
                 else f"{decision.agent.title()} could not complete this turn; no incomplete result or publication was saved."
             )
             if event_queue is not None:
@@ -2976,7 +2995,7 @@ async def orchestrate(
             print(f"[ORCHESTRATOR] Chat provider unavailable ({type(exc).__name__}).")
             final_msg = (
                 "تعذر تشغيل مزود الذكاء الاصطناعي الآن؛ لم يتم تنفيذ أدوات أو تغيير بيانات."
-                if _contains_arabic(prompt)
+                if arabic_reply
                 else "The selected AI provider is unavailable; no tools or data changes were executed."
             )
 
@@ -2991,7 +3010,11 @@ async def orchestrate(
 
     from app.ai.text_utils import extract_clean_text
 
-    final_msg = extract_clean_text(final_msg).strip() or "I do not have enough information to complete this request yet."
+    final_msg = extract_clean_text(final_msg).strip() or (
+        "لا أملك معلومات كافية لإكمال هذا الطلب بعد."
+        if arabic_reply
+        else "I do not have enough information to complete this request yet."
+    )
     if final_persona_id is not None:
         base_blocks = [TextBlock(text=extract_clean_text(str(redact_sensitive_data(final_msg))))]
         return OrchestratorResult(
@@ -3028,9 +3051,15 @@ async def orchestrate(
                     "'text' (NOT 'TextBlock'); for lists/bullet points, use exactly "
                     "'findings' (NOT 'FindingsBlock'). Strictly follow the block schema. "
                     + (
-                        " The finished message MUST be written in Arabic."
-                        if _language_directive(language, prompt) == "Arabic"
-                        else " Use the same language as the user-facing result."
+                        " The finished message MUST be written in Arabic, including "
+                        "headings, labels and fallback sentences, even if the source "
+                        "text below is in English. Translate it; keep brand names and "
+                        "quoted evidence in their original script."
+                        if arabic_reply
+                        else " The finished message MUST be written in English, "
+                        "including headings, labels and fallback sentences, even if "
+                        "the source text below is in Arabic. Translate it; keep brand "
+                        "names and quoted evidence in their original script."
                     )
                     + " Organize substantive answers with task-appropriate headings, concise findings, evidence/source distinctions, assumptions, and next steps where useful; do not add empty sections or padding. Preserve material facts and uncertainty, never invent evidence, and do not omit either Omar's strategy or Layla's creative section when both appear. For image/video prompts preserve technical visual/cinematic detail and separate the copy-ready prompt from caveats or settings."
                 )
