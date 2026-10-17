@@ -408,6 +408,15 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
 
+    # ----------------------------------------------- observability & tracing --
+    langchain_tracing_v2: bool = False
+    langchain_api_key: str | None = None
+    langchain_project: str = "sahm-ai"
+    langchain_endpoint: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
+
     @field_validator(
         "cors_origins",
         "cors_allow_methods",

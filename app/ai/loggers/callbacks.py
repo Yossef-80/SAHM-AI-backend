@@ -22,6 +22,7 @@ from langchain_core.outputs import LLMResult
 
 from app.ai.enums import LogKind
 from app.ai.loggers.base import get_component_logger
+from app.ai.loggers.cost import estimate_token_cost, format_cost
 from app.ai.loggers.providers.llm import logger as llm_logger
 from app.ai.security import redact_sensitive_data
 
@@ -34,8 +35,24 @@ def _preview(value: Any) -> str:
     return text if len(text) <= _PREVIEW_CHARS else text[:_PREVIEW_CHARS] + "..."
 
 
+def _diagnose_llm_error(error: BaseException, model: str | None) -> str:
+    err_str = str(error).lower()
+    err_type = type(error).__name__
+    if "connect" in err_str or "connection" in err_str or "unreachable" in err_str:
+        return "Network/Connection Failure: verify the LLM server or Ollama instance is running and reachable."
+    if "timeout" in err_str or "timed out" in err_str:
+        return "LLM Request Timed Out: increase AI_LLM_TIMEOUT_SECONDS or reduce context size."
+    if "rate_limit" in err_str or "429" in err_str or "quota" in err_str:
+        return "Rate Limit or Quota Exceeded: check your provider credit balance or switch to free local Ollama/Mock."
+    if "auth" in err_str or "401" in err_str or "api_key" in err_str or "unauthorized" in err_str:
+        return "Authentication Error: verify provider API key is set and valid in .env."
+    if "context_length" in err_str or "maximum context" in err_str or "token limit" in err_str:
+        return "Context Window Exceeded: prompt is too large. Enable session compression or reduce history tokens."
+    return f"Model call failed ({err_type}). Inspect stack trace and check input payload."
+
+
 class AILoggingCallback(BaseCallbackHandler):
-    """Routes tool + LLM events to their own log files."""
+    """Routes tool, LLM, and agent events to their own diagnostic log files."""
 
     #: Don't let a logging problem ever break an agent run.
     raise_error = False
@@ -84,42 +101,152 @@ class AILoggingCallback(BaseCallbackHandler):
     ) -> None:
         params = kwargs.get("invocation_params") or {}
         model = params.get("model") or params.get("model_name") or (serialized or {}).get("name")
+        node = (kwargs.get("metadata") or {}).get("langgraph_node")
         self._starts[run_id] = (time.perf_counter(), str(model))
+
+        prompt_preview = None
+        if messages and messages[0]:
+            prompt_preview = _preview(getattr(messages[0][-1], "content", str(messages[0][-1])))
+
         llm_logger.info(
             "llm_started",
             agent=self.agent,
             model=model,
-            node=(kwargs.get("metadata") or {}).get("langgraph_node"),
+            node=node,
             messages=sum(len(batch) for batch in messages),
+            prompt_preview=prompt_preview,
         )
+        if self.agent:
+            get_component_logger(LogKind.AGENT, self.agent).info(
+                "llm_call_initiated",
+                model=model,
+                node=node,
+                messages_count=sum(len(batch) for batch in messages),
+                prompt_preview=prompt_preview,
+            )
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> None:
         started, model = self._starts.pop(run_id, (time.perf_counter(), "?"))
         usage: dict[str, Any] = {}
-        tool_calls = 0
+        tool_calls: list[str] = []
+        response_preview = ""
         for gen_list in response.generations:
             for gen in gen_list:
                 msg = getattr(gen, "message", None)
                 if msg is not None:
                     usage = dict(getattr(msg, "usage_metadata", None) or usage)
-                    tool_calls += len(getattr(msg, "tool_calls", None) or [])
+                    t_calls = getattr(msg, "tool_calls", None) or []
+                    tool_calls.extend([tc.get("name", "unknown") for tc in t_calls if isinstance(tc, dict)])
+                    if not response_preview and hasattr(msg, "content"):
+                        response_preview = _preview(msg.content)
+                elif hasattr(gen, "text") and not response_preview:
+                    response_preview = _preview(gen.text)
+
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        in_tok = usage.get("input_tokens")
+        out_tok = usage.get("output_tokens")
+        tot_tok = usage.get("total_tokens") or ((in_tok or 0) + (out_tok or 0) if in_tok or out_tok else None)
+
+        cost_usd = estimate_token_cost(model, in_tok, out_tok)
+        cost_str = format_cost(cost_usd)
+
         llm_logger.info(
             "llm_finished",
             agent=self.agent,
             model=model,
-            duration_ms=int((time.perf_counter() - started) * 1000),
-            input_tokens=usage.get("input_tokens"),
-            output_tokens=usage.get("output_tokens"),
-            tool_calls=tool_calls,
+            duration_ms=duration_ms,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            total_tokens=tot_tok,
+            estimated_cost_usd=cost_usd,
+            cost=cost_str,
+            tool_calls=len(tool_calls),
+            tool_names=tool_calls if tool_calls else None,
+            preview=response_preview if response_preview else None,
         )
+        if self.agent:
+            get_component_logger(LogKind.AGENT, self.agent).info(
+                "llm_call_completed",
+                model=model,
+                duration_ms=duration_ms,
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                cost=cost_str,
+                tool_calls=tool_calls if tool_calls else None,
+            )
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
         started, model = self._starts.pop(run_id, (time.perf_counter(), "?"))
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        diagnosis = _diagnose_llm_error(error, model)
+
         llm_logger.error(
             "llm_failed",
             agent=self.agent,
             model=model,
-            duration_ms=int((time.perf_counter() - started) * 1000),
+            duration_ms=duration_ms,
+            error=f"{type(error).__name__}: {error}",
+            diagnosis=diagnosis,
+        )
+        if self.agent:
+            get_component_logger(LogKind.AGENT, self.agent).error(
+                "llm_call_failed",
+                model=model,
+                duration_ms=duration_ms,
+                error=f"{type(error).__name__}: {error}",
+                diagnosis=diagnosis,
+            )
+        get_component_logger(LogKind.AGENT, "diagnostic").error(
+            "llm_failure_diagnosed",
+            agent=self.agent,
+            model=model,
+            duration_ms=duration_ms,
+            error_type=type(error).__name__,
+            error_message=str(error),
+            remediation=diagnosis,
+        )
+
+    # ----------------------------------------------------------- agent graph --
+    def on_chain_start(
+        self, serialized: dict[str, Any], inputs: dict[str, Any], *, run_id: UUID, **kwargs: Any
+    ) -> None:
+        name = (serialized or {}).get("name") or kwargs.get("name") or "agent_node"
+        node = (kwargs.get("metadata") or {}).get("langgraph_node") or name
+        self._starts[run_id] = (time.perf_counter(), str(node))
+        if self.agent:
+            get_component_logger(LogKind.AGENT, self.agent).info(
+                "agent_step_started",
+                node=node,
+                agent=self.agent,
+            )
+
+    def on_chain_end(self, outputs: dict[str, Any] | Any, *, run_id: UUID, **kwargs: Any) -> None:
+        started, node = self._starts.pop(run_id, (time.perf_counter(), "agent_node"))
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        if self.agent:
+            get_component_logger(LogKind.AGENT, self.agent).info(
+                "agent_step_finished",
+                node=node,
+                agent=self.agent,
+                duration_ms=duration_ms,
+            )
+
+    def on_chain_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+        started, node = self._starts.pop(run_id, (time.perf_counter(), "agent_node"))
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        if self.agent:
+            get_component_logger(LogKind.AGENT, self.agent).error(
+                "agent_step_failed",
+                node=node,
+                agent=self.agent,
+                duration_ms=duration_ms,
+                error=f"{type(error).__name__}: {error}",
+            )
+        get_component_logger(LogKind.AGENT, "diagnostic").error(
+            "agent_node_failed",
+            node=node,
+            agent=self.agent,
+            duration_ms=duration_ms,
             error=f"{type(error).__name__}: {error}",
         )
 

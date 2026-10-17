@@ -187,6 +187,11 @@ _SENSITIVE_KEYS = frozenset(
         "supabase_secret_key",
         "supabase_service_role_key",
         "supabase_publishable_key",
+        # Observability credentials (LangSmith & Langfuse)
+        "langchain_api_key",
+        "langsmith_api_key",
+        "langfuse_public_key",
+        "langfuse_secret_key",
         # ``llm_extra_headers`` is merged into every outbound LLM request, and
         # gateways (OpenRouter, LiteLLM, vLLM) routinely carry
         # ``Authorization: Bearer <key>`` in exactly that field. It looked

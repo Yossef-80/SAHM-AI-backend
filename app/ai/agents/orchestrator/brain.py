@@ -27,6 +27,7 @@ from app.ai.agents.orchestrator.presentation import (
 from app.ai.agents.salma.graph import salma_graph
 from app.ai.loggers.callbacks import AILoggingCallback, AIToolAuditCallback
 from app.ai.memory.compressor import compress_history_messages
+from app.ai.observability import get_observability_callbacks
 from app.ai.providers.llm import get_llm
 from app.ai.security import redact_sensitive_data
 from app.ai.settings import get_ai_settings
@@ -2589,7 +2590,7 @@ async def orchestrate(
             try:
                 decision = await router.ainvoke(
                     messages,
-                    config={"callbacks": [AILoggingCallback(agent="orchestrator")]},
+                    config={"callbacks": get_observability_callbacks(agent="orchestrator")},
                 )
             except TypeError:
                 decision = await router.ainvoke(messages)
@@ -2721,7 +2722,7 @@ async def orchestrate(
         return (
             {
                 "configurable": configurable,
-                "callbacks": [AILoggingCallback(agent=agent_name), audit],
+                "callbacks": get_observability_callbacks(agent=agent_name, audit=audit),
             },
             competitor_ads_path,
         )
@@ -2986,7 +2987,7 @@ async def orchestrate(
             try:
                 fallback_res = await general_llm.ainvoke(
                     chat_msgs,
-                    config={"callbacks": [AILoggingCallback(agent="chat")]},
+                    config={"callbacks": get_observability_callbacks(agent="chat")},
                 )
             except TypeError:
                 fallback_res = await general_llm.ainvoke(chat_msgs)
@@ -3069,7 +3070,7 @@ async def orchestrate(
         try:
             formatted = await block_llm.ainvoke(
                 format_msgs,
-                config={"callbacks": [AILoggingCallback(agent="formatting")]},
+                config={"callbacks": get_observability_callbacks(agent="formatting")},
             )
         except TypeError:
             formatted = await block_llm.ainvoke(format_msgs)

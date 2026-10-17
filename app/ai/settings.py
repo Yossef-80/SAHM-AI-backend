@@ -228,6 +228,23 @@ class AISettings(BaseSettings):
     log_max_bytes: int = Field(5_000_000, gt=0, validation_alias=_env("AI_LOG_MAX_BYTES"))
     log_backup_count: int = Field(3, ge=0, validation_alias=_env("AI_LOG_BACKUP_COUNT"))
 
+    # =============================================== OBSERVABILITY & TRACING ====
+    langchain_tracing_v2: bool = Field(False, validation_alias=_env("LANGCHAIN_TRACING_V2"))
+    langchain_api_key: str | None = Field(
+        None, validation_alias=_env("LANGCHAIN_API_KEY", "LANGSMITH_API_KEY")
+    )
+    langchain_project: str = Field(
+        "sahm-ai", validation_alias=_env("LANGCHAIN_PROJECT", "LANGSMITH_PROJECT")
+    )
+    langchain_endpoint: str | None = Field(
+        None, validation_alias=_env("LANGCHAIN_ENDPOINT", "LANGSMITH_ENDPOINT")
+    )
+    langfuse_public_key: str | None = Field(None, validation_alias=_env("LANGFUSE_PUBLIC_KEY"))
+    langfuse_secret_key: str | None = Field(None, validation_alias=_env("LANGFUSE_SECRET_KEY"))
+    langfuse_host: str = Field(
+        "https://cloud.langfuse.com", validation_alias=_env("LANGFUSE_HOST", "LANGFUSE_BASEURL")
+    )
+
     @field_validator("ollama_base_url", "ads_vlm_base_url", mode="after")
     @classmethod
     def _strip_url(cls, v: str | None) -> str | None:

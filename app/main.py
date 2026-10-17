@@ -33,6 +33,7 @@ from app.api import (
     memory,
     recommendations,
     research,
+    subscriptions,
     tasks,
     tools,
     usage,
@@ -293,9 +294,10 @@ def create_app() -> FastAPI:
     # --- P2 configuration surface ---
     app.include_router(memory.router, prefix=prefix)
     app.include_router(settings_router.router, prefix=prefix)
-    # --- P4 usage / audit ---
+    # --- P4 usage / audit / subscriptions ---
     app.include_router(usage.router, prefix=prefix)
     app.include_router(audit.router, prefix=prefix)
+    app.include_router(subscriptions.router, prefix=prefix)
 
     # ------------------------------------------------------------- errors --
     def browser_visible_headers(request: Request) -> dict[str, str]:
