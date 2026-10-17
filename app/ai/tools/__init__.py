@@ -2,6 +2,7 @@
 
 from app.ai.tools.analyze_website import analyze_website_tool
 from app.ai.tools.brand_context import get_brand_context_tool
+from app.ai.tools.brand_identity import update_brand_identity_tool
 from app.ai.tools.brand_research import brand_report, full_analysis, route_file_to_tool
 from app.ai.tools.fetch_competitor_ads import fetch_competitor_ads, fetch_competitor_ads_tool
 from app.ai.tools.fetch_ga4_performance import fetch_ga4_performance, fetch_ga4_performance_tool
@@ -29,5 +30,6 @@ __all__ = [
     "get_reviews_tool",
     "route_file_to_tool",
     "save_learning_tool",
+    "update_brand_identity_tool",
     "web_search_tool",
 ]

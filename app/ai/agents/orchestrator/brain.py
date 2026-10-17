@@ -2736,6 +2736,19 @@ async def orchestrate(
             decision.agent = "layla"
             decision.workflow = "single"
             decision.reason = "Explicit image generation requested inside Sahm."
+        low_p = prompt.lower()
+        if any(
+            k in low_p
+            for k in (
+                "brand color", "brand colors", "brand colour", "brand colours", "palette", "visual identity",
+                "لون البراند", "الوان البراند", "ألوان البراند", "الهوية البصرية", "هوية البراند",
+                "غير لون", "عدل لون", "غير ألوان", "عدل ألوان", "غير الالوان", "غير الألوان",
+                "نبرة الصوت", "شعار البراند",
+            )
+        ) and decision.agent not in {"layla", "omar"}:
+            decision.agent = "layla" if any(k in low_p for k in ("color", "colour", "لون", "الوان", "ألوان", "palette", "visual", "شكل")) else "omar"
+            decision.workflow = "single"
+            decision.reason = "Brand identity or color update requested."
     except Exception as exc:
         print(f"[ORCHESTRATOR] Routing failed; using chat fallback ({type(exc).__name__}).")
         if creative_prompt_workflow:

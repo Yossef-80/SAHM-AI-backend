@@ -176,3 +176,30 @@ async def test_api_sync_brand_identity(api_client: AsyncClient) -> None:
     assert "swot" in data
     assert isinstance(data["competitors"], list)
 
+
+@pytest.mark.asyncio
+async def test_update_brand_identity_tool(seeded_db: AsyncSession) -> None:
+    import json
+    from app.ai.tools.brand_identity import update_brand_identity_tool
+
+    res_str = await update_brand_identity_tool.ainvoke(
+        {
+            "primary_color": "yellow",
+            "accent_color": "orange",
+            "brand_voice": "Energetic and warm",
+        },
+        config={"configurable": {"tool_db": seeded_db, "business_id": "biz_test"}},
+    )
+    res = json.loads(res_str)
+    assert res.get("status") == "ok", res
+    assert res["primary_color"] == "#FACC15"
+    assert res["accent_color"] == "#EA580C"
+    assert res["brand_voice"] == "Energetic and warm"
+
+    # Verify database was updated immediately
+    identity = await get_brand_identity(seeded_db, "biz_test")
+    assert identity.colors.primary == "#FACC15"
+    assert identity.colors.accent == "#EA580C"
+    assert identity.essence.brand_voice == "Energetic and warm"
+
+

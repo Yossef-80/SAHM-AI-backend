@@ -12,7 +12,7 @@ from app.ai.agents.layla.schema import CreativeBrief
 from app.ai.agents.layla.state import LaylaState
 from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
-from app.ai.tools import get_brand_context_tool
+from app.ai.tools import get_brand_context_tool, update_brand_identity_tool
 from app.ai.tools.core_bridge import get_core_tools_for_agent, persist_ai_tools
 from app.ai.tools.image_generation import generate_image_draft_tool
 from app.core.i18n import SUBAGENT_LANGUAGE_RULE
@@ -25,7 +25,7 @@ def submit_creative_brief(**kwargs) -> str:
 
 
 LAYLA_TOOLS = [
-    *persist_ai_tools([get_brand_context_tool]),
+    *persist_ai_tools([get_brand_context_tool, update_brand_identity_tool]),
     *get_core_tools_for_agent("layla"),
     submit_creative_brief,
     generate_image_draft_tool,
@@ -38,6 +38,10 @@ or creative variations as requested. Preserve the user's intended visual details
 and do not add unsupported offers, claims, brand facts, or CTAs. Proofread the
 final copy for spelling, grammar, natural phrasing, and the user's apparent dialect
 before submitting; do not leave malformed or accidental words in the ad text.
+
+BRAND IDENTITY & VISUAL STYLE UPDATES:
+- When the user asks to change, update, or set brand colors (e.g. "غير لون البراند للاصفر", "change brand colors to yellow and orange"), visual style, or palette, IMMEDIATELY call update_brand_identity_tool with the requested colors (e.g. primary_color, accent_color).
+- Confirm the update explicitly in your reply once the tool succeeds.
 
 REFERENCE-IMAGE FLOW:
 - Analyze an image only when the user clearly identifies it as a reference/inspiration.

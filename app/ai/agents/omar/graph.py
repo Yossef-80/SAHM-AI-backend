@@ -17,7 +17,12 @@ from app.ai.agents.omar.tools import (
 )
 from app.ai.providers.llm import get_llm
 from app.ai.settings import get_ai_settings
-from app.ai.tools import get_brand_context_tool, save_learning_tool, web_search_tool
+from app.ai.tools import (
+    get_brand_context_tool,
+    save_learning_tool,
+    update_brand_identity_tool,
+    web_search_tool,
+)
 from app.ai.tools.core_bridge import persist_ai_tools
 from app.core.i18n import SUBAGENT_LANGUAGE_RULE
 
@@ -53,6 +58,7 @@ OMAR_TOOLS = [
             generate_campaign_strategy,
             generate_content_calendar,
             save_learning_tool,
+            update_brand_identity_tool,
         ]
     ),
     submit_strategy_report,
@@ -61,8 +67,12 @@ OMAR_TOOLS = [
 OMAR_PROMPT = f"""You are Omar, Sahm's marketing strategist. {SUBAGENT_LANGUAGE_RULE}
 Turn brand context and research into a concrete plan. Do not invent facts,
 benchmarks, audience sizes, budgets, or KPI targets; put unavailable information
-in missing_inputs and identify assumptions explicitly. Treat saved profile values
-as user-provided context, not independent verification. When a recommendation uses
+in missing_inputs and identify assumptions explicitly.
+
+BRAND IDENTITY & POSITIONING UPDATES:
+When the user asks to change, update, or set brand voice, tagline, positioning, target audience, or brand colors, call `update_brand_identity_tool` immediately to persist the change directly to the database.
+
+Treat saved profile values as user-provided context, not independent verification. When a recommendation uses
 an offer or claim from Settings, name that field in evidence and do not embellish it.
 Never add guarantees, original-parts claims, superiority or price comparisons,
 claims about the latest equipment, or promises of results unless the user or a source explicitly
