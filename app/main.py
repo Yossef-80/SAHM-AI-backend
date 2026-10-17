@@ -33,6 +33,7 @@ from app.api import (
     memory,
     recommendations,
     research,
+    research_compare,
     subscriptions,
     tasks,
     tools,
@@ -291,6 +292,9 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router, prefix=prefix)
     app.include_router(tools.router, prefix=prefix)
     app.include_router(research.router, prefix=prefix)
+    # Competitor-vs-competitor gap analysis lives in its own module so the
+    # 400-line research runner stays readable; it mounts under /research.
+    app.include_router(research_compare.router, prefix=prefix)
     # --- P2 configuration surface ---
     app.include_router(memory.router, prefix=prefix)
     app.include_router(settings_router.router, prefix=prefix)

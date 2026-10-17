@@ -112,3 +112,66 @@ def test_llm_error_diagnosis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert "Network/Connection Failure" in llm_log
     assert "llm_call_failed" in layla_log
     assert "llm_failure_diagnosed" in diagnostic_log
+
+
+def test_callback_methods_are_real_class_attributes() -> None:
+    """Regression: a mis-indented helper once nested these methods into a function.
+
+    Nested methods still *import* and still *parse*, so nothing fails until
+    runtime — at which point ``on_llm_end`` is a silent no-op inherited from the
+    LangChain base class and every call is logged as started and never finished.
+    """
+    from langchain_core.callbacks import BaseCallbackHandler
+
+    from app.ai.loggers.callbacks import AILoggingCallback
+
+    expected = {
+        "on_chat_model_start",
+        "on_llm_end",
+        "on_llm_error",
+        "on_chain_start",
+        "on_chain_end",
+        "on_chain_error",
+        "on_tool_start",
+        "on_tool_end",
+        "on_tool_error",
+    }
+    for name in expected:
+        assert name in AILoggingCallback.__dict__, f"{name} is not defined on AILoggingCallback"
+        assert getattr(AILoggingCallback, name) is not getattr(BaseCallbackHandler, name, object)
+
+
+def test_callback_reads_usage_from_llm_output_when_message_has_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Providers that report tokens on ``llm_output`` must still produce a cost."""
+    import app.ai.loggers.base as log_base
+    from langchain_core.outputs import Generation
+
+    from app.ai.loggers.callbacks import AILoggingCallback
+
+    settings = AISettings(_env_file=None, log_dir=str(tmp_path), log_format=LogFormat.TEXT)
+    monkeypatch.setattr(log_base, "get_ai_settings", lambda: settings)
+
+    callback = AILoggingCallback(agent="omar")
+    run_id = uuid4()
+    callback._starts[run_id] = (0.0, "gpt-4o")
+    callback.on_llm_end(
+        LLMResult(
+            generations=[[Generation(text="ok")]],
+            llm_output={
+                "token_usage": {"prompt_tokens": 1000, "completion_tokens": 500},
+                "model_name": "gpt-4o",
+            },
+        ),
+        run_id=run_id,
+    )
+
+    log_file = tmp_path / "providers" / "llm.log"
+    assert log_file.exists()
+    text = log_file.read_text(encoding="utf-8")
+    assert "usage_source='llm_output'" in text
+    assert "input_tokens=1000" in text
+    assert "output_tokens=500" in text
+    # 1,000 in at $2.50/1M + 500 out at $10.00/1M = $0.0075
+    assert "estimated_cost_usd=0.0075" in text

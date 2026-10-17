@@ -14,47 +14,19 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+from app.config import MODEL_PRICING
+
 
 class ModelPricing(NamedTuple):
     input_usd_per_m: float
     output_usd_per_m: float
 
 
-#: Pricing table: (input USD per 1M tokens, output USD per 1M tokens).
-#: Source: Official provider pricing sheets.
+#: Backwards-compatible alias. Tariffs are declared in ``app/config.py`` so the
+#: "model ids live in config only" invariant stays true.
 _PRICING_TABLE: dict[str, ModelPricing] = {
-    # OpenAI
-    "gpt-4o": ModelPricing(2.50, 10.00),
-    "gpt-4o-mini": ModelPricing(0.15, 0.60),
-    "gpt-4-turbo": ModelPricing(10.00, 30.00),
-    "o1": ModelPricing(15.00, 60.00),
-    "o1-preview": ModelPricing(15.00, 60.00),
-    "o1-mini": ModelPricing(3.00, 12.00),
-    "o3-mini": ModelPricing(1.10, 4.40),
-    # Anthropic
-    "claude-3-5-sonnet": ModelPricing(3.00, 15.00),
-    "claude-3-5-haiku": ModelPricing(0.80, 4.00),
-    "claude-3-opus": ModelPricing(15.00, 75.00),
-    "claude-3-sonnet": ModelPricing(3.00, 15.00),
-    "claude-3-haiku": ModelPricing(0.25, 1.25),
-    # Google Gemini
-    "gemini-1.5-pro": ModelPricing(1.25, 5.00),
-    "gemini-1.5-flash": ModelPricing(0.075, 0.30),
-    "gemini-2.0-flash": ModelPricing(0.10, 0.40),
-    "gemini-2.0-flash-exp": ModelPricing(0.00, 0.00),  # Free during preview
-    # Groq / Open Source
-    "llama-3.3-70b": ModelPricing(0.59, 0.79),
-    "llama-3.1-70b": ModelPricing(0.59, 0.79),
-    "llama-3.1-8b": ModelPricing(0.05, 0.08),
-    "mixtral-8x7b": ModelPricing(0.24, 0.24),
-    # DeepSeek
-    "deepseek-chat": ModelPricing(0.14, 0.28),
-    "deepseek-reasoner": ModelPricing(0.55, 2.19),
-    # Local & Mock
-    "mock": ModelPricing(0.0, 0.0),
-    "ollama": ModelPricing(0.0, 0.0),
+    model: ModelPricing(*rates) for model, rates in MODEL_PRICING.items()
 }
-
 
 def _match_pricing(model_name: str | None) -> ModelPricing:
     """Find the best pricing entry matching the given model name."""
@@ -74,9 +46,11 @@ def _match_pricing(model_name: str | None) -> ModelPricing:
         # Local models running on Ollama are free
         return ModelPricing(0.0, 0.0)
 
-    for key, pricing in _PRICING_TABLE.items():
+    # Longest key first, so a dated variant of a mini model cannot match the
+    # pricier base row that happens to be a prefix of it.
+    for key in sorted(_PRICING_TABLE, key=len, reverse=True):
         if key in clean:
-            return pricing
+            return _PRICING_TABLE[key]
 
     # Fallback to an economical estimate ($0.50 / $1.50 per 1M)
     return ModelPricing(0.50, 1.50)

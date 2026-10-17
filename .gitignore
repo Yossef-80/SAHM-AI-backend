@@ -57,3 +57,6 @@ brand_data/
 .idea/
 .vscode/
 .DS_Store
+
+# Memory validation harness output (scripts/validate_memory.py)
+memory_validation_results.json

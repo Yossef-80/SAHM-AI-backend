@@ -1,3 +1,0 @@
-2026-10-12 12:42:52 | ERROR   | tool.get_brand_context | brand_context_read_failed | business_id='default' error_type='ProviderNotInstalledError'
-2026-10-12 12:43:03 | ERROR   | tool.get_brand_context | brand_context_read_failed | business_id='default' error_type='ProviderNotInstalledError'
-2026-10-12 12:43:19 | ERROR   | tool.get_brand_context | brand_context_read_failed | business_id='default' error_type='ProviderNotInstalledError'

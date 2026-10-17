@@ -580,6 +580,29 @@ async def handle_message(
             "style": style,
         }
 
+    # A Research-page result the user chose to discuss. Research runs already
+    # store their full report in brand memory (`app/api/research.py`, kind_map),
+    # but until now nothing could read it back: the UI sent a memory id as
+    # `competitor_id` and no code path consumed that field, so the model only
+    # ever saw the competitor's *name* and re-ran the research. Loading the row
+    # here turns the chip into real context.
+    research_id = str(context.get("research_item_id") or "").strip()
+    if research_id:
+        research_item = await db.get(BrandMemoryItem, research_id)
+        if research_item is None or research_item.business_id != business.id:
+            raise NotFoundError("research item not found")
+        research_meta = research_item.metadata_ or {}
+        research_details = research_meta.get("details")
+        ai_context["research_item_context"] = {
+            "id": research_item.id,
+            "kind": research_item.kind,
+            "title": str(research_meta.get("title") or "Research result")[:200],
+            "query": str(research_meta.get("query") or "")[:300],
+            "tool": str(research_meta.get("tool") or "")[:80],
+            "report": research_item.text[:6000],
+            "details": research_details if isinstance(research_details, dict) else {},
+        }
+
     # Images attached to *this* message. Loaded here (bytes never live in the
     # conversation context) so the AI layer can show them to a vision-capable
     # chat model without the creative-reference workflow being involved.
@@ -763,6 +786,14 @@ async def handle_message(
             _logger.warning(
                 "memory_consolidation_schedule_failed", extra={"error": str(exc)}
             )
+
+    try:
+        from app.ai.observability import flush_observability
+
+        flush_observability()
+    except Exception:
+        pass
+
     return AssistantMessageResponse(
         message=assistant_message,
         user_message=user_message,

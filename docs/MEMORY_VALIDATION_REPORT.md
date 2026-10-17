@@ -7,7 +7,7 @@ code walkthrough; a measurement report.
 **Scope:** memory only. The bilingual *answer* contract is a separate change and is
 documented in [`LANGUAGE_POLICY.md`](./LANGUAGE_POLICY.md).
 **Artifacts:** `app/core/memory/`, `app/ai/memory/consolidator.py`, `docs/MEMORY_ARCHITECTURE.md`,
-`/home/user/sahm/validate_memory.py`, `/home/user/sahm/memory_validation_results.json`
+`scripts/validate_memory.py` (the harness), `memory_validation_results.json` (its output)
 
 ---
 
@@ -113,7 +113,9 @@ deliberate design decision and it holds.
 
 ## 3. Evidence
 
-Reproduce: `PYTHONPATH=. python3 /home/user/sahm/validate_memory.py` (15 checks, 11 pass).
+Reproduce: `PYTHONPATH=. python3 scripts/validate_memory.py` (15 checks, 11 pass).
+It needs no network, no LLM and no database server — it builds a throwaway SQLite
+file and drives the real store and consolidator.
 
 | # | Check | Measured | Verdict |
 |---|---|---|---|
@@ -304,16 +306,30 @@ closed.**
 
 ## Appendix A — reproduce
 
-```bash
-cd /home/user/sahm/SAHM-AI-backend-main
-PYTHONPATH=. python3 /home/user/sahm/validate_memory.py     # 15 behavioural checks
-PYTHONPATH=. python3 -m pytest tests/ -q                    # 880 tests
-PYTHONPATH=. python3 - <<'PY'                               # migration chain
-# see /tmp/mig_test.py in the validation run: fresh, legacy, re-run, downgrade
-PY
+From the repository root (PowerShell users: run `$env:PYTHONPATH="."` first):
+
+```
+PYTHONPATH=. python3 scripts/validate_memory.py     # 15 behavioural checks, 11 pass
+PYTHONPATH=. python3 -m pytest tests/ -q            # 880 tests
 ```
 
-Results are written to `/home/user/sahm/memory_validation_results.json`.
+Migration chain, against a throwaway database rather than the deployment one:
+
+```
+export DATABASE_URL="sqlite+aiosqlite:///./var/mig_check.db"
+alembic upgrade head && alembic downgrade -1 && alembic upgrade head
+rm -f ./var/mig_check.db
+```
+
+The harness prints a SUMMARY block and writes `memory_validation_results.json`
+into the repository root, so a later run can be diffed against the numbers in
+this report. It is gitignored: it is output, not source.
+
+**The four failures are findings, not bugs to fix before shipping.** They are the
+measured limits reported in section 1 — same-language retrieval misses, the
+cross-language gap, paraphrase dedupe, and the in-process consolidator lock
+(R-02). A run that reports 15/15 means the behaviour changed and this report is
+out of date.
 
 ## Appendix B — changed as a direct result of this validation
 

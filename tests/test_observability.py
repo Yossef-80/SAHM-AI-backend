@@ -39,6 +39,11 @@ def test_langsmith_detection(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_langfuse_detection_and_safe_init(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.ai.settings import get_ai_settings
+
+    settings = get_ai_settings()
+    monkeypatch.setattr(settings, "langfuse_public_key", None)
+    monkeypatch.setattr(settings, "langfuse_secret_key", None)
     monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
     monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
 

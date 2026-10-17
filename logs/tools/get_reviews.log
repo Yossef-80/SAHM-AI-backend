@@ -1,2 +1,0 @@
-2026-10-11 00:01:51 | INFO    | tool.get_reviews | reviews_done | business='Andora Egypt' requested=10 status='unavailable' duration_ms=0
-2026-10-14 11:35:05 | INFO    | tool.get_reviews | reviews_done | business='Shaheen Coffee' requested=5 status='unavailable' duration_ms=0

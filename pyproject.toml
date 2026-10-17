@@ -37,6 +37,10 @@ dependencies = [
     "psycopg[binary]>=3.3.6",
     "google-analytics-data>=0.23.3",
     "apify-client>=3.3.0",
+    # Observability: Langfuse traces + cost tracking. Optional at runtime (the
+    # import is guarded and keys absent = disabled), but shipped by default so a
+    # fresh `uv sync` can actually trace; `langsmith` arrives via langchain.
+    "langfuse>=3.0",
 ]
 
 [project.optional-dependencies]

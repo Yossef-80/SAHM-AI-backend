@@ -214,7 +214,8 @@ docs/                        architecture, memory, language, product, presentati
 mcp_servers/brand_mcp.py     standalone brand-research MCP server (brand_report,
                              full_analysis); imported by app/core/tools/research.py
 scripts/                     operator and dev scripts (db_admin backup/restore,
-                             seed_demo_data, migration + schema checks)
+                             seed_demo_data, schema checks, validate_memory.py
+                             -- the memory harness behind MEMORY_VALIDATION_REPORT)
 AGENTS.md                    the map: task → files → tests (read this before the code)
 ```
 

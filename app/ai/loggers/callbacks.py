@@ -51,6 +51,26 @@ def _diagnose_llm_error(error: BaseException, model: str | None) -> str:
     return f"Model call failed ({err_type}). Inspect stack trace and check input payload."
 
 
+def _usage_from_llm_output(response: LLMResult) -> dict[str, Any]:
+    """Provider-reported usage when the message itself carries no ``usage_metadata``.
+
+    Some providers (and older LangChain paths) report tokens on
+    ``LLMResult.llm_output["token_usage"]`` using OpenAI-style keys instead of
+    ``AIMessage.usage_metadata``. Without this fallback a paid call would log
+    ``Free ($0.00)`` — the worst possible failure mode for a cost tracker,
+    because it looks like a healthy zero instead of missing data.
+    """
+    raw = (response.llm_output or {}).get("token_usage") or {}
+    if not isinstance(raw, dict):
+        return {}
+    mapped = {
+        "input_tokens": raw.get("input_tokens") or raw.get("prompt_tokens"),
+        "output_tokens": raw.get("output_tokens") or raw.get("completion_tokens"),
+        "total_tokens": raw.get("total_tokens"),
+    }
+    return {key: value for key, value in mapped.items() if value is not None}
+
+
 class AILoggingCallback(BaseCallbackHandler):
     """Routes tool, LLM, and agent events to their own diagnostic log files."""
 
@@ -142,6 +162,15 @@ class AILoggingCallback(BaseCallbackHandler):
                 elif hasattr(gen, "text") and not response_preview:
                     response_preview = _preview(gen.text)
 
+        usage_source = "message" if usage else None
+        if not usage:
+            usage = _usage_from_llm_output(response)
+            usage_source = "llm_output" if usage else None
+
+        # Some providers only name the model on the response, not at start.
+        if model in ("?", "", "None"):
+            model = (response.llm_output or {}).get("model_name") or model
+
         duration_ms = int((time.perf_counter() - started) * 1000)
         in_tok = usage.get("input_tokens")
         out_tok = usage.get("output_tokens")
@@ -158,6 +187,7 @@ class AILoggingCallback(BaseCallbackHandler):
             input_tokens=in_tok,
             output_tokens=out_tok,
             total_tokens=tot_tok,
+            usage_source=usage_source,
             estimated_cost_usd=cost_usd,
             cost=cost_str,
             tool_calls=len(tool_calls),

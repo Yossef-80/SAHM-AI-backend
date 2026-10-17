@@ -108,3 +108,27 @@ async def test_subscriptions_api_endpoints(api_client: AsyncClient) -> None:
     assert switch_data["success"] is True
     assert switch_data["newPlan"]["id"] == "pro"
     assert switch_data["updatedDailyBudget"] == 1_000_000
+
+
+async def test_displayed_budget_matches_the_enforced_budget(
+    seeded_db: AsyncSession, test_settings
+) -> None:
+    """The plan endpoint must report the ceiling the cost guard actually enforces.
+
+    A workspace without an override used to be shown a hardcoded 100k while the
+    guard fell back to ``Settings.daily_token_budget`` (2M by default) — the user
+    would see "5% used" and then get cut off at a completely different number.
+    """
+    from app.core.subscriptions import get_workspace_subscription
+    from app.core.usage import effective_daily_budget
+
+    business = await seeded_db.scalar(select(Business))
+    assert business is not None
+    business.daily_token_budget = None
+    await seeded_db.commit()
+
+    status = await get_workspace_subscription(seeded_db, business.workspace_id)
+    enforced = await effective_daily_budget(seeded_db, business.workspace_id)
+
+    assert status.daily_token_budget == enforced
+    assert status.daily_token_budget == test_settings.daily_token_budget

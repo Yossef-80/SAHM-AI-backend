@@ -29,6 +29,11 @@ class MessageContext(ApiModel):
     business_id: str | None = None
     competitor_id: str | None = None
     competitor_name: str | None = None
+    #: A stored Research-page result (``BrandMemoryItem`` id). Unlike
+    #: ``competitor_id`` this is actually read: the service loads the row and
+    #: hands its report to the model, so "chat about this research" answers from
+    #: what the user already paid for instead of re-running the tool.
+    research_item_id: str | None = None
     #: Images uploaded with this turn (``POST /assistant/attachments``). They are
     #: shown to the model as multimodal content for *this* turn only and are
     #: never persisted into the conversation's sticky context -- re-attaching a

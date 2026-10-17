@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.observability import get_observability_status
 from app.core.errors import NotFoundError, ValidationFailed
 from app.core.logging import get_logger
-from app.core.usage import workspace_usage_today
+from app.core.usage import effective_daily_budget, workspace_usage_today
 from app.db.models import Business
 from app.schemas.subscriptions import (
     PlanId,
@@ -129,7 +129,11 @@ async def get_workspace_subscription(
     if business is None:
         raise NotFoundError(f"Business for workspace '{workspace_id}' not found.")
 
-    daily_budget = business.daily_token_budget or 100_000
+    # Read the budget through the same resolver the cost guard uses, so the
+    # number shown here is the number actually enforced. Falls back to
+    # ``Settings.daily_token_budget`` (2M by default) when the workspace has no
+    # override — not to a hardcoded 100k, which would under-report the ceiling.
+    daily_budget = await effective_daily_budget(db, business.workspace_id or workspace_id)
     current_plan = resolve_plan_for_budget(daily_budget)
 
     tokens_used = await workspace_usage_today(db, business.workspace_id or workspace_id)
@@ -163,7 +167,9 @@ async def switch_workspace_plan(
     if business is None:
         raise NotFoundError(f"Business for workspace '{workspace_id}' not found.")
 
-    previous_plan = resolve_plan_for_budget(business.daily_token_budget)
+    previous_plan = resolve_plan_for_budget(
+        await effective_daily_budget(db, business.workspace_id or workspace_id)
+    )
     new_plan = get_plan(new_plan_id)
 
     # Update business token budget in the database

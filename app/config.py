@@ -495,6 +495,45 @@ class Settings(BaseSettings):
         return "openai" in providers and bool(self.openai_api_key)
 
 
+#: Token tariffs, USD per 1M tokens: ``{model_prefix: (input, output)}``.
+#:
+#: These live here, not in ``app/ai/loggers/cost.py``, because model ids are
+#: only allowed in this module (``tests/test_llm_layer.py`` enforces it). The
+#: estimator matches the longest key contained in the runtime model name, so
+#: ``gpt-4o-mini-2024-07-18`` resolves to the ``gpt-4o-mini`` row.
+MODEL_PRICING: dict[str, tuple[float, float]] = {
+    # OpenAI (USD per 1M tokens)
+    "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4o": (2.50, 10.00),
+    "gpt-4-turbo": (10.00, 30.00),
+    "o1-preview": (15.00, 60.00),
+    "o1-mini": (3.00, 12.00),
+    "o1": (15.00, 60.00),
+    "o3-mini": (1.10, 4.40),
+    # Anthropic (USD per 1M tokens)
+    "claude-3-5-sonnet": (3.00, 15.00),
+    "claude-3-5-haiku": (0.80, 4.00),
+    "claude-3-opus": (15.00, 75.00),
+    "claude-3-sonnet": (3.00, 15.00),
+    "claude-3-haiku": (0.25, 1.25),
+    # Google Gemini (USD per 1M tokens)
+    "gemini-1.5-pro": (1.25, 5.00),
+    "gemini-1.5-flash": (0.075, 0.30),
+    "gemini-2.0-flash-exp": (0.00, 0.00),  # free during preview
+    "gemini-2.0-flash": (0.10, 0.40),
+    # Groq / open-weight models (USD per 1M tokens)
+    "llama-3.3-70b": (0.59, 0.79),
+    "llama-3.1-70b": (0.59, 0.79),
+    "llama-3.1-8b": (0.05, 0.08),
+    "mixtral-8x7b": (0.24, 0.24),
+    # DeepSeek (USD per 1M tokens)
+    "deepseek-chat": (0.14, 0.28),
+    "deepseek-reasoner": (0.55, 2.19),
+    # Local & mock runtimes are genuinely free
+    "mock": (0.0, 0.0),
+    "ollama": (0.0, 0.0),
+}
+
 @lru_cache
 def get_settings() -> Settings:
     """Cached settings accessor (FastAPI dependency friendly)."""
