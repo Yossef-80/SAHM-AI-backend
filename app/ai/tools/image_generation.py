@@ -45,8 +45,16 @@ def _result(status: str, *, reason: str | None = None, asset: Any = None) -> str
     if reason:
         payload["reason"] = reason
     if asset is not None:
+        raw_url = str(asset.url or "")
+        # Never pass raw base64 data URLs into LLM message history: a base64 raster
+        # can easily be 1.7M tokens and exceed the model context length (128k limit).
+        url_for_model = (
+            raw_url[:60] + "... [data URL truncated for model context limit]"
+            if raw_url.startswith("data:")
+            else raw_url
+        )
         payload["asset"] = {
-            "url": asset.url,
+            "url": url_for_model,
             "prompt": asset.prompt,
             "provider": asset.provider,
             "model": asset.model,
@@ -162,6 +170,14 @@ async def generate_image_draft_tool(
         return _result("unavailable", reason=f"Image generation failed ({type(exc).__name__}{detail}).")
 
     if asset is not None:
+        if str(asset.url or "").startswith("data:"):
+            from app.core.tools.media import _persist_generated_data_url
+            try:
+                asset.url = _persist_generated_data_url(asset.url, get_settings())
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("Could not persist generated data URL: %s", exc)
+
         db = configurable.get("tool_db")
         biz_id = configurable.get("business_id")
         campaign_id = configurable.get("campaign_id")

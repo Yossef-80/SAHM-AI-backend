@@ -183,14 +183,16 @@ async def analyze_reference_image(
         max_pixels=settings.ads_vlm_max_pixels,
     )
     instruction = (
-        "Analyse the attached reference image for a high-fidelity visual recreation. "
-        "Return only structured observations, not a prose summary. Record the canvas "
-        "ratio, background and lighting; transcribe every legible word exactly (same "
-        "language, capitalization and line order); and list up to 24 visible elements "
-        "in reading order with approximate relative position, size, appearance, exact "
-        "visible text, and layer order. Preserve composition and object count. Report "
-        "only what is actually visible: never guess an unreadable word, exact font name, "
-        "palette colour, offer, CTA, or performance claim. Leave uncertain fields empty."
+        "You are an expert commercial advertising art director and computer vision analyzer. "
+        "Analyse the attached reference image with extreme precision and exhaustive detail for high-fidelity visual recreation. "
+        "Return structured observations with full granularity: "
+        "\n1. Background: describe the exact color (provide exact HEX code, e.g. #244733 forest green), gradient or vignette, texture/finish (e.g. seamless matte studio wall, paper, smooth solid backdrop), and any background lighting falloff or cast shadows. "
+        "\n2. Palette: provide an ordered list of 5-10 precise dominant and accent HEX colors found in the image (background, primary product, secondary props, typography, highlights). "
+        "\n3. Lighting: specify direction (e.g. 45-degree soft key light from left), shadow softness, rim lighting, specular highlights on surfaces (glass, liquid, packaging), and color temperature (e.g. warm golden, neutral daylight). "
+        "\n4. Elements: list every single visible element, prop, container, product, decorative icon, and text block (up to 24 items). For each item provide: exact element name, relative position (e.g. bottom-center, mid-left, top-center), relative size, comprehensive appearance details (materials, textures, finishes, colors, reflections), exact visible text verbatim, and layering order (background to foreground). "
+        "\n5. Typography: describe the script, Arabic font style/calligraphy type (e.g. modern geometric sans-serif, classical Thuluth/Naskh/Kufi), text weight, alignment, line breaks, and styling (e.g. flanked by decorative horizontal rules). "
+        "\n6. Composition & Layout: focal point, symmetry/rule-of-thirds, negative space ratio, depth of field, framing, and camera angle. "
+        "\nTranscribe every legible word verbatim in its original language. Report every visual detail so that another artist or generative model can recreate the exact scene."
     )
     if focus and focus.strip():
         instruction += f" Pay particular attention to: {focus.strip()}."

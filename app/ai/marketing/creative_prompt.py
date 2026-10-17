@@ -54,6 +54,14 @@ def compose_reference_faithful_prompt(prompt: str, style: dict[str, Any]) -> str
     ]
 
     if style:
+        p_lower = prompt.lower()
+        color_override = any(
+            k in p_lower
+            for k in (
+                "لون", "الوان", "ألوان", "خلفية", "الخلفية", "براند", "هوية",
+                "color", "colour", "palette", "background", "brand",
+            )
+        )
         observations: list[str] = []
         for key, label in (
             ("canvas_ratio", "Canvas ratio"),
@@ -66,14 +74,19 @@ def compose_reference_faithful_prompt(prompt: str, style: dict[str, Any]) -> str
             ("text_density", "Text density"),
             ("lighting", "Lighting"),
         ):
+            if color_override and key in {"background", "color_mood"}:
+                continue
             value = _as_text(style.get(key))
             if value:
                 observations.append(f"- {label}: {value}")
-        palette = style.get("palette")
-        if isinstance(palette, list) and palette:
-            colors = [str(color)[:40] for color in palette[:16] if str(color).strip()]
-            if colors:
-                observations.append("- Palette, preserve order/relative prominence: " + ", ".join(colors))
+        if not color_override:
+            palette = style.get("palette")
+            if isinstance(palette, list) and palette:
+                colors = [str(color)[:40] for color in palette[:16] if str(color).strip()]
+                if colors:
+                    observations.append("- Palette, preserve order/relative prominence: " + ", ".join(colors))
+        else:
+            observations.append("- Color & Background: STRICT OVERRIDE — follow the user brief's specified brand colors and background completely; do NOT use reference colors or reference background.")
         visible_text = style.get("visible_text")
         if isinstance(visible_text, list) and visible_text:
             exact = [str(text)[:300] for text in visible_text[:24] if str(text).strip()]

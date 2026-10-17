@@ -718,6 +718,15 @@ def _compose_image_prompt(
         return compose_reference_faithful_prompt(prompt, style)
     if not style:
         return prompt
+    p_lower = prompt.lower()
+    color_override = any(
+        k in p_lower
+        for k in (
+            "لون", "الوان", "ألوان", "خلفية", "الخلفية", "براند", "هوية",
+            "color", "colour", "palette", "background", "brand",
+        )
+    )
+
     parts = [prompt, "", "STYLE OBSERVATIONS (follow as closely as possible):"]
     mapping = [
         ("canvas_ratio", "Canvas ratio"),
@@ -735,11 +744,18 @@ def _compose_image_prompt(
         ("elements", "Observed element layout"),
     ]
     for key, label in mapping:
+        if color_override and key in {"background", "palette", "color_mood"}:
+            continue
         value = style.get(key)
         if isinstance(value, list) and value:
             parts.append(f"- {label}: {', '.join(str(v) for v in value)}")
         elif isinstance(value, str) and value:
             parts.append(f"- {label}: {value}")
+    if color_override:
+        parts.append(
+            "- Color & Background: STRICT OVERRIDE — follow the user brief's specified brand colors, "
+            "palette, and background completely; do NOT use reference colors or reference background."
+        )
     if isinstance(style.get("brand_elements"), list) and style["brand_elements"]:
         parts.append(f"- Brand elements: {', '.join(str(v) for v in style['brand_elements'])}")
     return "\n".join(parts)

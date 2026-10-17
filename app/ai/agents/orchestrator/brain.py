@@ -3132,9 +3132,17 @@ async def orchestrate(
             output = agent_output(final_state, submit_tool)
             if decision.agent == "layla":
                 for msg in final_state.get("messages", []):
-                    if getattr(msg, "name", None) == "generate_image_draft_tool" or getattr(msg, "tool_call_id", None) == "gen-1":
+                    msg_name = getattr(msg, "name", None)
+                    msg_id = getattr(msg, "tool_call_id", None)
+                    msg_content = getattr(msg, "content", None)
+                    is_image_call = (
+                        msg_name in {"generate_image_draft_tool", "generate_image"}
+                        or msg_id == "gen-1"
+                        or (isinstance(msg_content, str) and '"layla_image_generation"' in msg_content)
+                    )
+                    if is_image_call:
                         try:
-                            data = json.loads(msg.content) if isinstance(msg.content, str) else msg.content
+                            data = json.loads(msg_content) if isinstance(msg_content, str) else msg_content
                             if isinstance(data, dict) and data.get("status") == "ok" and "asset" in data:
                                 asset = data["asset"]
                                 p_text = asset.get("prompt") or ""
@@ -3192,7 +3200,7 @@ async def orchestrate(
                     language=reply_language,
                 )
                 return OrchestratorResult(
-                    blocks=prompt_blocks,
+                    blocks=[*image_blocks, *prompt_blocks],
                     persona_id="layla",
                     creative_prompt_stage=next_stage,
                     creative_prompt_workflow=True,

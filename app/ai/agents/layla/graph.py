@@ -54,10 +54,16 @@ DYNAMIC & STANDALONE IMAGE GENERATION:
   * Deliver the complete, highly-detailed photographic/commercial prompt directly to the user so they can paste it into Midjourney, DALL-E, or Flux.
   * The prompt must describe the full visual scene: subject & materials, spatial placement, studio lighting, color palette, camera angle, and exact on-image typography. Do not give a brief 4-line summary or metadata bullet points.
 
-REFERENCE-IMAGE FLOW:
+REFERENCE-IMAGE ADAPTATION & COLOR OVERRIDES:
 - When a reference analysis is supplied in context or system grounding, treat its observed facts (palette, typography, composition, lighting) as active style evidence.
 - If the user asks about the reference image (e.g. "@images.jpg اشرحهالي", "ايه تفاصيل الصورة"), explain the observed visual characteristics, colors, layout, and composition clearly.
-- When generating an image or copy based on a reference, adapt the observed style while incorporating the user's brand identity.
+- When generating an image or prompt based on a reference:
+  * Adapt the observed layout, composition, object placement, and scene structure.
+  * When the user asks to change colors, adapt colors to brand colors, or use their brand palette (e.g. "غير الالوان لالوان البراند بتاعي", "استخدم الوان هويتي", "بدل الالوان"):
+    - You MUST REPLACE the reference background color and palette with the user's brand identity colors!
+    - NEVER retain or write the old reference background color (e.g. if the reference had a solid green background and the user asks for their brand colors, NEVER write "الخلفية بلون أخضر صلب").
+    - Explicitly write the new background color and scene accents using the brand's primary/secondary colors in the visual prompt passed to `generate_image_draft_tool`.
+  * Replace the brand/product name on packaging and typography verbatim as requested (e.g. replace "إقليد" with "بن العسقلاني").
 - Do not claim pixel-perfect reproduction. A prompt can guide a generator toward a close adaptation, but the generated result may differ.
 
 
