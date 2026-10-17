@@ -125,25 +125,50 @@ def _attachment_messages(context: dict[str, Any], handle: Any) -> list[Any]:
 
 
 _PROMPT_ONLY_PATTERN = re.compile(
-    r"(?i)(?:\bprompt\s+only\b|\bwrite\s+(?:me\s+)?a\s+prompt\b|"
-    r"\bimage\s+prompt\b|\bvideo\s+prompt\b|اكتب\s+(?:لي\s+)?(?:برومبت|prompt)|"
-    r"برومبت\s+فقط|صياغة\s+البرومبت)"
+    r"(?i)(?:\bprompt\s+only\b|\bwrite\s+(?:me\s+)?(?:a\s+)?prompt\b|\bgive\s+(?:me\s+)?(?:the\s+)?prompt\b|"
+    r"\bimage\s+prompt\b|\bvideo\s+prompt\b|"
+    r"اكتب\s*(?:لي|لى)?\s*(?:ال)?بروم[بپ]ت|اديني\s*(?:ال)?بروم[بپ]ت|اعطيني\s*(?:ال)?بروم[بپ]ت|"
+    r"هات\s*(?:لي|لى)?\s*(?:ال)?بروم[بپ]ت|طلع\s*(?:لي|لى)?\s*(?:ال)?بروم[بپ]ت|"
+    r"بروم[بپ]ت\s*(?:بس|فقط)|صياغة\s+(?:ال)?بروم[بپ]ت)"
+)
+
+_NEGATIVE_GENERATION_PATTERN = re.compile(
+    r"(?i)(?:"
+    r"لا\s+تولّ?د[يى]?|لا\s+تنشئ[يى]?|لا\s+تصمم[يى]?|لا\s+تعمل[يى]?|"
+    r"بدون\s+توليد|دون\s+توليد|بدون\s+صورة|دون\s+صورة|بدون\s+وسائط|دون\s+وسائط|"
+    r"مش\s+عايز[ةه]?\s+صورة|مش\s+محتاج[ةه]?\s+صورة|"
+    r"وانا\s+(?:اللي\s+)?(?:هعمل|هصمم|هطلع|هولد)(?:ها)?|"
+    r"وانا\s+هعمل\s+الصورة|وانا\s+هسوي\s+الصورة|"
+    r"بروم[بپ]ت\s+(?:بس|فقط)|صياغة\s+البروم[بپ]ت\s+(?:بس|فقط)|"
+    r"do\s*n['o]t\s+generate|no\s+generation|no\s+media|prompt\s+only|just\s+(?:the\s+)?prompt|"
+    r"i\s+will\s+generate|i\s*will\s+make\s+it\s+myself"
+    r")"
 )
 
 
 def _requests_image_generation(prompt: str, context: dict[str, Any] | None = None) -> bool:
+    low = (prompt or "").lower()
+    if _NEGATIVE_GENERATION_PATTERN.search(low):
+        return False
+    if any(p in low for p in ("how do i", "how to", "ازاي", "كيف")):
+        return False
+    # If the user asks for prompt only without an explicit secondary media creation command:
+    if _PROMPT_ONLY_PATTERN.search(low) and not any(
+        pos in low
+        for pos in (
+            "اعملي الصورة", "اعمل الصورة", "ولد الصورة", "ولدي الصورة",
+            "generate the image", "create the image", "render the image",
+        )
+    ):
+        return False
+
     if context and (
         context.get("creative_mode") == "design"
         or context.get("allow_image_generation") is True
     ):
         return True
-    low = (prompt or "").lower()
     if "/image_draft" in low or "image_draft" in low:
         return True
-    if _PROMPT_ONLY_PATTERN.search(low):
-        return False
-    if any(p in low for p in ("how do i", "how to", "ازاي", "كيف")):
-        return False
 
     english_action_verbs = ("generate", "create", "make", "render", "draw", "design", "produce", "build")
     english_image_nouns = ("image", "photo", "picture", "visual", "poster", "banner", "artwork", "draft", "creative")
@@ -955,9 +980,29 @@ def _is_explicit_prompt_approval(message: str) -> bool:
     )
 
 
+def _is_prompt_direct_demand(message: str) -> bool:
+    """Detect when the user explicitly demands the final prompt directly."""
+    normalized = re.sub(r"[.!؟?،,;؛\s]+", " ", message.strip().casefold()).strip()
+    patterns = (
+        r"اديني\s*(?:ال)?بروم[بپ]ت",
+        r"اكتب\s*(?:لي|لى)?\s*(?:ال)?بروم[بپ]ت",
+        r"هات\s*(?:لي|لى)?\s*(?:ال)?بروم[بپ]ت",
+        r"اعطيني\s*(?:ال)?بروم[بپ]ت",
+        r"طلع\s*(?:لي|لى)?\s*(?:ال)?بروم[بپ]ت",
+        r"بروم[بپ]ت\s*(?:بس|فقط)",
+        r"مش\s+مهم\s+.*بروم[بپ]ت",
+        r"خد\s+كل\s+.*(?:عايزه|محتاجه|هنا)",
+        r"give\s+(?:me\s+)?(?:the\s+)?prompt",
+        r"write\s+(?:me\s+)?(?:the\s+)?prompt",
+        r"just\s+(?:give\s+me\s+)?(?:the\s+)?prompt",
+        r"prompt\s+now",
+    )
+    return any(re.search(p, normalized) for p in patterns)
+
+
 def _is_prompt_no_more_details(message: str) -> bool:
     """Recognize that the user has no more brief details and wants a proposed plan."""
-    normalized = re.sub(r"[.!؟?،,\s]+", " ", message.strip().casefold()).strip()
+    normalized = re.sub(r"[.!؟?،,;؛\s]+", " ", message.strip().casefold()).strip()
     phrases = (
         "that's all", "that is all", "that's all i have", "that is all i have",
         "i sent all that", "i already sent all that", "i sent everything", "i already sent everything",
@@ -967,8 +1012,23 @@ def _is_prompt_no_more_details(message: str) -> bool:
         "قلتلك كل التفاصيل", "ده كل اللي عندي", "دي كل التفاصيل", "ده كل اللي هبعته",
         "مفيش تفاصيل تانية", "مافيش تفاصيل تانية", "مش عندي تفاصيل تانية",
         "مش عندي حاجة تانية", "مافيش حاجة تانية", "خلاص ده كل شيء", "خلاص دي كل حاجة",
+        "خد كل اللي عايزه", "خد كل اللي محتاجه", "خد اللي عايزه", "خد اللي محتاجه",
+        "مش مهم", "مش فارقة", "مش فارق", "كفاية كده", "كافي",
     )
-    return normalized in phrases
+    if normalized in phrases:
+        return True
+    patterns = (
+        r"خد\s+(?:كل\s+)?(?:اللي\s+)?(?:عايزه|محتاجه|هنا)",
+        r"مش\s+مهم\s+(?:التفاصيل|المنصة|الباقي)?",
+        r"مش\s+فارق[ةه]?",
+        r"اقترح[يى]?\s+(?:انت|انتي|من\s+عندك)",
+        r"من\s+عندك",
+        r"no\s+more\s+details",
+        r"use\s+defaults",
+        r"take\s+what\s+you\s+need",
+        r"doesn'?t\s+matter",
+    )
+    return any(re.search(p, normalized) for p in patterns)
 
 
 def _is_prompt_revision_request(message: str) -> bool:
@@ -1813,6 +1873,11 @@ def _prepare_creative_prompt_turn(
             # A reminder is not approval; keep the pending plan and avoid restarting
             # the interview with another optional-details checklist.
             prepared["creative_prompt_use_defaults"] = True
+    elif stage == "collecting_details" and _is_prompt_direct_demand(message):
+        # The user demanded the prompt directly (e.g. "اديني البرومبت", "اكتبلي البرومبت", "خد كل اللي عايزه");
+        # bypass further interview loops and generate the prompt immediately using inferred defaults.
+        stage = "approved"
+        prepared["creative_prompt_use_defaults"] = True
     elif stage == "collecting_details" and _is_prompt_no_more_details(message):
         # The user is not approving a plan here; they are asking Layla to proceed
         # with clearly labeled, non-factual suggestions for optional choices.
@@ -2324,6 +2389,11 @@ def _creative_prompt_blocks(
     parts = [
         f"## {'البرومبت النهائي' if arabic else 'Final'} — {'صورة' if arabic and kind == 'image' else 'فيديو' if arabic else kind.title()}\n\n{prompt_text}"
     ]
+    if details:
+        parts.append(
+            f"### {'تفاصيل المشهد البصري والمواصفات' if arabic else 'Visual Scene Specifications'}\n"
+            + "\n".join(f"- {item}" for item in details)
+        )
     negative = str(_creative_value(output, "negative_prompt", "") or "").strip()
     if negative:
         parts.append(f"### {'Negative prompt / ما يجب تجنبه' if arabic else 'Negative prompt'}\n{negative}")

@@ -151,7 +151,15 @@ async def generate_image_draft_tool(
                 reason="The configured image provider is not supported by this Layla adapter.",
             )
     except Exception as exc:  # noqa: BLE001 - never include provider URLs or secrets in the tool result.
-        return _result("unavailable", reason=f"Image generation failed ({type(exc).__name__}).")
+        detail = ""
+        if hasattr(exc, "response") and getattr(exc.response, "text", None):
+            try:
+                err_data = exc.response.json()
+                msg = err_data.get("error", {}).get("message") or exc.response.text[:200]
+                detail = f": {msg}"
+            except Exception:
+                detail = f": {exc.response.text[:200]}"
+        return _result("unavailable", reason=f"Image generation failed ({type(exc).__name__}{detail}).")
 
     if asset is not None:
         db = configurable.get("tool_db")

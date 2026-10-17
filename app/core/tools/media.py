@@ -419,11 +419,23 @@ async def _generate_openai_image(
     final asset. Image-edit models that return base64 are persisted separately by
     the local asset store below.
     """
-    size = {"1:1": "1024x1024", "4:5": "1024x1280", "9:16": "1024x1792", "16:9": "1792x1024"}.get(
-        aspect_ratio, "1024x1024"
-    )
     endpoint = "/images/edits" if reference_image else "/images/generations"
     url = (base_url or "https://api.openai.com/v1").rstrip("/") + endpoint
+    is_real_openai = "api.openai.com" in url
+    model_lower = str(model).lower()
+
+    if is_real_openai and "gpt-image" in model_lower:
+        size = {"1:1": "1024x1024", "4:5": "1024x1536", "9:16": "1024x1536", "16:9": "1536x1024"}.get(
+            aspect_ratio, "1024x1024"
+        )
+    elif is_real_openai and "dall-e-3" in model_lower:
+        size = {"1:1": "1024x1024", "4:5": "1024x1792", "9:16": "1024x1792", "16:9": "1792x1024"}.get(
+            aspect_ratio, "1024x1024"
+        )
+    else:
+        size = {"1:1": "1024x1024", "4:5": "1024x1280", "9:16": "1024x1792", "16:9": "1792x1024"}.get(
+            aspect_ratio, "1024x1024"
+        )
     headers = {"authorization": f"Bearer {api_key}"}
     async with httpx.AsyncClient(timeout=120.0, trust_env=False) as client:
         if reference_image:
@@ -441,7 +453,20 @@ async def _generate_openai_image(
                 headers=headers,
                 json={"model": model, "prompt": prompt, "size": size, "n": 1},
             )
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            _logger.error(
+                "openai_image_call_failed",
+                extra={
+                    "status_code": resp.status_code,
+                    "error_text": resp.text[:1000],
+                    "model": model,
+                    "size": size,
+                    "endpoint": endpoint,
+                },
+            )
+            raise
         data = resp.json().get("data", [])
     assets: list[GeneratedAssetRecord] = []
     for item in data if isinstance(data, list) else []:

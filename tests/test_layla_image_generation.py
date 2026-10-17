@@ -389,3 +389,37 @@ def test_reference_analysis_message_grounding():
     assert "product_hero.jpg" in en_msg
     assert "Warm morning sunlight" in en_msg
 
+
+def test_prompt_demand_and_negative_generation_guards():
+    # Negative directives must NOT trigger generation even in design mode
+    assert not brain._requests_image_generation(
+        "ليلى، أريد إعداد برومبت قوي لتوليد صورة. لا تولّدي أي وسائط.",
+        context={"creative_mode": "design"},
+    )
+    assert not brain._requests_image_generation(
+        "اكتبلي البرومبت وانا هعمل الصورة",
+        context={"creative_mode": "design"},
+    )
+    assert not brain._requests_image_generation(
+        "مش مهم اديني البرومبت",
+        context={"creative_mode": "design"},
+    )
+    assert not brain._requests_image_generation(
+        "برومبت فقط للصورة",
+        context={"creative_mode": "design"},
+    )
+
+    # Positive command with explicit media request DOES trigger generation
+    assert brain._requests_image_generation(
+        "اكتبلي البروميت كامله و اعملي الصورة",
+        context={"creative_mode": "prompt"},
+    )
+
+    # _is_prompt_direct_demand tests
+    assert brain._is_prompt_direct_demand("مش مهم اديني البرومبت")
+    assert brain._is_prompt_direct_demand("اكتبلي البرومبت وانا هعمل الصورة")
+    assert brain._is_prompt_direct_demand("خد كل الي عايزه من هنا")
+    assert brain._is_prompt_direct_demand("اديني البرومبت")
+    assert brain._is_prompt_direct_demand("just give me the prompt")
+
+
