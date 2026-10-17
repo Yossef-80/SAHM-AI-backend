@@ -127,7 +127,7 @@ async def test_analysis_sends_resized_copy_to_vlm_without_mutating_source(
     with Image.open(BytesIO(base64.b64decode(original))) as source:
         assert (source.width, source.height) == (1080, 1350)
     assert handle.runnable is not None
-    data_url = handle.runnable.messages[1].content[1]["image_url"]
+    data_url = handle.runnable.messages[1].content[1]["image_url"]["url"]
     sent_image = data_url.partition(",")[2]
     with Image.open(BytesIO(base64.b64decode(sent_image))) as resized:
         assert resized.width * resized.height <= settings.ads_vlm_max_pixels
@@ -151,7 +151,9 @@ async def test_layla_reference_analysis_attaches_actual_image_bytes(monkeypatch:
     assert "focus on the product" in system
     assert human.content[1] == {
         "type": "image_url",
-        "image_url": "data:image/png;base64,aGVsbG8=",
+        "image_url": {
+            "url": "data:image/png;base64,aGVsbG8=",
+        },
     }
 
 

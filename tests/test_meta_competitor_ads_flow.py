@@ -247,7 +247,7 @@ async def test_selected_ad_sends_only_the_chosen_image_to_the_vlm(monkeypatch, t
     parts = captured[0].content
     image_parts = [part for part in parts if part.get("type") == "image_url"]
     assert len(image_parts) == 1
-    assert base64.b64encode(selected_bytes).decode("ascii") in image_parts[0]["image_url"]
+    assert base64.b64encode(selected_bytes).decode("ascii") in str(image_parts[0]["image_url"])
     assert base64.b64encode(other_bytes).decode("ascii") not in str(parts)
     assert any(block.type == "ad_style_analysis" for block in result.blocks)
     assert "ما التغييرات التي تريدها" in result.blocks[-1].text

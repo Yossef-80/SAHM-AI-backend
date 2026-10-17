@@ -120,7 +120,7 @@ def _attachment_messages(context: dict[str, Any], handle: Any) -> list[Any]:
         data_url = str(item.get("data_url") or "")
         if not data_url.startswith("data:image/"):
             continue
-        blocks.append({"type": "image_url", "image_url": data_url})
+        blocks.append({"type": "image_url", "image_url": {"url": data_url}})
     return [HumanMessage(content=blocks)]
 
 

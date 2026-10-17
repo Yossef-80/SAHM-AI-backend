@@ -202,7 +202,9 @@ async def analyze_reference_image(
                 {"type": "text", "text": "Return the structured style analysis for the attached image."},
                 {
                     "type": "image_url",
-                    "image_url": f"data:{vision_mime};base64,{vision_image_b64}",
+                    "image_url": {
+                        "url": f"data:{vision_mime};base64,{vision_image_b64}",
+                    },
                 },
             ]
         ),

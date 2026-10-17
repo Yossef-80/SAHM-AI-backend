@@ -477,7 +477,9 @@ def _analysis_prompt(
             parts.append(
                 {
                     "type": "image_url",
-                    "image_url": f"data:{image.mime_type};base64,{image.base64_data}",
+                    "image_url": {
+                        "url": f"data:{image.mime_type};base64,{image.base64_data}",
+                    },
                 }
             )
     return parts
@@ -1073,7 +1075,9 @@ async def analyze_selected_competitor_ad(
                         {"type": "text", "text": instruction},
                         {
                             "type": "image_url",
-                            "image_url": f"data:{mime_type};base64,{image_data}",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_data}",
+                            },
                         },
                     ]
                 )
