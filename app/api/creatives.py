@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi import APIRouter, File, Form, Query, UploadFile, status
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -173,6 +173,20 @@ async def update_creative_reference(
         favorite=bool(metadata.get("favorite", False)),
         created_at=row.created_at,
     )
+
+
+@router.delete("/references/{reference_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_creative_reference(
+    reference_id: str,
+    ws: WorkspaceDep,
+    db: SessionDep,
+) -> None:
+    """Delete a saved reference-image analysis."""
+    row = await db.get(BrandMemoryItem, reference_id)
+    if row is None or row.business_id != ws.business_id or row.kind != "reference_analysis":
+        raise NotFoundError("creative reference not found")
+    await db.delete(row)
+    await db.commit()
 
 
 @router.post("/generate", response_model=GenerateCreativeResponse)
@@ -384,6 +398,7 @@ async def list_creatives(
 
 __all__ = [
     "analyze_reference",
+    "delete_creative_reference",
     "generate_creative",
     "generate_layla_text",
     "list_creative_references",

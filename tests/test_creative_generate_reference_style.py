@@ -145,3 +145,31 @@ async def test_style_spec_from_the_body_reaches_the_generated_asset(
     # them off the asset record used to be a 500 on this (success) path.
     assert asset["status"] == "ok"
     assert asset["source"] == "generate_image:mock"
+
+
+@pytest.mark.asyncio
+async def test_delete_creative_reference_success(api_client: object, seeded_db: AsyncSession) -> None:
+    await _seed_reference(seeded_db, reference_id="mem_delete_target", business_id="biz_test")
+    # Verify it exists
+    resp_list = await api_client.get("/api/v1/creatives/references", headers=HEADERS)  # type: ignore[attr-defined]
+    assert resp_list.status_code == 200
+    assert any(r["id"] == "mem_delete_target" for r in resp_list.json())
+
+    # Delete it
+    resp_del = await api_client.delete("/api/v1/creatives/references/mem_delete_target", headers=HEADERS)  # type: ignore[attr-defined]
+    assert resp_del.status_code == 204
+
+    # Verify it's gone
+    resp_after = await api_client.get("/api/v1/creatives/references", headers=HEADERS)  # type: ignore[attr-defined]
+    assert resp_after.status_code == 200
+    assert not any(r["id"] == "mem_delete_target" for r in resp_after.json())
+
+
+@pytest.mark.asyncio
+async def test_delete_creative_reference_cross_workspace_isolated(
+    api_client: object, seeded_db: AsyncSession
+) -> None:
+    await _seed_reference(seeded_db, reference_id="mem_foreign_ref", business_id="biz_foreign")
+    # Tenancy invariant: accessing or deleting another workspace's resource returns 404
+    resp = await api_client.delete("/api/v1/creatives/references/mem_foreign_ref", headers=HEADERS)  # type: ignore[attr-defined]
+    assert resp.status_code == 404

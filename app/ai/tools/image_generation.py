@@ -149,6 +149,35 @@ async def generate_image_draft_tool(
     except Exception as exc:  # noqa: BLE001 - never include provider URLs or secrets in the tool result.
         return _result("unavailable", reason=f"Image generation failed ({type(exc).__name__}).")
 
+    if asset is not None:
+        db = configurable.get("tool_db")
+        biz_id = configurable.get("business_id")
+        campaign_id = configurable.get("campaign_id")
+        if db is not None and biz_id:
+            try:
+                import uuid
+                from app.db.models import Creative
+
+                creative = Creative(
+                    id=f"cr_{uuid.uuid4().hex[:16]}",
+                    business_id=biz_id,
+                    campaign_id=campaign_id or None,
+                    persona_id="layla",
+                    task_name="generate_image_draft",
+                    kind="image",
+                    url=asset.url,
+                    prompt=getattr(asset, "prompt", None) or effective_prompt,
+                    aspect_ratio=getattr(asset, "aspect_ratio", None) or aspect_ratio,
+                    provider=getattr(asset, "provider", None) or provider,
+                    model=getattr(asset, "model", None) or model,
+                    style_spec=style or None,
+                    status="ok",
+                )
+                db.add(creative)
+                await db.flush()
+            except Exception:  # noqa: BLE001
+                pass
+
     return _result("ok", asset=asset)
 
 
