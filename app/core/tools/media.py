@@ -511,8 +511,9 @@ def _persist_generated_data_url(data_url: str, cfg: Any) -> str:
 
     base = str(cfg.public_asset_base_url or "").strip()
     parsed = urlparse(base)
+    is_local = (parsed.hostname or "").lower() in ("localhost", "127.0.0.1")
     if (
-        not validate_creative_image_url(base)
+        (not validate_creative_image_url(base) and not is_local)
         or parsed.path not in ("", "/")
         or parsed.query
         or parsed.fragment

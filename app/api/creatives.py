@@ -396,8 +396,23 @@ async def list_creatives(
     ]
 
 
+@router.delete("/{creative_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_creative(
+    creative_id: str,
+    ws: WorkspaceDep,
+    db: SessionDep,
+) -> None:
+    """Delete a creative created by this workspace."""
+    creative = await db.get(Creative, creative_id)
+    if creative is None or creative.business_id != ws.business_id:
+        raise NotFoundError(f"creative {creative_id} not found")
+    await db.delete(creative)
+    await db.commit()
+
+
 __all__ = [
     "analyze_reference",
+    "delete_creative",
     "delete_creative_reference",
     "generate_creative",
     "generate_layla_text",

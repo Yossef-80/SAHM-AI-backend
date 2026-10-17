@@ -387,6 +387,12 @@ def validate_creative_image_url(value: str) -> bool:
         return False
     if _DATA_IMAGE_URL.fullmatch(text) is not None:
         return True
+    try:
+        parsed = urlparse(text)
+        if (parsed.hostname or "").lower() in ("localhost", "127.0.0.1"):
+            return True
+    except (TypeError, ValueError):
+        pass
     return _is_public_https_url(text)
 
 
