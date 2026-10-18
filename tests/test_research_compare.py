@@ -157,3 +157,26 @@ class TestResearchItemMessage:
         assert _research_item_message({"research_item_context": {"report": "   "}}) is None
         assert _research_item_message({}) is None
         assert _research_item_message({"research_item_context": "not a dict"}) is None
+
+
+class TestSearchNormalization:
+    @pytest.mark.asyncio
+    async def test_normalizes_pydantic_search_results(self):
+        from app.ai.providers.search.base import SearchResult
+        from app.api.research_compare import _search
+
+        class FakeProvider:
+            def search(self, query: str, max_results: int = 5):
+                return [
+                    SearchResult(title="Acme Coffee", url="https://acme.com", snippet="Best beans in Cairo"),
+                    {"title": "Dict Coffee", "url": "https://dict.com", "snippet": "Dict snippet"},
+                ]
+
+        hits = await _search(FakeProvider(), "Acme Coffee")
+        assert len(hits) == 2
+        assert isinstance(hits[0], dict)
+        assert hits[0]["title"] == "Acme Coffee"
+        assert hits[0]["url"] == "https://acme.com"
+        assert isinstance(hits[1], dict)
+        assert hits[1]["title"] == "Dict Coffee"
+

@@ -23,6 +23,7 @@ from app.core.chat_attachments import store_chat_attachment
 from app.core.errors import NotFoundError, ValidationFailed
 from app.core.logging import get_logger
 from app.core.orchestrator.service import (
+    delete_conversation,
     get_conversation,
     handle_message,
     list_conversations,
@@ -229,6 +230,15 @@ async def get_conversation_detail(
     return await get_conversation(db, conversation_id, business_id=ws.business_id)
 
 
+@router.delete("/conversations/{conversation_id}", status_code=204)
+async def delete_conversation_endpoint(
+    conversation_id: str, ws: WorkspaceDep, db: SessionDep
+) -> Response:
+    """Delete one conversation. Foreign ids return 404."""
+    await delete_conversation(db, conversation_id, business_id=ws.business_id)
+    return Response(status_code=204)
+
+
 @router.get("/ad-previews/{preview_id}")
 async def get_ad_preview(
     preview_id: str,
@@ -256,9 +266,11 @@ async def get_ad_preview(
 
 
 __all__ = [
+    "delete_conversation_endpoint",
     "get_ad_preview",
     "get_conversation_detail",
     "get_conversations",
     "post_message",
     "post_message_stream",
 ]
+

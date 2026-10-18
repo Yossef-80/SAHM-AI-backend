@@ -340,6 +340,21 @@ async def get_conversation(
     )
 
 
+async def delete_conversation(
+    db: AsyncSession, conversation_id: str, *, business_id: str
+) -> None:
+    """Delete one conversation. Tenancy checked: another workspace's id is 404."""
+    stmt = select(Conversation).where(
+        Conversation.id == conversation_id,
+        Conversation.business_id == business_id,
+    )
+    conversation = await db.scalar(stmt)
+    if conversation is None:
+        raise NotFoundError(f"conversation '{conversation_id}' not found")
+    await db.delete(conversation)
+    await db.commit()
+
+
 async def _persist_message(
     db: AsyncSession,
     *,
@@ -1094,6 +1109,7 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 __all__ = [
     "cancel_task",
     "create_task",
+    "delete_conversation",
     "get_conversation",
     "get_task",
     "handle_message",

@@ -134,3 +134,33 @@ async def test_an_approved_plan_is_not_reopened_on_the_next_turn(
     )
     assert next_stage == "prompt_ready", next_stage
     assert "البرومبت النهائي" in blocks[0].text
+
+
+@pytest.mark.asyncio
+async def test_delete_conversation_endpoint(api_client, monkeypatch) -> None:
+    from app.ai.agents.orchestrator import brain
+
+    async def fake_orchestrate(*_args, **kwargs):
+        return _layla_result("awaiting_approval")
+
+    monkeypatch.setattr(brain, "orchestrate", fake_orchestrate)
+
+    res = await api_client.post(
+        "/api/v1/assistant/message",
+        json={"message": "محادثة للتجربة"},
+    )
+    assert res.status_code == 200
+    conv_id = res.json()["conversationId"]
+
+    # Read conversation detail -> 200
+    get_res = await api_client.get(f"/api/v1/assistant/conversations/{conv_id}")
+    assert get_res.status_code == 200
+
+    # Delete conversation -> 204
+    del_res = await api_client.delete(f"/api/v1/assistant/conversations/{conv_id}")
+    assert del_res.status_code == 204
+
+    # Subsequent read -> 404
+    get_after = await api_client.get(f"/api/v1/assistant/conversations/{conv_id}")
+    assert get_after.status_code == 404
+

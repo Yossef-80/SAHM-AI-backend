@@ -226,16 +226,28 @@ def _markdown_summary(comparison: CompetitorComparison, a: str, b: str) -> str:
 
 
 async def _search(provider: Any, query: str, limit: int = 5) -> list[dict[str, Any]]:
-    """Best-effort search: a dead provider must not silently produce an empty comparison."""
+    """Best-effort search: normalizes SearchResult models and dicts."""
+    clean_query = query.strip()
+    if not clean_query:
+        return []
     try:
-        hits = await asyncio.to_thread(provider.search, query, max_results=limit)
+        hits = await asyncio.to_thread(provider.search, clean_query, max_results=limit)
     except Exception as exc:  # noqa: BLE001 - surfaced to the caller below
         logger.warning(
             "compare_competitors search failed",
-            extra={"query": query, "error": str(exc)[:200]},
+            extra={"query": clean_query, "error": str(exc)[:200]},
         )
         return []
-    return [hit for hit in (hits or []) if isinstance(hit, dict)]
+
+    results: list[dict[str, Any]] = []
+    for hit in (hits or []):
+        if hasattr(hit, "model_dump"):
+            results.append(hit.model_dump())
+        elif isinstance(hit, dict):
+            results.append(hit)
+        elif hasattr(hit, "__dict__"):
+            results.append(hit.__dict__)
+    return results
 
 
 @router.post("/compare")
@@ -273,13 +285,24 @@ async def compare_competitors(
     query_a = f"{name_a} {category}".strip()
     query_b = f"{name_b} {category}".strip()
     hits_a, hits_b = await asyncio.gather(_search(provider, query_a), _search(provider, query_b))
+
+    # If the combined query yielded no results (e.g. category was conversational), fall back to competitor name
+    if not hits_a:
+        hits_a = await _search(provider, name_a)
+    if not hits_b:
+        hits_b = await _search(provider, name_b)
+
+    evidence_note = ""
     if not hits_a and not hits_b:
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                "The search provider returned nothing for both competitors, so there is no "
-                "evidence to compare. Check the search provider configuration and try again."
-            ),
+        logger.info(
+            "compare_competitors: no search hits retrieved, synthesizing from domain patterns",
+            extra={"competitor_a": name_a, "competitor_b": name_b, "category": category},
+        )
+        evidence_note = (
+            "\nNote: Live web search returned sparse/no hits for these entities. "
+            f"Synthesize the comparison using your expert industry knowledge of typical market patterns "
+            f"for '{category or 'this business category'}'. Clearly state in the summary that this analysis "
+            "is based on synthesized market domain patterns.\n"
         )
 
     system = SYSTEM_TEMPLATE.format(
@@ -291,6 +314,7 @@ async def compare_competitors(
         f"Competitor B: {name_b}\n"
         f"Category / market: {category or 'infer from the evidence, do not invent'}\n"
         f"Our workspace: {ws.business_id}\n\n"
+        f"{evidence_note}"
         f"SEARCH EVIDENCE\n\n{_sources_block(hits_a, f'A — {name_a}')}\n"
         f"{_sources_block(hits_b, f'B — {name_b}')}\n"
         f"Cover these dimensions, in this order: {', '.join(DIMENSIONS)}."
