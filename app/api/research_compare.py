@@ -61,7 +61,7 @@ EFFORT = ("low", "medium", "high")
 class CompareRequest(BaseModel):
     competitor_a: str = Field(min_length=1, max_length=120)
     competitor_b: str = Field(min_length=1, max_length=120)
-    category: str | None = Field(default=None, max_length=160)
+    category: str | None = Field(default=None, max_length=500)
     language: str | None = None
 
 
@@ -113,41 +113,58 @@ DIMENSIONS = (
     "funnel_entry_points",
 )
 
-SYSTEM_TEMPLATE = """You are a competitive-intelligence analyst for a marketing platform.
+SYSTEM_TEMPLATE = """You are an elite competitive-intelligence analyst and senior market researcher.
 
-Compare two real competitors on the SAME fixed dimensions, using ONLY the search
-evidence provided. Rules:
+Compare two real competitors on the SAME fixed dimensions, using the search evidence provided as well as verified industry realities.
 
-1. Ground every statement in the evidence. Put the observations you used in
-   `evidence` as short factual phrases (you may name the source domain).
-2. If the evidence does not cover a dimension, say so in that dimension's text
-   ("no data in the retrieved sources") instead of inventing a plausible answer.
-   Never invent prices, follower counts, revenue, or campaign names.
-3. `verdict` is one of: a_leads (competitor A is stronger), b_leads, parity.
-4. A **gap** is where one competitor does something the other does not, and it
-   matters commercially. `who_has_it` names the side that has it; use "neither"
-   when the gap is an unmet market need neither addresses.
-5. An **opportunity** is an actionable move for OUR brand — not a restatement of
-   a gap. Give it effort and impact, and one concrete first step.
-6. `recommended_focus` is 2-3 items, ranked, each a single sentence.
-7. Answer in {language_name}. Keep field names in English.
+CRITICAL RULES FOR ACCURACY, ZERO-HALLUCINATION & HYPERLINKS:
 
-Return ONE JSON object and nothing else. No markdown fences, no commentary.
+1. ABSOLUTE TRUTHFULNESS & ZERO HALLUCINATION (ممنوع الهبد أو التأليف إطلاقاً):
+   - Never invent or fabricate prices, follower counts, financial numbers, store locations, or product lines.
+   - If a specific detail (e.g. secret manufacturing material, private price list, exact branch count) is NOT found in the verified search evidence or publicly known facts, state honestly:
+     "غير متوفر في المصادر العامة المتاحة" (or "Not publicly disclosed in available sources").
+   - Honesty and verified facts are strictly required over plausible-sounding guesses.
+
+2. THOROUGH, HIGH-EFFORT COMPARISON:
+   - If the user provides specific focus areas or questions in the prompt (e.g. pricing, materials/craftsmanship, branches, customer service), you MUST address every single requested point thoroughly in the corresponding dimensions.
+   - If no specific areas are given, conduct an exhaustive, rigorous competitive analysis covering:
+     * Specific pricing tiers and real price ranges (with local currency e.g. EGP / SAR) from the evidence.
+     * Quality, materials, craftsmanship, and build/finishing standards.
+     * Physical retail presence (branches, store experience, key locations).
+     * Digital footprint, online shop, delivery speed, and customer service responsiveness.
+     * Customer satisfaction, sentiment, reviews, and reputation.
+
+3. CLICKABLE SOURCE HYPERLINKS (روابط المصادر الحية):
+   - In every `evidence` item, cite the real source URL from the search evidence formatted as a markdown hyperlink: `[Source Title or Domain](URL)`.
+   - Never create fictional or placeholder URLs; cite only authentic URLs provided in the SEARCH EVIDENCE block.
+
+4. FIXED DIMENSIONS & VERDICTS:
+   - `verdict` MUST be exactly one of: "a_leads" (Competitor A is superior), "b_leads" (Competitor B is superior), or "parity" (tied or balanced).
+   - In each dimension, provide concrete, distinct analysis for competitor A and competitor B.
+
+5. GAPS & OPPORTUNITIES:
+   - A **gap** is where one competitor does something the other does not, and it matters commercially. `who_has_it` names who has it ("a", "b", "both", "neither"). Include evidence with source hyperlinks.
+   - An **opportunity** is an actionable move for OUR brand to exploit. Give it realistic `effort` and `impact` ("low" | "medium" | "high"), and a concrete, immediate `first_step`.
+   - `recommended_focus` is 2-3 ranked, strategic, punchy recommendations (each 1-2 sentences).
+
+6. LANGUAGE:
+   - Answer in {language_name}. Keep JSON keys strictly in English as defined in the schema.
+   - Output ONE strict JSON object and nothing else. No markdown fences, no explanatory commentary.
 
 Schema:
 {{
-  "summary": "one paragraph, plain language",
+  "summary": "Detailed executive summary comparing both competitors, highlighting key advantages and market standing.",
   "dimensions": [
-    {{"dimension": "{dimensions}", "competitor_a": "...", "competitor_b": "...",
-      "verdict": "a_leads|b_leads|parity", "evidence": ["...", "..."]}}
+    {{"dimension": "{dimensions}", "competitor_a": "Detailed analysis for A with specific evidence and links", "competitor_b": "Detailed analysis for B with specific evidence and links",
+      "verdict": "a_leads|b_leads|parity", "evidence": ["[Source Title](URL) - Observation 1", "[Source Title](URL) - Observation 2"]}}
   ],
   "gaps": [
     {{"title": "...", "why_it_matters": "...", "who_has_it": "a|b|both|neither",
-      "evidence": ["..."], "confidence": "high|medium|low"}}
+      "evidence": ["[Source Title](URL) - Observation"], "confidence": "high|medium|low"}}
   ],
   "opportunities": [
     {{"title": "...", "rationale": "...", "effort": "low|medium|high",
-      "impact": "low|medium|high", "first_step": "...", "evidence": ["..."]}}
+      "impact": "low|medium|high", "first_step": "...", "evidence": ["[Source Title](URL) - Observation"]}}
   ],
   "recommended_focus": ["...", "..."]
 }}
@@ -159,7 +176,7 @@ def _sources_block(hits: list[dict[str, Any]], label: str) -> str:
     if not hits:
         return f"### {label}\n(no results retrieved)\n"
     lines = [f"### {label}"]
-    for index, hit in enumerate(hits[:6], start=1):
+    for index, hit in enumerate(hits[:12], start=1):
         title = str(hit.get("title") or "").strip() or "(untitled)"
         url = str(hit.get("url") or hit.get("link") or "").strip()
         snippet = str(hit.get("snippet") or hit.get("content") or "").strip()
@@ -167,8 +184,47 @@ def _sources_block(hits: list[dict[str, Any]], label: str) -> str:
         if url:
             lines.append(f"   URL: {url}")
         if snippet:
-            lines.append(f"   {snippet[:600]}")
+            lines.append(f"   {snippet[:800]}")
     return "\n".join(lines) + "\n"
+
+
+def _clean_keywords(text: str) -> str:
+    """Extract substantive keywords from conversational category/notes."""
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+    stopwords = {
+        "قارنلي", "قارن", "بينهم", "بين", "في", "من", "على", "عن", "مع", "هو", "هي", "كل", "حاجة",
+        "عايز", "عاوز", "اريد", "أريد", "اعمل", "لو", "سمحت", "بالله", "عليك", "ممكن",
+        "السوق", "المصري", "مصر", "بتاعتهم", "بتاعهم",
+        "compare", "between", "versus", "vs", "in", "for", "and", "the", "please",
+        "market", "tell", "show", "me", "what", "are", "their", "is",
+    }
+    words = re.findall(r"[\w\u0600-\u06FF]+", raw)
+    filtered = [w for w in words if w.casefold() not in stopwords and len(w) > 1]
+    return " ".join(filtered[:8])
+
+
+def _dedupe_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicate web hits by normalized URL or title."""
+    seen_urls: set[str] = set()
+    seen_titles: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for hit in hits:
+        url = str(hit.get("url") or hit.get("link") or "").strip().rstrip("/").casefold()
+        title = str(hit.get("title") or "").strip().casefold()
+        if url:
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+        elif title:
+            if title in seen_titles:
+                continue
+            seen_titles.add(title)
+        else:
+            continue
+        deduped.append(hit)
+    return deduped
 
 
 def _strip_json(raw: str) -> str:
@@ -193,7 +249,13 @@ def _invoke(llm: Any, system: str, user: str) -> str:
     return str(content or "")
 
 
-def _markdown_summary(comparison: CompetitorComparison, a: str, b: str) -> str:
+def _markdown_summary(
+    comparison: CompetitorComparison,
+    a: str,
+    b: str,
+    sources_a: list[dict[str, Any]] | None = None,
+    sources_b: list[dict[str, Any]] | None = None,
+) -> str:
     """A compact markdown rendering, so the existing report panel stays useful."""
     lines = [f"## {a} vs {b}", "", comparison.summary.strip(), ""]
     if comparison.dimensions:
@@ -207,16 +269,43 @@ def _markdown_summary(comparison: CompetitorComparison, a: str, b: str) -> str:
     if comparison.gaps:
         lines.extend(["### Gaps", ""])
         for gap in comparison.gaps:
-            lines.append(f"- **{gap.title}** ({gap.who_has_it}, {gap.confidence} confidence) — {gap.why_it_matters}")
+            evidence_str = ""
+            if gap.evidence:
+                evidence_str = " · " + "; ".join(gap.evidence[:2])
+            lines.append(f"- **{gap.title}** ({gap.who_has_it}, {gap.confidence} confidence) — {gap.why_it_matters}{evidence_str}")
         lines.append("")
     if comparison.opportunities:
         lines.extend(["### Opportunities", ""])
         for opp in comparison.opportunities:
-            lines.append(f"- **{opp.title}** — impact {opp.impact} / effort {opp.effort}. {opp.first_step}")
+            evidence_str = ""
+            if opp.evidence:
+                evidence_str = " · " + "; ".join(opp.evidence[:2])
+            lines.append(f"- **{opp.title}** — impact {opp.impact} / effort {opp.effort}. {opp.first_step}{evidence_str}")
         lines.append("")
     if comparison.recommended_focus:
         lines.extend(["### Recommended focus", ""])
         lines.extend(f"{i}. {item}" for i, item in enumerate(comparison.recommended_focus, start=1))
+        lines.append("")
+
+    all_sources_a = [s for s in (sources_a or []) if str(s.get("url") or s.get("link") or "").strip()]
+    all_sources_b = [s for s in (sources_b or []) if str(s.get("url") or s.get("link") or "").strip()]
+    if all_sources_a or all_sources_b:
+        lines.extend(["### Verified Sources & Evidence", ""])
+        if all_sources_a:
+            lines.append(f"#### {a}")
+            for s in all_sources_a[:6]:
+                title = str(s.get("title") or s.get("url") or s.get("link")).strip()
+                url = str(s.get("url") or s.get("link")).strip()
+                lines.append(f"- [{title}]({url})")
+            lines.append("")
+        if all_sources_b:
+            lines.append(f"#### {b}")
+            for s in all_sources_b[:6]:
+                title = str(s.get("title") or s.get("url") or s.get("link")).strip()
+                url = str(s.get("url") or s.get("link")).strip()
+                lines.append(f"- [{title}]({url})")
+            lines.append("")
+
     return "\n".join(lines).strip()
 
 
@@ -248,6 +337,47 @@ async def _search(provider: Any, query: str, limit: int = 5) -> list[dict[str, A
         elif hasattr(hit, "__dict__"):
             results.append(hit.__dict__)
     return results
+
+
+async def _gather_deep_competitor_evidence(
+    provider: Any,
+    name: str,
+    category: str,
+    is_ar: bool,
+) -> list[dict[str, Any]]:
+    """Gather rich multi-angle search evidence for a competitor."""
+    clean_cat = _clean_keywords(category)
+
+    queries: list[str] = []
+    if is_ar:
+        queries.append(f"{name} مصر")
+        queries.append(f"{name} أسعار منتجات عروض")
+        queries.append(f"{name} فروع عناوين")
+        queries.append(f"{name} خامات جودة تقييمات ريفيوهات")
+        if clean_cat:
+            queries.append(f"{name} {clean_cat}")
+    else:
+        queries.append(f"{name}")
+        queries.append(f"{name} products prices offers")
+        queries.append(f"{name} stores branches locations")
+        queries.append(f"{name} quality reviews customer experience")
+        if clean_cat:
+            queries.append(f"{name} {clean_cat}")
+
+    search_tasks = [_search(provider, q, limit=4) for q in queries]
+    results_lists = await asyncio.gather(*search_tasks, return_exceptions=True)
+
+    all_hits: list[dict[str, Any]] = []
+    for res in results_lists:
+        if isinstance(res, list):
+            all_hits.extend(res)
+
+    deduped = _dedupe_hits(all_hits)
+
+    if not deduped:
+        deduped = await _search(provider, name, limit=6)
+
+    return deduped[:12]
 
 
 @router.post("/compare")
@@ -282,15 +412,11 @@ async def compare_competitors(
     provider = get_search_provider(ai_settings.search_provider)
     llm = get_llm(provider=ai_settings.llm_provider).chat
 
-    query_a = f"{name_a} {category}".strip()
-    query_b = f"{name_b} {category}".strip()
-    hits_a, hits_b = await asyncio.gather(_search(provider, query_a), _search(provider, query_b))
-
-    # If the combined query yielded no results (e.g. category was conversational), fall back to competitor name
-    if not hits_a:
-        hits_a = await _search(provider, name_a)
-    if not hits_b:
-        hits_b = await _search(provider, name_b)
+    # Deep parallel multi-query search for both competitors
+    hits_a, hits_b = await asyncio.gather(
+        _gather_deep_competitor_evidence(provider, name_a, category, is_ar),
+        _gather_deep_competitor_evidence(provider, name_b, category, is_ar),
+    )
 
     evidence_note = ""
     if not hits_a and not hits_b:
@@ -302,7 +428,20 @@ async def compare_competitors(
             "\nNote: Live web search returned sparse/no hits for these entities. "
             f"Synthesize the comparison using your expert industry knowledge of typical market patterns "
             f"for '{category or 'this business category'}'. Clearly state in the summary that this analysis "
-            "is based on synthesized market domain patterns.\n"
+            "is based on synthesized market domain patterns. Strictly adhere to zero-hallucination: if numbers or specific private facts are unknown, state 'غير متوفر في المصادر العامة المتاحة'.\n"
+        )
+
+    user_focus_note = ""
+    if category:
+        user_focus_note = (
+            f"\nUSER SPECIFIC REQUIREMENTS & FOCUS:\n"
+            f"The user specifically asked to compare and inspect: '{category}'.\n"
+            f"You MUST prioritize and thoroughly address every aspect of this request (e.g. prices, materials/finishing, branches/stores, customer experience) across the relevant dimensions.\n"
+        )
+    else:
+        user_focus_note = (
+            "\nEXHAUSTIVE COMPETITIVE AUDIT:\n"
+            "The user did not specify custom focus areas. Provide an exhaustive, deeply analytical comparison covering real pricing & offers, materials/quality & finishing, branch network & stores, and customer reputation.\n"
         )
 
     system = SYSTEM_TEMPLATE.format(
@@ -314,10 +453,13 @@ async def compare_competitors(
         f"Competitor B: {name_b}\n"
         f"Category / market: {category or 'infer from the evidence, do not invent'}\n"
         f"Our workspace: {ws.business_id}\n\n"
+        f"{user_focus_note}\n"
         f"{evidence_note}"
-        f"SEARCH EVIDENCE\n\n{_sources_block(hits_a, f'A — {name_a}')}\n"
+        f"SEARCH EVIDENCE (Use these real URLs for markdown hyperlinks in evidence):\n\n"
+        f"{_sources_block(hits_a, f'A — {name_a}')}\n"
         f"{_sources_block(hits_b, f'B — {name_b}')}\n"
-        f"Cover these dimensions, in this order: {', '.join(DIMENSIONS)}."
+        f"Cover these dimensions, in this order: {', '.join(DIMENSIONS)}.\n"
+        f"Remember: Zero hallucination. If a claim is not in the evidence, state 'غير متوفر في المصادر العامة المتاحة' instead of guessing."
     )
 
     raw = ""
@@ -354,21 +496,23 @@ async def compare_competitors(
 
     sources = [
         {
-            "title": str(hit.get("title") or "").strip(),
+            "title": str(hit.get("title") or "").strip() or str(hit.get("url") or hit.get("link") or "").strip(),
             "url": str(hit.get("url") or hit.get("link") or "").strip(),
             "side": "a",
         }
-        for hit in hits_a[:6]
+        for hit in hits_a
+        if str(hit.get("url") or hit.get("link") or "").strip()
     ] + [
         {
-            "title": str(hit.get("title") or "").strip(),
+            "title": str(hit.get("title") or "").strip() or str(hit.get("url") or hit.get("link") or "").strip(),
             "url": str(hit.get("url") or hit.get("link") or "").strip(),
             "side": "b",
         }
-        for hit in hits_b[:6]
+        for hit in hits_b
+        if str(hit.get("url") or hit.get("link") or "").strip()
     ]
 
-    summary_text = _markdown_summary(comparison, name_a, name_b)
+    summary_text = _markdown_summary(comparison, name_a, name_b, sources_a=hits_a, sources_b=hits_b)
     now = datetime.now(timezone.utc)
     memory_id = f"mem_{uuid.uuid4().hex[:12]}"
     title = f"مقارنة: {name_a} مقابل {name_b}" if is_ar else f"{name_a} vs {name_b}"

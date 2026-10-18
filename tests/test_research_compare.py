@@ -17,6 +17,8 @@ from pydantic import ValidationError
 from app.api.research_compare import (
     DIMENSIONS,
     CompetitorComparison,
+    _clean_keywords,
+    _dedupe_hits,
     _markdown_summary,
     _sources_block,
     _strip_json,
@@ -114,6 +116,15 @@ class TestRendering:
         assert "Acme leads" in text
         assert "a_leads" not in text
 
+    def test_markdown_includes_sources_when_provided(self):
+        comparison = CompetitorComparison.model_validate(VALID)
+        sources_a = [{"title": "Acme Store", "url": "https://acme.com/store"}]
+        sources_b = [{"title": "Bolt Shoes", "url": "https://bolt.com/shop"}]
+        text = _markdown_summary(comparison, "Acme", "Bolt", sources_a=sources_a, sources_b=sources_b)
+        assert "### Verified Sources & Evidence" in text
+        assert "[Acme Store](https://acme.com/store)" in text
+        assert "[Bolt Shoes](https://bolt.com/shop)" in text
+
     def test_sources_block_lists_urls_and_handles_empty(self):
         block = _sources_block(
             [{"title": "Home", "url": "https://a.com", "snippet": "shoes"}], "A — Acme"
@@ -126,6 +137,36 @@ class TestRendering:
         assert len(DIMENSIONS) == 8
         assert "positioning" in DIMENSIONS
         assert "funnel_entry_points" in DIMENSIONS
+
+
+class TestSearchHelpers:
+    def test_clean_keywords_filters_arabic_and_english_stopwords(self):
+        arabic_raw = "السوق المصري قارنلي الاسعار و الخامات و التقفيل و الاستور في مصر"
+        cleaned = _clean_keywords(arabic_raw)
+        assert "الاسعار" in cleaned
+        assert "الخامات" in cleaned
+        assert "قارنلي" not in cleaned
+        assert "السوق" not in cleaned
+
+        english_raw = "compare between the prices and store locations please"
+        cleaned_en = _clean_keywords(english_raw)
+        assert "prices" in cleaned_en
+        assert "locations" in cleaned_en
+        assert "compare" not in cleaned_en
+
+    def test_dedupe_hits_removes_duplicate_urls_and_titles(self):
+        hits = [
+            {"title": "Page 1", "url": "https://example.com/item/"},
+            {"title": "Page 1 duplicate", "url": "https://example.com/item"},
+            {"title": "Page 2", "url": "https://example.com/item2"},
+            {"title": "Unique Title", "url": ""},
+            {"title": "Unique Title", "url": ""},
+        ]
+        deduped = _dedupe_hits(hits)
+        assert len(deduped) == 3
+        assert deduped[0]["url"] == "https://example.com/item/"
+        assert deduped[1]["url"] == "https://example.com/item2"
+        assert deduped[2]["title"] == "Unique Title"
 
 
 class TestResearchItemMessage:
